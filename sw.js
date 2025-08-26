@@ -1,4 +1,4 @@
-const CACHE_NAME = "pagebud-cache-v1";
+const CACHE_NAME = "pagebud-cache-v15";
 
 // Install: pre-cache important files if you want (optional)
 self.addEventListener("install", (event) => {
