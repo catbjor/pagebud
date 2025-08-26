@@ -6,7 +6,7 @@
   <title>PageBud • Stats</title>
 
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet"/>
-  <link href="style.css?v=1.0.3" rel="stylesheet"/>
+  <link href="style.css?v=2025-08-26-1" rel="stylesheet"/>
   <link rel="manifest" href="manifest.json">
 
   <!-- iOS PWA polish -->
@@ -20,7 +20,7 @@
 <body>
   <div class="app-container">
     <div class="stats-page">
-      <div class="stats-header">
+      <div class="stats-header header">
         <h1>Statistics</h1>
         <a class="back-button" href="index.html" aria-label="Back"><i class="fas fa-arrow-left"></i></a>
       </div>
@@ -79,7 +79,7 @@
           <div class="stat-row"><span>Favorites (≥6★)</span><span id="favorite-books">0</span></div>
         </div>
 
-        <!-- Charts -->
+        <!-- Charts (lazy-init on open) -->
         <details class="stats-card">
           <summary>Genres</summary>
           <div class="card-body"><canvas id="chartGenres"></canvas></div>
@@ -97,53 +97,29 @@
         <div class="stats-card">
           <h3 style="margin-bottom:6px">Export</h3>
           <div class="btn-group">
-            <button class="btn btn-secondary" type="button" onclick="exportBooksCSV && exportBooksCSV()">Export CSV</button>
-            <button class="btn btn-primary"   type="button" onclick="exportBooksJSON && exportBooksJSON()">Export JSON</button>
+            <button class="btn btn-secondary" type="button" onclick="exportBooksCSV()">Export CSV</button>
+            <button class="btn btn-primary"   type="button" onclick="exportBooksJSON()">Export JSON</button>
           </div>
         </div>
 
-        <!-- Maintenance / Force update -->
+        <!-- Maintenance -->
         <div class="stats-card">
-          <h3 style="margin-bottom:6px">Maintenance</h3>
-          <div class="btn-group">
-            <button class="btn btn-secondary" type="button" onclick="window.forceUpdateNow && window.forceUpdateNow()">
-              Force update (reload app)
-            </button>
-          </div>
-          <p class="muted" style="margin-top:6px;color:#6b6b6b">
-            Henter ny service worker og reloader appen.
-          </p>
+          <h3>Maintenance</h3>
+          <button class="btn btn-secondary" type="button" onclick="window.forceUpdateNow()">
+            Force update (reload app)
+          </button>
+          <div class="muted">Fetches new service worker and reloads.</div>
         </div>
       </section>
     </div>
 
     <nav class="bottom-nav">
-      <div class="nav-item" onclick="location.href='index.html'">
-        <i class="fas fa-book"></i> Library
-      </div>
-      <div class="nav-item active" onclick="location.href='stats.html'">
-        <i class="fas fa-chart-line"></i> Stats
-      </div>
-      <div class="nav-item" onclick="location.href='buddy-read.html'">
-        <i class="fas fa-users"></i> Buddy Read
-      </div>
+      <div class="nav-item" onclick="location.href='index.html'"><i class="fas fa-book"></i> Library</div>
+      <div class="nav-item active" onclick="location.href='stats.html'"><i class="fas fa-chart-line"></i> Stats</div>
+      <div class="nav-item" onclick="location.href='buddy-read.html'"><i class="fas fa-users"></i> Buddy Read</div>
     </nav>
   </div>
 
-  <!-- Hovedscript (må komme etter markup) -->
-  <script src="script.js?v=1.0.3"></script>
-
-  <!-- Ditt eksisterende stats.js-innhold kan ligge her (beregninger/grafer) -->
-  <!-- (Hvis du vil at jeg limer inn hele din gamle stats-logikk, si ifra) -->
-
-  <!-- Bottom-nav aktiv marker -->
-  <script>
-    (function(){
-      const map = { '':0,'index.html':0,'add-book.html':0,'edit-page.html':0,'stats.html':1,'buddy-read.html':2 };
-      const file = location.pathname.split('/').pop();
-      const idx = map[file] ?? 0;
-      document.querySelectorAll('.bottom-nav .nav-item').forEach((el,i)=>el.classList.toggle('active', i===idx));
-    })();
-  </script>
+  <script src="script.js?v=2025-08-26-1"></script>
 </body>
 </html>

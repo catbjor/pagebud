@@ -7,21 +7,10 @@
 
   <!-- Icons + Styles -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
-  <link rel="stylesheet" href="style.css"/>
+  <link rel="stylesheet" href="style.css?v=2025-08-26-1"/>
   <link rel="manifest" href="manifest.json">
-  <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="style.css?v=1.0.3">
 
-  <!-- PWA SW -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js', { scope: './' });
-      });
-    }
-  </script>
-
-  <!-- iOS install polish -->
+  <!-- iOS PWA polish -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -37,11 +26,11 @@
 
     <!-- Search -->
     <div class="categories" style="border-top:1px solid var(--border); padding-top:12px;">
-      <input id="search-input" class="form-control" placeholder="Search by title or author…" style="width:100%; padding:10px 14px; border-radius:12px; border:1px solid var(--border); background:var(--card);"/>
+      <input id="search-input" class="form-control" placeholder="Search by title or author…"/>
     </div>
 
-    <!-- Category chips -->
-    <div class="categories">
+    <!-- Category chips (horizontal scroll) -->
+    <div class="categories scroll-x" id="filter-chips">
       <div class="category active" data-filter="all">All Books</div>
       <div class="category" data-filter="reading">Reading</div>
       <div class="category" data-filter="finished">Finished</div>
@@ -66,13 +55,13 @@
     </section>
 
     <!-- FAB -->
-    <div id="add-book-btn" class="add-book" title="Add Book">
+    <button id="add-book-btn" class="add-book" title="Add Book" aria-label="Add Book">
       <i class="fas fa-plus"></i>
-    </div>
+    </button>
 
     <!-- Bottom Nav -->
     <nav class="bottom-nav">
-      <div class="nav-item" onclick="location.href='index.html'">
+      <div class="nav-item active" onclick="location.href='index.html'">
         <i class="fas fa-book"></i> Library
       </div>
       <div class="nav-item" onclick="location.href='stats.html'">
@@ -84,27 +73,6 @@
     </nav>
   </div>
 
-  <script src="script.js?v=1.0.3"></script>
-
-  <!-- Bottom-nav auto-active -->
-  <script>
-  (function(){
-    var path = location.pathname;
-    var file = path.substring(path.lastIndexOf('/') + 1) || 'index.html';
-    var map = {
-      'index.html': 0,
-      'add-book.html': 0,
-      'edit-page.html': 0,
-      'stats.html': 1,
-      'buddy-read.html': 2
-    };
-    var idx = (file in map) ? map[file] : 0;
-    var items = document.querySelectorAll('.bottom-nav .nav-item');
-    for (var i=0;i<items.length;i++){
-      if (i === idx) items[i].classList.add('active');
-      else items[i].classList.remove('active');
-    }
-  })();
-  </script>
+  <script src="script.js?v=2025-08-26-1"></script>
 </body>
 </html>

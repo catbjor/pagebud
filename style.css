@@ -1,49 +1,185 @@
-/* === Responsiv bredde: mobil -> iPad === */
+/* ===========================================================
+   PageBud – global styles (mobile-first)
+   =========================================================== */
+:root{
+  --bg:#EFF7F6;
+  --text:#1c1c1c;
+  --card:#fff;
+  --border:#e6e6e6;
+  --primary:#6C63FF;
+  --btn:#1c1c1c;
+  --btn-text:#F7D6E0;
+  --radius:16px;
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
 body{
-  max-width: 420px;
+  margin:0;
+  color:var(--text);
+  background:var(--bg);
+  font-family:system-ui,-apple-system,"Segoe UI",Inter,Roboto,Arial,sans-serif;
+  max-width:420px;           /* phone default */
   margin-inline:auto;
 }
-@media (min-width:480px){
-  body{ max-width:520px; }
-}
-@media (min-width:768px){
-  body{ max-width:720px; }
+@media (min-width:600px){
+  body{ max-width:560px; }   /* nicer on iPad mini/air */
 }
 
-/* === Kategori-chips: horisontal scroll (pills side-om-side) === */
-.categories{
-  display:flex;
-  gap:8px;
-  padding:12px 16px;
-  overflow-x:auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
+/* Container keeps space for the bottom nav */
+.app-container{
+  min-height:100vh;
+  position:relative;
+  padding-bottom:var(--pb-bottompad,88px);
 }
+
+/* ---------------- Header + Back button ---------------- */
+.header{
+  position:sticky; top:0; z-index:1000;
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  padding:16px; background:var(--card); border-bottom:1px solid var(--border);
+  box-shadow:0 2px 10px rgba(0,0,0,.04);
+}
+.header h1{margin:0; font-size:1.6rem; font-weight:900; letter-spacing:-.02em}
+.back-button{
+  width:40px; height:40px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--bg); color:inherit; text-decoration:none; cursor:pointer;
+}
+
+/* ---------------- Bottom nav ---------------- */
+.bottom-nav{
+  position:fixed; left:0; right:0; bottom:0;
+  max-width:inherit; margin:0 auto;
+  display:flex; background:var(--card);
+  border-top:1px solid var(--border);
+  box-shadow:0 -2px 10px rgba(0,0,0,.05);
+  z-index:900;
+}
+.nav-item{
+  flex:1; text-align:center; padding:12px; cursor:pointer;
+  color:#6b6b6b; font-size:.9rem; user-select:none;
+}
+.nav-item i{display:block; font-size:1.25rem; margin-bottom:4px}
+.nav-item.active{ color:#1c1c1c; font-weight:700 }
+
+/* ---------------- Search + categories ---------------- */
+.categories{ display:flex; gap:8px; flex-wrap:wrap; padding:12px 16px }
+.form-control{
+  width:100%; padding:10px 14px; border-radius:12px;
+  border:1px solid var(--border); background:var(--card);
+}
+.scroll-x{
+  display:flex; gap:8px; padding:12px 16px;
+  overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none;
+}
+.scroll-x::-webkit-scrollbar{ display:none; }
 .category{
   flex:0 0 auto;
-  padding:8px 12px;
-  border-radius:999px;
+  padding:10px 16px; border-radius:999px; background:var(--card);
+  border:1px solid var(--border); cursor:pointer; font-weight:700; font-size:.95rem;
+}
+.category.active{ background:#111; color:#fff; border-color:#111 }
+
+/* ---------------- Library: grid ---------------- */
+.library{ padding:0 16px 16px }
+.library h2{ margin:8px 0 12px; }
+.empty-state{ text-align:center; padding:40px 20px; color:#5a6463 }
+.empty-icon{ font-size:3rem; margin-bottom:12px; opacity:.5 }
+
+.book-grid{
+  display:grid; grid-template-columns:repeat(2,1fr); gap:12px;
+}
+.book-card{
   background:var(--card);
   border:1px solid var(--border);
-  font-weight:600;
-  font-size:.9rem;
-  white-space:nowrap;
-  scroll-snap-align:start;
+  border-radius:12px; overflow:hidden;
+  box-shadow:0 1px 4px rgba(0,0,0,.04); cursor:pointer;
 }
-.categories::-webkit-scrollbar{ height:6px }
-.categories::-webkit-scrollbar-thumb{ background:rgba(0,0,0,.15); border-radius:999px }
+.book-cover{
+  width:100%; aspect-ratio:3/4; background:#e9efee;
+  display:flex; align-items:center; justify-content:center; color:#9aa5a4
+}
+.book-info{ padding:10px 10px 12px }
+.book-title{ font-weight:700; font-size:.98rem; line-height:1.25 }
+.book-author{ color:#6b6b6b; font-size:.85rem; margin-top:2px }
+.book-rating{ margin-top:6px; font-size:.95rem }
 
-/* === FAB: alltid klikkbar over nav === */
+/* ---------------- Buttons ---------------- */
+.btn{
+  padding:12px 16px; border-radius:12px;
+  border:1px solid var(--border); background:var(--bg);
+  font-weight:700; cursor:pointer;
+}
+.btn-primary{ background:var(--btn); color:var(--btn-text); border-color:var(--btn) }
+.btn-secondary{ background:var(--bg); color:var(--text) }
+.muted{ color:#6b6b6b; font-size:.9rem }
+
+/* Floating add button (FAB) */
 .add-book{
-  position:fixed;
-  right:16px;
-  bottom: calc(var(--pb-bottompad, 72px) + 12px) !important;
-  z-index: 1100 !important;
-  pointer-events: auto !important;
+  position:fixed; right:16px; bottom:84px; z-index:950;
+  width:56px; height:56px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  background:#111; color:#fff; box-shadow:0 6px 18px rgba(0,0,0,.2); cursor:pointer;
+  border:0;
 }
+.add-book i{ font-size:1.4rem }
 
-/* hold nav nedenfor */
-.bottom-nav{ z-index:1000; }
+/* ---------------- Forms / chips ---------------- */
+.form-group{ padding:0 16px 12px }
+.form-group label{ display:block; font-weight:700; margin:6px 0 }
+.form-group input, .form-group select, .form-group textarea{
+  width:100%; padding:12px; border:1px solid var(--border); border-radius:12px; background:#fff;
+}
+.chip-toggle{ margin:8px 16px; background:#fff; border:1px solid var(--border); border-radius:12px; }
+.chip-toggle > summary{ padding:12px 14px; font-weight:800; cursor:pointer; list-style:none }
+.chip-scroll{ padding:0 14px 14px }
+.toggle-option{
+  padding:10px 14px; border-radius:12px; border:1px solid var(--border);
+  background:var(--card); cursor:pointer; font-weight:600; display:block; margin:6px 0;
+}
+.toggle-option.selected{ background:#111; color:#fff; border-color:#111 }
 
-/* Back-knappen alltid klikkbar */
-.back-button{ pointer-events:auto; z-index:1001; }
+.star-container{ display:inline-flex; font-size:1.1rem; margin-right:4px; cursor:pointer }
+.star-container.special{ margin-left:6px }
+@keyframes pb-pulse{0%{transform:scale(1)}50%{transform:scale(1.15)}100%{transform:scale(1)}}
+
+/* Quotes */
+.quotes-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px }
+.quote-item{ background:#fff; border:1px solid var(--border); border-radius:10px; overflow:hidden }
+.quote-text{ padding:10px; font-weight:600 }
+.quote-image{ width:100%; display:block }
+.quote-actions{ display:flex; justify-content:flex-end; padding:8px }
+.quote-action{ font-weight:700; cursor:pointer }
+
+/* ---------------- Reader overlay ---------------- */
+.reader-overlay{ position:fixed; inset:0; display:none; flex-direction:column;
+  background:#111; color:#eee; z-index:9999; }
+.reader-overlay.show{ display:flex; }
+.reader-top{ height:44px; display:flex; align-items:center; justify-content:space-between;
+  padding:0 10px; background:#000; color:#fff; }
+.reader-top .group{ display:flex; gap:8px; align-items:center; }
+.reader-top button{ background:#111; color:#fff; border:none; padding:6px 9px; border-radius:8px; cursor:pointer; }
+.reader-title{ font-weight:600; font-size:14px; opacity:.9; }
+.reader-body{ position:relative; flex:1; background:#111; overflow:hidden; }
+#pdfWrap, #epubWrap{ position:absolute; inset:0; width:100%; height:100%; }
+#pdfCanvas{ display:block; margin:0 auto; background:transparent; }
+#tapLeft, #tapRight{ position:absolute; top:0; bottom:0; width:33%; }
+#tapLeft{ left:0; } #tapRight{ right:0; }
+.reader-bottom{ height:44px; display:flex; align-items:center; gap:10px; padding:0 10px; background:#000; color:#fff; }
+#rSlider{ flex:1; } #rCount{ font-size:12px; opacity:.8; min-width:70px; text-align:right; }
+
+/* ---------------- Cards (buddy-read) ---------------- */
+.card{ background:#fff; border-radius:16px; padding:12px 16px; box-shadow:0 1px 2px rgba(0,0,0,.06); border:1px solid var(--border); margin:12px 16px }
+.progress-bar{ height:8px; background:#e9e9e9; border-radius:999px; overflow:hidden }
+.progress-fill{ height:100%; width:0%; background:#6C63FF; transition:width .25s ease }
+
+/* ---------------- Stats scoped additions ---------------- */
+.stats-page canvas, .stats-page svg, .stats-page .chart-surface{ pointer-events:none !important; z-index:1; }
+.seg{ display:flex; background:#fff; border-radius:12px; overflow:hidden; box-shadow:0 1px 2px rgba(0,0,0,.06); }
+.seg button{ border:0; background:transparent; padding:8px 12px; font-weight:600; cursor:pointer; }
+.seg button.active{ background:#111; color:#fff; }
+.pickers{ display:flex; gap:8px; align-items:center; padding:0 16px }
+
+/* Update prompt (built by JS, these are fallback styles) */
+.pb-update-banner{ position:fixed; left:50%; bottom:18px; transform:translateX(-50%); z-index:9999; }
