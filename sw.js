@@ -1,4 +1,5 @@
-const CACHE = 'pb-v1';
+// sw.js
+const CACHE = 'pb-v2'; // bump so the new cache is used
 const CORE = [
   './',
   'index.html',
@@ -9,9 +10,12 @@ const CORE = [
   'style.css',
   'script.js',
   'manifest.json',
-  'icons/icon-192.png',
-  'icons/icon-512.png'
+  'icons/192.png',   // <- fixed
+  'icons/512.png'    // <- fixed
 ];
+
+// (rest of your SW can stay exactly as you had it)
+
 
 // Install: pre-cache core shell
 self.addEventListener('install', (event) => {
