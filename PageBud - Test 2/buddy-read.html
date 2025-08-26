@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Buddy Read - PageBud</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.json">
+
+<!-- iOS install polish -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="theme-color" content="#111111">
+
+<!-- Important for safe areas on iPhone (home indicator) -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
+  <style>
+    :root { --radius:16px; }
+    body { max-width:400px; margin:0 auto; }
+    .app-container{ padding-bottom:80px; }
+    .header{ background:#fff; padding:16px; position:sticky; top:0; z-index:5; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e6e6e6; }
+    .header h1{ font-size:1.6rem; font-weight:900; }
+    .back-button{ width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:#EFF7F6; cursor:pointer; }
+
+    .main-content{ padding:20px; }
+    .card{ background:#fff; border-radius:var(--radius); padding:18px; border:1px solid #e6e6e6; box-shadow:0 1px 4px rgba(0,0,0,.04); }
+
+    .group-creation .form-group{ margin-bottom:12px; }
+    .form-group label{ display:block; font-weight:600; margin-bottom:6px; }
+    .form-group input,.form-group select{ width:100%; padding:12px; border:1px solid #e6e6e6; border-radius:12px; background:#EFF7F6; }
+    .btn{ width:100%; padding:14px; border:none; border-radius:12px; font-weight:700; cursor:pointer; }
+    .btn-primary{ background:#1c1c1c; color:#F7D6E0; }
+    .btn-secondary{ background:#EFF7F6; border:1px solid #e6e6e6; }
+
+    .groups-list{ display:flex; flex-direction:column; gap:12px; }
+    .group-card{ cursor:pointer; }
+    .group-header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+    .group-name{ font-weight:800; font-size:1.06rem; }
+    .group-book{ display:flex; gap:10px; align-items:center; margin:10px 0; }
+    .group-book-cover{ width:40px; height:60px; border-radius:8px; background:#EFF7F6; display:flex; align-items:center; justify-content:center; color:#6b6b6b; }
+    .group-book-title{ font-weight:700; }
+    .progress-bar{ height:6px; background:#e4efeD; border-radius:999px; overflow:hidden; }
+    .progress-fill{ height:100%; background:#6C63FF; width:0%; }
+
+    .group-detail{ display:none; }
+    .member-pill{ display:inline-flex; gap:8px; align-items:center; background:#EFF7F6; border-radius:999px; padding:6px 10px; margin:6px 6px 0 0; }
+    .member-avatar{ width:26px; height:26px; border-radius:50%; background:#6C63FF; color:#fff; font-weight:800; display:flex; align-items:center; justify-content:center; font-size:.8rem; }
+
+    .session-controls{ display:flex; gap:10px; margin-bottom:12px; }
+    .session-btn{ flex:1; border:1px solid #e6e6e6; background:#EFF7F6; border-radius:10px; padding:12px; display:flex; gap:8px; align-items:center; justify-content:center; }
+    .session-btn.active{ background:#6C63FF; color:#fff; border-color:#6C63FF; }
+
+    .chat-messages{ height:260px; overflow:auto; padding:10px; background:#EFF7F6; border-radius:12px; display:flex; flex-direction:column; gap:8px; }
+    .message{ max-width:80%; padding:12px; border-radius:12px; }
+    .message.in{ background:#fff; border:1px solid #e6e6e6; align-self:flex-start; }
+    .message.out{ background:#6C63FF; color:#fff; align-self:flex-end; }
+    .chat-input{ display:flex; gap:10px; margin-top:10px; }
+    .chat-input input{ flex:1; padding:12px; border:1px solid #e6e6e6; border-radius:20px; }
+    .send-btn{ width:45px; height:45px; border-radius:50%; background:#6C63FF; color:#fff; border:none; }
+
+    .bottom-nav{ position:fixed; bottom:0; left:0; right:0; max-width:400px; margin:0 auto; display:flex; background:#fff; border-top:1px solid #e6e6e6; }
+    .nav-item{ flex:1; text-align:center; padding:12px; color:#6b6b6b; }
+    .nav-item.active{ color:#1c1c1c; }
+    .nav-item i{ display:block; font-size:1.3rem; margin-bottom:4px; }
+    .row{ display:flex; gap:8px; }
+    .danger{ color:#b00020; background:#fff; border:1px solid #ffd5d9; }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <div class="header">
+      <h1>Buddy Read</h1>
+      <div class="back-button" onclick="goBack()"><i class="fas fa-arrow-left"></i></div>
+    </div>
+
+    <div class="main-content">
+      <!-- Create group -->
+      <div class="group-creation card">
+        <h2 style="margin-bottom:10px">Start a Buddy Read</h2>
+        <div class="form-group">
+          <label for="group-name">Group Name</label>
+          <input id="group-name" type="text" placeholder="Enter group name">
+        </div>
+        <div class="form-group">
+          <label for="group-book">Select Book</label>
+          <select id="group-book">
+            <option value="">Choose a book from your library</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="group-schedule">Reading Schedule (optional)</label>
+          <input id="group-schedule" type="text" placeholder="e.g., 20 pages per day">
+        </div>
+        <button class="btn btn-primary" id="create-btn">Create Group</button>
+      </div>
+
+      <!-- Groups list -->
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <h2 style="font-size:1.2rem">Your Reading Groups</h2>
+          <button class="btn btn-secondary" id="refresh-btn" style="width:auto;padding:8px 12px">Refresh</button>
+        </div>
+        <div class="groups-list" id="groups-list"></div>
+        <div id="empty-groups" style="text-align:center;color:#6b6b6b;display:none;padding:14px">
+          <div style="font-size:2rem;opacity:.4;margin-bottom:6px">📚</div>
+          No groups yet — create one above.
+        </div>
+      </div>
+
+      <!-- Group detail -->
+      <div class="group-detail" id="group-detail">
+        <div class="card" id="detail-card">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <h2 id="detail-name">Group</h2>
+            <div class="row" style="width:auto">
+              <button id="delete-group" class="btn danger" style="width:auto;padding:8px 12px"><i class="fa fa-trash"></i></button>
+              <button id="back-to-list" class="btn btn-secondary" style="width:auto;padding:8px 12px">Back</button>
+            </div>
+          </div>
+
+          <div id="detail-members" style="margin-top:8px"></div>
+
+          <div class="group-book" style="margin-top:12px">
+            <div class="group-book-cover"><i class="fas fa-book"></i></div>
+            <div>
+              <div class="group-book-title" id="detail-book-title"></div>
+              <div style="color:#6b6b6b" id="detail-book-author"></div>
+            </div>
+          </div>
+
+          <div style="margin-top:10px">
+            <div class="progress-bar"><div class="progress-fill" id="detail-progress"></div></div>
+            <div style="font-size:.85rem;color:#6b6b6b;margin-top:4px" id="detail-progress-text">Group progress: 0%</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 style="margin-bottom:8px">Reading Session</h3>
+          <div class="session-controls">
+            <div id="btnTogether" class="session-btn active"><i class="fas fa-book-open"></i> Read Together</div>
+            <div id="btnSync" class="session-btn"><i class="fas fa-user-friends"></i> Sync Reading</div>
+          </div>
+          <div style="font-size:.85rem;color:#6b6b6b;margin-bottom:8px">
+            <b>Read Together</b> = everyone reads at own pace (chat-enabled).  
+            <b>Sync Reading</b> = leader flips pages for everyone.
+          </div>
+          <button class="btn btn-primary" id="start-session"><i class="fas fa-play"></i> Start Reading Session</button>
+        </div>
+
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <h3>Group Chat</h3>
+            <span id="online-count" style="color:#6b6b6b">0 online</span>
+          </div>
+          <div class="chat-messages" id="chat-messages"></div>
+          <div class="chat-input">
+            <input id="chat-input" placeholder="Type a message…">
+            <button class="send-btn" id="send-btn"><i class="fas fa-paper-plane"></i></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bottom-nav">
+      <div class="nav-item active"><i class="fas fa-users"></i>Groups</div>
+      <div class="nav-item"><i class="fas fa-comments"></i>Chat</div>
+      <div class="nav-item"><i class="fas fa-sticky-note"></i>Notes</div>
+      <div class="nav-item"><i class="fas fa-chart-line"></i>Progress</div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+  <script>
+    const $ = (s, r=document)=>r.querySelector(s);
+    const LSget=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch{return d}};
+    const LSset=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}};
+
+    const KEY='pb:buddy-read:groups';
+
+    function libraryBooks(){
+      return (window.getAllBooks?window.getAllBooks():LSget('pb:books',[])).map(b=>({
+        id:b.id,title:b.title,author:b.author
+      }));
+    }
+
+    function loadGroups(){ return LSget(KEY, []); }
+    function saveGroups(arr){ LSset(KEY, arr); }
+
+    function renderSelect(){
+      const sel = $('#group-book'); sel.innerHTML = '<option value="">Choose a book from your library</option>';
+      libraryBooks().forEach(b=>{
+        const o=document.createElement('option');
+        o.value=b.id; o.textContent=`${b.title} — ${b.author}`;
+        sel.appendChild(o);
+      });
+    }
+
+    function renderGroups(){
+      const list = $('#groups-list'); const empty=$('#empty-groups');
+      list.innerHTML='';
+      const groups=loadGroups();
+      if (!groups.length){ empty.style.display='block'; return; }
+      empty.style.display='none';
+      groups.forEach(g=>{
+        const card=document.createElement('div'); card.className='group-card card';
+        const pct = Math.round(avgProgress(g.members||[]));
+        card.innerHTML = `
+          <div class="group-header">
+            <div class="group-name">${g.name}</div>
+            <div class="row" style="width:auto">
+              <div class="member-count" style="color:#6b6b6b">${(g.members||[]).length} members</div>
+              <button class="btn danger" style="width:auto;padding:6px 10px" data-del="${g.id}"><i class="fa fa-trash"></i></button>
+            </div>
+          </div>
+          <div class="group-book">
+            <div class="group-book-cover"><i class="fas fa-book"></i></div>
+            <div>
+              <div class="group-book-title">${g.book.title}</div>
+              <div style="color:#6b6b6b">${g.book.author||''}</div>
+            </div>
+          </div>
+          <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+          <div style="color:#6b6b6b;font-size:.85rem;margin-top:4px">Group progress: ${pct}%</div>
+        `;
+        card.addEventListener('click', (e)=>{
+          if (e.target.closest('[data-del]')) return; // clicking delete won’t open
+          openGroup(g.id);
+        });
+        list.appendChild(card);
+
+        // delete button
+        card.querySelector('[data-del]')?.addEventListener('click', (e)=>{
+          e.stopPropagation();
+          if (!confirm('Delete this group?')) return;
+          const arr=loadGroups().filter(x=>x.id!==g.id);
+          saveGroups(arr); renderGroups();
+        });
+      });
+    }
+
+    function avgProgress(members){
+      if (!members.length) return 0;
+      let sum=0, n=0;
+      members.forEach(m=>{ if (typeof m.progress==='number'){ sum+=m.progress; n++; } });
+      return n? (sum/n) : 0;
+    }
+
+    function createGroup(){
+      const name = $('#group-name').value.trim();
+      const bookId = $('#group-book').value;
+      if (!name || !bookId) return alert('Please enter a name and choose a book.');
+
+      const lib = libraryBooks();
+      const b = lib.find(x=>x.id===bookId);
+      const g = {
+        id: 'g'+Date.now(),
+        name,
+        book: { id:b.id, title:b.title, author:b.author },
+        members: [
+          { id:'me', name:'You', progress:0 },
+        ],
+        schedule: $('#group-schedule').value.trim() || null,
+        chat: []
+      };
+      const arr = loadGroups(); arr.unshift(g); saveGroups(arr);
+      $('#group-name').value=''; $('#group-book').value=''; $('#group-schedule').value='';
+      renderGroups();
+      openGroup(g.id);
+    }
+
+    function openGroup(id){
+      const g = loadGroups().find(x=>x.id===id); if (!g) return;
+      $('#group-detail').style.display='block';
+      $('#detail-name').textContent=g.name;
+      $('#detail-book-title').textContent=g.book.title;
+      $('#detail-book-author').textContent=g.book.author||'';
+      const pct = Math.round(avgProgress(g.members||[]));
+      $('#detail-progress').style.width=pct+'%';
+      $('#detail-progress-text').textContent=`Group progress: ${pct}%`;
+      const mWrap = $('#detail-members'); mWrap.innerHTML='';
+      (g.members||[]).forEach(m=>{
+        const pill=document.createElement('span');
+        pill.className='member-pill';
+        pill.innerHTML=`<span class="member-avatar">${(m.name||'?').slice(0,1).toUpperCase()}</span>${m.name||'Member'} · ${Math.round(m.progress||0)}%`;
+        mWrap.appendChild(pill);
+      });
+
+      $('#delete-group').onclick = ()=>{
+        if (!confirm('Delete this group?')) return;
+        saveGroups(loadGroups().filter(x=>x.id!==g.id));
+        $('#group-detail').style.display='none';
+        renderGroups();
+        window.scrollTo({top:0,behavior:'smooth'});
+      };
+      $('#back-to-list').onclick = ()=>{
+        $('#group-detail').style.display='none';
+        window.scrollTo({top:0,behavior:'smooth'});
+      };
+
+      // basic chat render
+      const cm = $('#chat-messages'); cm.innerHTML='';
+      (g.chat||[]).forEach(msg=>appendMsg(msg.text, msg.me));
+      $('#online-count').textContent = `${(g.members||[]).length} online`;
+
+      $('#send-btn').onclick = ()=>{
+        const t = $('#chat-input').value.trim(); if (!t) return;
+        appendMsg(t, true);
+        $('#chat-input').value='';
+        // store
+        const all=loadGroups();
+        const gi=all.findIndex(x=>x.id===g.id);
+        if (gi>=0){ all[gi].chat = (all[gi].chat||[]); all[gi].chat.push({text:t, me:true, ts:Date.now()}); saveGroups(all); }
+      };
+
+      function appendMsg(text, me){
+        const d=document.createElement('div'); d.className='message '+(me?'out':'in');
+        d.textContent=text; cm.appendChild(d); cm.scrollTop=cm.scrollHeight;
+      }
+    }
+
+    function goBack(){ if ($('#group-detail').style.display==='block'){ $('#group-detail').style.display='none'; } else { location.href='index.html'; } }
+
+    document.addEventListener('DOMContentLoaded', ()=>{
+      // populate book select from library
+      renderSelect();
+      // render existing groups
+      renderGroups();
+
+      $('#refresh-btn').addEventListener('click', ()=>{ renderSelect(); renderGroups(); });
+      $('#create-btn').addEventListener('click', createGroup);
+
+      // toggle session type visual only
+      $('#btnTogether').addEventListener('click', ()=>{ $('#btnTogether').classList.add('active'); $('#btnSync').classList.remove('active'); });
+      $('#btnSync').addEventListener('click', ()=>{ $('#btnSync').classList.add('active'); $('#btnTogether').classList.remove('active'); });
+
+      $('#start-session').addEventListener('click', ()=>{
+        alert('Session started. (Demo)\nRead Together: chat & independent reading.\nSync Reading: host flips pages for all.');
+      });
+    });
+  </script>
+</body>
+</html>

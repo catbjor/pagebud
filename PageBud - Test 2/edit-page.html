@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Edit Book - PageBud</title>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <link rel="stylesheet" href="style.css"/>
+  <link rel="manifest" href="manifest.json">
+
+<!-- iOS install polish -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="theme-color" content="#111111">
+
+<!-- Important for safe areas on iPhone (home indicator) -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
+
+  <!-- Libraries for cover extraction + readers -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
+
+  <!-- Minimal overlay CSS (reader only; endrer ikke tema/layout ellers) -->
+  <style>
+    #epubWrap iframe { width:100% !important; height:100% !important; border:0; }
+    .reader-body { overflow:hidden; }
+    .app-container { padding-bottom: var(--pb-bottompad, 0px); }
+
+    .reader-overlay{ position:fixed; inset:0; display:none; flex-direction:column;
+      background:var(--reader-bg,#111); color:var(--reader-text,#eee); z-index:9999; }
+    .reader-overlay.show{ display:flex; }
+    .reader-top{ height:44px; display:flex; align-items:center; justify-content:space-between;
+      padding:0 10px; background:#000; color:#fff; }
+    .reader-top .group{ display:flex; gap:8px; align-items:center; }
+    .reader-top button{ background:#111; color:#fff; border:none; padding:6px 9px; border-radius:8px; cursor:pointer; }
+    .reader-title{ font-weight:600; font-size:14px; opacity:.9; }
+
+    .reader-body{ position:relative; flex:1; background:var(--reader-bg,#111); }
+    #pdfWrap, #epubWrap{ position:absolute; inset:0; width:100%; height:100%; }
+    #pdfCanvas{ display:block; margin:0 auto; background:transparent; }
+    #tapLeft, #tapRight{ position:absolute; top:0; bottom:0; width:33%; }
+    #tapLeft{ left:0; } #tapRight{ right:0; }
+
+    .reader-bottom{ height:44px; display:flex; align-items:center; gap:10px;
+      padding:0 10px; background:#000; color:#fff; }
+    #rSlider{ flex:1; }
+    #rCount{ font-size:12px; opacity:.8; min-width:70px; text-align:right; }
+
+    .star-container.special i{ opacity:.85; }
+    @keyframes pb-pulse{ 0%{transform:scale(1)} 50%{transform:scale(1.15)} 100%{transform:scale(1)} }
+    .star-container.pulse i{ animation:pb-pulse .18s ease; }
+  </style>
+</head>
+<body>
+  <div class="app-container edit-page">
+
+    <!-- Header -->
+    <div class="add-book-header">
+      <h1>Edit Book</h1>
+      <div class="back-button" onclick="window.location.href='index.html'">
+        <i class="fas fa-arrow-left"></i>
+      </div>
+    </div>
+
+    <!-- Cover -->
+    <div class="cover-upload">
+      <div id="cover" class="cover-image">
+        <i id="coverIcon" class="fas fa-book"></i>
+      </div>
+      <div id="pickCover" class="upload-btn">Upload Cover</div>
+      <input id="coverInput" type="file" accept="image/*" hidden />
+    </div>
+
+    <!-- Form -->
+    <div class="form-group">
+      <label for="title">Title</label>
+      <input id="title" type="text" placeholder="Book title…"/>
+    </div>
+
+    <div class="form-group">
+      <label for="author">Author</label>
+      <input id="author" type="text" placeholder="Author name…"/>
+    </div>
+
+    <div class="form-group">
+      <label for="status">Status</label>
+      <select id="status">
+        <option value="reading">Reading</option>
+        <option value="finished">Finished</option>
+        <option value="want">Want</option>
+        <option value="dnf">DNF</option>
+        <option value="owned">Owned</option>
+        <option value="wishlist">Wishlist</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Rating</label>
+      <div id="stars" class="star-rating">
+        <div class="star-container" data-v="1"><i class="far fa-star"></i></div>
+        <div class="star-container" data-v="2"><i class="far fa-star"></i></div>
+        <div class="star-container" data-v="3"><i class="far fa-star"></i></div>
+        <div class="star-container" data-v="4"><i class="far fa-star"></i></div>
+        <div class="star-container" data-v="5"><i class="far fa-star"></i></div>
+        <div class="star-container special" data-v="6"><i class="far fa-star"></i></div>
+      </div>
+      <div id="ratingVal" class="rating-value">Selected: 0</div>
+    </div>
+
+    <!-- Genres (collapsible) -->
+    <details class="chip-toggle" id="genresBox">
+      <summary>Genres</summary>
+      <div class="chip-scroll">
+        <div id="genres">
+          <div class="toggle-option" data-val="fantasy">Fantasy</div>
+          <div class="toggle-option" data-val="romance">Romance</div>
+          <div class="toggle-option" data-val="sci-fi">Sci-Fi</div>
+          <div class="toggle-option" data-val="mystery">Mystery</div>
+          <div class="toggle-option" data-val="thriller">Thriller</div>
+          <div class="toggle-option" data-val="horror">Horror</div>
+          <div class="toggle-option" data-val="contemporary">Contemporary</div>
+          <div class="toggle-option" data-val="historical">Historical</div>
+          <div class="toggle-option" data-val="nonfiction">Non-fiction</div>
+          <div class="toggle-option" data-val="biography">Biography</div>
+          <div class="toggle-option" data-val="memoir">Memoir</div>
+          <div class="toggle-option" data-val="self-help">Self-Help</div>
+          <div class="toggle-option" data-val="business">Business</div>
+          <div class="toggle-option" data-val="poetry">Poetry</div>
+          <div class="toggle-option" data-val="classics">Classics</div>
+          <div class="toggle-option" data-val="ya">YA</div>
+          <div class="toggle-option" data-val="new-adult">New Adult</div>
+          <div class="toggle-option" data-val="dystopian">Dystopian</div>
+          <div class="toggle-option" data-val="paranormal">Paranormal</div>
+          <div class="toggle-option" data-val="urban-fantasy">Urban Fantasy</div>
+          <div class="toggle-option" data-val="lgbtq">LGBTQ+</div>
+          <div class="toggle-option" data-val="graphic-novel">Graphic Novel</div>
+          <div class="toggle-option" data-val="short-stories">Short Stories</div>
+          <div class="toggle-option" data-val="crime">Crime</div>
+          <div class="toggle-option" data-val="true-crime">True Crime</div>
+          <div class="toggle-option" data-val="adventure">Adventure</div>
+        </div>
+      </div>
+    </details>
+
+    <!-- Moods (collapsible) -->
+    <details class="chip-toggle" id="moodsBox">
+      <summary>Moods</summary>
+      <div class="chip-scroll">
+        <div id="moods">
+          <div class="toggle-option" data-val="cozy">🧡 Cozy</div>
+          <div class="toggle-option" data-val="funny">🤣 Funny</div>
+          <div class="toggle-option" data-val="feel-good">🥰 Feel-good</div>
+          <div class="toggle-option" data-val="tearjerker">😢 Tearjerker</div>
+          <div class="toggle-option" data-val="dark">🧟‍♀️ Dark</div>
+          <div class="toggle-option" data-val="creepy">😱 Creepy</div>
+          <div class="toggle-option" data-val="twisty">🌀 Twisty</div>
+          <div class="toggle-option" data-val="thoughtful">🧠 Thought-provoking</div>
+          <div class="toggle-option" data-val="whimsical">🧭 Whimsical</div>
+          <div class="toggle-option" data-val="atmospheric">🌊 Atmospheric</div>
+          <div class="toggle-option" data-val="fast">⚡ Fast-paced</div>
+          <div class="toggle-option" data-val="slow-burn">🐢 Slow-burn</div>
+          <div class="toggle-option" data-val="action">💥 Action-heavy</div>
+          <div class="toggle-option" data-val="steamy">😍 Steamy</div>
+          <div class="toggle-option" data-val="spicy">🌶️ Spicy</div>
+          <div class="toggle-option" data-val="morally-grey">🐍 Morally grey</div>
+          <div class="toggle-option" data-val="toxic">🥵 Toxic</div>
+          <div class="toggle-option" data-val="magical">🧙‍♂️ Magical</div>
+          <div class="toggle-option" data-val="spacey">🚀 Spacey</div>
+          <div class="toggle-option" data-val="academic">🎓 Academic</div>
+          <div class="toggle-option" data-val="pastoral">🏞️ Pastoral</div>
+          <div class="toggle-option" data-val="mind-bending">🧩 Mind-bending</div>
+          <div class="toggle-option" data-val="heartbreaking">💔 Heartbreaking</div>
+        </div>
+      </div>
+    </details>
+
+    <div class="form-group">
+      <label for="review">Review</label>
+      <textarea id="review" placeholder="Write your review…"></textarea>
+    </div>
+
+    <div class="form-group">
+      <label for="notes">Notes</label>
+      <textarea id="notes" placeholder="Add your notes…"></textarea>
+    </div>
+
+    <div class="form-group">
+      <label>Quotes</label>
+      <textarea id="quoteText" placeholder="Add a quote…"></textarea>
+
+      <div class="quote-options" style="margin-top:10px">
+        <div id="qText" class="quote-option selected">
+          <i class="fas fa-font"></i><div>Text</div>
+        </div>
+        <div id="qCamera" class="quote-option">
+          <i class="fas fa-camera"></i><div>Camera</div>
+        </div>
+        <div id="qGallery" class="quote-option">
+          <i class="fas fa-image"></i><div>Gallery</div>
+        </div>
+      </div>
+
+      <div id="addQuote" class="btn btn-secondary" style="margin-top:12px">+ Add Quote</div>
+      <div id="quotes" class="quotes-grid" style="margin-top:12px"></div>
+    </div>
+
+    <div class="form-group">
+      <label>Book File (PDF/EPUB)</label>
+      <div id="upload-file-btn" class="btn btn-secondary">
+        <i class="fas fa-upload"></i>&nbsp; Upload Book File
+      </div>
+      <input id="bookFile" type="file" accept=".pdf,.epub" hidden />
+      <div id="fileName" class="muted" style="margin-top:8px">No file attached</div>
+    </div>
+
+    <div class="btn-group">
+      <div id="delete-book-btn" class="btn btn-secondary">Delete Book</div>
+      <div class="btn btn-secondary" onclick="window.location.href='index.html'">Cancel</div>
+      <div id="update-book-btn" class="btn btn-primary">Update Book</div>
+      <div id="read-book-btn" class="btn btn-primary">Read Book</div>
+    </div>
+
+    <nav class="bottom-nav">
+      <div class="nav-item" onclick="location.href='index.html'">
+        <i class="fas fa-book"></i> Library
+      </div>
+      <div class="nav-item" onclick="location.href='stats.html'">
+        <i class="fas fa-chart-line"></i> Stats
+      </div>
+    </nav>
+  </div>
+
+  <!-- In-app Reader Overlay -->
+  <div id="reader" class="reader-overlay" aria-hidden="true">
+    <div class="reader-top">
+      <div class="group">
+        <button id="rClose" title="Close">×</button>
+        <span class="reader-title" id="rTitle">book</span>
+      </div>
+      <div class="group">
+        <button id="rAminus">A-</button>
+        <button id="rAplus">A+</button>
+      </div>
+    </div>
+
+    <div id="rBody" class="reader-body">
+      <div id="pdfWrap" style="display:none"><canvas id="pdfCanvas"></canvas></div>
+      <div id="epubWrap" style="display:none"></div>
+      <div id="tapLeft"></div>
+      <div id="tapRight"></div>
+    </div>
+
+    <div class="reader-bottom">
+      <input id="rSlider" type="range" min="1" max="1" value="1">
+      <span id="rCount">1 / 1</span>
+    </div>
+  </div>
+
+  <!-- epub.js er allerede lastet i <head>; ingen duplikat her -->
+  <script src="script.js"></script>
+</body>
+</html>
