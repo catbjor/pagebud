@@ -1,7 +1,7 @@
 // sw.js — PageBud (precache + sane strategies)
 
 // 1) Bump denne ved hvert deploy
-const CACHE_NAME = "pagebud-cache-v18";
+const CACHE_NAME = "pagebud-cache-v19";
 
 // 2) Legg inn ALLE filer du vil være 100% sikre på lastes riktig.
 //    Viktig: bruk samme query som i HTML!
