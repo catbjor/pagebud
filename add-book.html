@@ -1,77 +1,50 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Add Book - PageBud</title>
 
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
-  <link rel="stylesheet" href="style.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+<link rel="stylesheet" href="style.css"/>
+  <link rel="manifest" href="manifest.json">
 
-  <!-- Needed for auto-cover extraction (PDF first page + EPUB cover) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-</head>
-<body>
-  <div class="app-container add-book-page">
-    <!-- top bar -->
-    <div class="add-book-header">
-      <h1>Add Book</h1>
-      <div class="back-button" onclick="window.location.href='index.html'">
-        <i class="fas fa-arrow-left"></i>
-      </div>
-    </div>
+<!-- iOS install polish -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="theme-color" content="#111111">
 
-    <!-- cover -->
-    <div class="cover-upload">
-      <div id="cover" class="cover-image">
-        <i id="coverIcon" class="fas fa-book"></i>
-      </div>
-      <div id="pickCover" class="upload-btn">Upload Cover</div>
-      <input id="coverInput" type="file" accept="image/*" hidden />
-    </div>
+<!-- Important for safe areas on iPhone (home indicator) -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 
-    <!-- form -->
-    <div class="form-group">
-      <label for="title">Title</label>
-      <input id="title" type="text" placeholder="Book title…"/>
-    </div>
 
-    <div class="form-group">
-      <label for="author">Author</label>
-      <input id="author" type="text" placeholder="Author name…"/>
-    </div>
-
-    <div class="form-group">
-      <label for="status">Status</label>
-      <select id="status">
-        <option value="reading">Reading</option>
-        <option value="finished">Finished</option>
-        <option value="want">Want</option>
-        <option value="dnf">DNF</option>
-        <option value="owned">Owned</option>
-        <option value="wishlist">Wishlist</option>
-      </select>
-    </div>
-
-    <div class="form-group">
-      <label>Rating</label>
-      <div id="stars" class="star-rating">
-        <div class="star-container" data-v="1"><i class="far fa-star"></i></div>
-        <div class="star-container" data-v="2"><i class="far fa-star"></i></div>
-        <div class="star-container" data-v="3"><i class="far fa-star"></i></div>
-        <div class="star-container" data-v="4"><i class="far fa-star"></i></div>
-        <div class="star-container" data-v="5"><i class="far fa-star"></i></div>
-        <div class="star-container special" data-v="6"><i class="far fa-star"></i></div>
-      </div>
-      <div id="ratingVal" class="rating-value">Selected: 0</div>
-    </div>
-
-    <!-- Genres -->
-<details class="chip-toggle" id="genresBox">
-  <summary>Genres</summary>
-  <div class="chip-scroll">
-    <div id="genres">
+<!-- Needed for auto-cover extraction (PDF first page + EPUB cover) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+@@ -83,69 +72,152 @@ <h1>Add Book</h1>
+<summary>Genres</summary>
+<div class="chip-scroll">
+<div id="genres">
+    <div class="toggle-option" data-val="fantasy">Fantasy</div>
+    <div class="toggle-option" data-val="romance">Romance</div>
+    <div class="toggle-option" data-val="sci-fi">Sci-Fi</div>
+    <div class="toggle-option" data-val="mystery">Mystery</div>
+    <div class="toggle-option" data-val="thriller">Thriller</div>
+    <div class="toggle-option" data-val="horror">Horror</div>
+    <div class="toggle-option" data-val="contemporary">Contemporary</div>
+    <div class="toggle-option" data-val="historical">Historical</div>
+    <div class="toggle-option" data-val="nonfiction">Non-fiction</div>
+    <div class="toggle-option" data-val="biography">Biography</div>
+    <div class="toggle-option" data-val="memoir">Memoir</div>
+    <div class="toggle-option" data-val="self-help">Self-Help</div>
+    <div class="toggle-option" data-val="business">Business</div>
+    <div class="toggle-option" data-val="poetry">Poetry</div>
+    <div class="toggle-option" data-val="classics">Classics</div>
+    <div class="toggle-option" data-val="ya">YA</div>
+    <div class="toggle-option" data-val="new-adult">New Adult</div>
+    <div class="toggle-option" data-val="dystopian">Dystopian</div>
+    <div class="toggle-option" data-val="paranormal">Paranormal</div>
+    <div class="toggle-option" data-val="urban-fantasy">Urban Fantasy</div>
+    <div class="toggle-option" data-val="lgbtq">LGBTQ+</div>
+    <div class="toggle-option" data-val="graphic-novel">Graphic Novel</div>
+    <div class="toggle-option" data-val="short-stories">Short Stories</div>
+    <div class="toggle-option" data-val="crime">Crime</div>
+    <div class="toggle-option" data-val="true-crime">True Crime</div>
+    <div class="toggle-option" data-val="adventure">Adventure</div>
       <div class="toggle-option" data-val="adventure">Adventure</div>
       <div class="toggle-option" data-val="biography">Biography</div>
       <div class="toggle-option" data-val="business">Business</div>
@@ -99,15 +72,40 @@
       <div class="toggle-option" data-val="urban-fantasy">Urban Fantasy</div>
       <div class="toggle-option" data-val="ya">YA</div>
     </div>
-  </div>
+</div>
+</div>
 </details>
 
+<!-- Moods -->
 
     <!-- Moods -->
 <details class="chip-toggle" id="moodsBox">
-  <summary>Moods</summary>
-  <div class="chip-scroll">
-    <div id="moods">
+<summary>Moods</summary>
+<div class="chip-scroll">
+<div id="moods">
+    <div class="toggle-option" data-val="cozy">🧡 Cozy</div>
+    <div class="toggle-option" data-val="funny">🤣 Funny</div>
+    <div class="toggle-option" data-val="feel-good">🥰 Feel-good</div>
+    <div class="toggle-option" data-val="tearjerker">😢 Tearjerker</div>
+    <div class="toggle-option" data-val="dark">🧟‍♀️ Dark</div>
+    <div class="toggle-option" data-val="creepy">😱 Creepy</div>
+    <div class="toggle-option" data-val="twisty">🌀 Twisty</div>
+    <div class="toggle-option" data-val="thoughtful">🧠 Thought-provoking</div>
+    <div class="toggle-option" data-val="whimsical">🧭 Whimsical</div>
+    <div class="toggle-option" data-val="atmospheric">🌊 Atmospheric</div>
+    <div class="toggle-option" data-val="fast">⚡ Fast-paced</div>
+    <div class="toggle-option" data-val="slow-burn">🐢 Slow-burn</div>
+    <div class="toggle-option" data-val="action">💥 Action-heavy</div>
+    <div class="toggle-option" data-val="steamy">😍 Steamy</div>
+    <div class="toggle-option" data-val="spicy">🌶️ Spicy</div>
+    <div class="toggle-option" data-val="morally-grey">🐍 Morally grey</div>
+    <div class="toggle-option" data-val="toxic">🥵 Toxic</div>
+    <div class="toggle-option" data-val="magical">🧙‍♂️ Magical</div>
+    <div class="toggle-option" data-val="spacey">🚀 Spacey</div>
+    <div class="toggle-option" data-val="academic">🎓 Academic</div>
+    <div class="toggle-option" data-val="pastoral">🏞️ Pastoral</div>
+    <div class="toggle-option" data-val="mind-bending">🧩 Mind-bending</div>
+    <div class="toggle-option" data-val="heartbreaking">💔 Heartbreaking</div>
       <div class="toggle-option" data-val="academic">🎓 Academic</div>
       <div class="toggle-option" data-val="action">💥 Action-heavy</div>
       <div class="toggle-option" data-val="atmospheric">🌊 Atmospheric</div>
@@ -132,7 +130,8 @@
       <div class="toggle-option" data-val="twisty">🌀 Twisty</div>
       <div class="toggle-option" data-val="whimsical">🧭 Whimsical</div>
     </div>
-  </div>
+</div>
+</div>
 </details>
 
 
@@ -218,65 +217,35 @@
 
 
 
-    <div class="form-group">
-      <label for="review">Review</label>
-      <textarea id="review" placeholder="Write your review…"></textarea>
-    </div>
+<div class="form-group">
+<label for="review">Review</label>
+<textarea id="review" placeholder="Write your review…"></textarea>
+@@ -160,7 +232,6 @@ <h1>Add Book</h1>
+<label>Quotes</label>
+<textarea id="quoteText" placeholder="Add a quote…"></textarea>
 
-    <div class="form-group">
-      <label for="notes">Notes</label>
-      <textarea id="notes" placeholder="Add your notes…"></textarea>
-    </div>
+      <!-- keep your three option tiles for same look -->
+<div class="quote-options" style="margin-top:10px">
+<div id="qText" class="quote-option selected">
+<i class="fas fa-font"></i><div>Text</div>
+@@ -193,15 +264,39 @@ <h1>Add Book</h1>
 
-    <div class="form-group">
-      <label>Quotes</label>
-      <textarea id="quoteText" placeholder="Add a quote…"></textarea>
-
-      <div class="quote-options" style="margin-top:10px">
-        <div id="qText" class="quote-option selected">
-          <i class="fas fa-font"></i><div>Text</div>
-        </div>
-        <div id="qCamera" class="quote-option">
-          <i class="fas fa-camera"></i><div>Camera</div>
-        </div>
-        <div id="qGallery" class="quote-option">
-          <i class="fas fa-image"></i><div>Gallery</div>
-        </div>
-      </div>
-
-      <div id="addQuote" class="btn btn-secondary" style="margin-top:12px">+ Add Quote</div>
-      <div id="quotes" class="quotes-grid" style="margin-top:12px"></div>
-    </div>
-
-    <div class="form-group">
-      <label>Book File (PDF/EPUB)</label>
-      <div id="upload-file-btn" class="btn btn-secondary">
-        <i class="fas fa-upload"></i>&nbsp; Upload Book File
-      </div>
-      <input id="bookFile" type="file" accept=".pdf,.epub" hidden />
-      <div id="fileName" class="muted" style="margin-top:8px">No file attached</div>
-    </div>
-
-    <div class="btn-group">
-      <div class="btn btn-secondary" onclick="window.location.href='index.html'">Cancel</div>
-      <div id="save-book-btn" class="btn btn-primary">Save Book</div>
-    </div>
-
-    <!-- bottom nav -->
-    <nav class="bottom-nav">
+<!-- bottom nav -->
+<nav class="bottom-nav">
+      <div class="nav-item active" onclick="location.href='index.html'">
       <div class="nav-item" onclick="location.href='index.html'">
-        <i class="fas fa-book"></i> Library
-      </div>
-      <div class="nav-item" onclick="location.href='stats.html'">
-        <i class="fas fa-chart-line"></i> Stats
-      </div>
+<i class="fas fa-book"></i> Library
+</div>
+<div class="nav-item" onclick="location.href='stats.html'">
+<i class="fas fa-chart-line"></i> Stats
+</div>
       <div class="nav-item" onclick="location.href='buddy-read.html'">
         <i class="fas fa-users"></i> Buddy Read
       </div>
-    </nav>
-  </div>
+</nav>
+</div>
 
-  <script src="script.js"></script>
+<script src="script.js"></script>
 
   <!-- Bottom-nav auto-active -->
   <script>
