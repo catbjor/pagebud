@@ -2,7 +2,7 @@
    PageBud – Global styles (mobile-first)
    =========================================================== */
 :root{
-  --bg:#EFF7F6;
+  --bg:#F0E3EA;
   --text:#1c1c1c;
   --card:#fff;
   --border:#e6e6e6;
@@ -177,7 +177,7 @@ body{
 
 /* ================= Reader overlay ================= */
 .reader-overlay{ position:fixed; inset:0; display:none; flex-direction:column;
-  background:#111; color:#eee; z-index:9999; }
+  background:#ffffff; color:#eee; z-index:9999; }
 .reader-overlay.show{ display:flex; }
 .reader-top{ height:44px; display:flex; align-items:center; justify-content:space-between;
   padding:0 10px; background:#000; color:#fff; }
