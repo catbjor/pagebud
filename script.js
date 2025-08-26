@@ -8,6 +8,38 @@
    - finishedAt timestamp when status becomes “Finished”
    - helpers exported for Stats page
    ====================================================================== */
+   // Put near the top of script.js so all pages get it
+(function setupPWAUpdates(){
+  if (!('serviceWorker' in navigator)) return;
+
+  // Optional: nudge the SW to check hourly
+  navigator.serviceWorker.getRegistration().then(reg => {
+    if (reg) setInterval(() => reg.update(), 60 * 60 * 1000);
+  });
+
+  let shown = false;
+  function showUpdateBar(){
+    if (shown) return; shown = true;
+    const bar = document.createElement('div');
+    bar.className = 'pb-update-banner';
+    bar.innerHTML = `
+      <span>Update available</span>
+      <button class="pb-update-btn">Reload</button>
+    `;
+    document.body.appendChild(bar);
+    requestAnimationFrame(()=> bar.classList.add('show'));
+    bar.querySelector('.pb-update-btn').onclick = () => location.reload();
+  }
+
+  // Fired when the new SW takes control
+  navigator.serviceWorker.addEventListener('controllerchange', showUpdateBar);
+
+  // Fired from the SW's activate broadcast (see sw.js)
+  navigator.serviceWorker.addEventListener('message', (e)=>{
+    if (e.data && e.data.type === 'SW_ACTIVATED') showUpdateBar();
+  });
+})();
+
 
 /* ----------------------------- helpers -------------------------------- */
 const $  = (sel, root=document) => root.querySelector(sel);
