@@ -7,7 +7,7 @@
 
   <!-- Icons + Styles -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
-  <link rel="stylesheet" href="style.css?v=2025-08-26-16"/>
+  <link rel="stylesheet" href="style.css?v=2025-08-26-17"/>
   <link rel="manifest" href="manifest.json">
 
   <!-- iOS PWA polish -->
@@ -28,6 +28,14 @@
     <div class="categories" style="border-top:1px solid var(--border); padding-top:12px;">
       <input id="search-input" class="form-control" placeholder="Search by title or author…"/>
     </div>
+
+    <div class="categories" style="gap:8px; padding-top:0">
+  <div class="view-toggle" id="viewToggle">
+    <button class="btn btn-secondary" data-view="grid">Grid</button>
+    <button class="btn btn-secondary" data-view="list">List</button>
+  </div>
+</div>
+
 
     <!-- Category chips (horizontal scroll) -->
     <div class="categories scroll-x" id="filter-chips">
@@ -73,6 +81,6 @@
     </nav>
   </div>
 
-  <script src="script.js?v=2025-08-26-16"></script>
+  <script src="script.js?v=2025-08-26-17"></script>
 </body>
 </html>
