@@ -7,24 +7,13 @@
 
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
   <link rel="stylesheet" href="style.css"/>
-  <link rel="manifest" href="manifest.json">
-
-<!-- iOS install polish -->
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="apple-touch-icon" href="icons/icon-192.png">
-<meta name="theme-color" content="#111111">
-
-<!-- Important for safe areas on iPhone (home indicator) -->
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-
 
   <!-- Libraries for cover extraction + readers -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
 
-  <!-- Minimal overlay CSS (reader only; endrer ikke tema/layout ellers) -->
+  <!-- Minimal overlay CSS (matches your theme; layout unchanged) -->
   <style>
     #epubWrap iframe { width:100% !important; height:100% !important; border:0; }
     .reader-body { overflow:hidden; }
@@ -111,72 +100,157 @@
       <div id="ratingVal" class="rating-value">Selected: 0</div>
     </div>
 
-    <!-- Genres (collapsible) -->
-    <details class="chip-toggle" id="genresBox">
-      <summary>Genres</summary>
-      <div class="chip-scroll">
-        <div id="genres">
-          <div class="toggle-option" data-val="fantasy">Fantasy</div>
-          <div class="toggle-option" data-val="romance">Romance</div>
-          <div class="toggle-option" data-val="sci-fi">Sci-Fi</div>
-          <div class="toggle-option" data-val="mystery">Mystery</div>
-          <div class="toggle-option" data-val="thriller">Thriller</div>
-          <div class="toggle-option" data-val="horror">Horror</div>
-          <div class="toggle-option" data-val="contemporary">Contemporary</div>
-          <div class="toggle-option" data-val="historical">Historical</div>
-          <div class="toggle-option" data-val="nonfiction">Non-fiction</div>
-          <div class="toggle-option" data-val="biography">Biography</div>
-          <div class="toggle-option" data-val="memoir">Memoir</div>
-          <div class="toggle-option" data-val="self-help">Self-Help</div>
-          <div class="toggle-option" data-val="business">Business</div>
-          <div class="toggle-option" data-val="poetry">Poetry</div>
-          <div class="toggle-option" data-val="classics">Classics</div>
-          <div class="toggle-option" data-val="ya">YA</div>
-          <div class="toggle-option" data-val="new-adult">New Adult</div>
-          <div class="toggle-option" data-val="dystopian">Dystopian</div>
-          <div class="toggle-option" data-val="paranormal">Paranormal</div>
-          <div class="toggle-option" data-val="urban-fantasy">Urban Fantasy</div>
-          <div class="toggle-option" data-val="lgbtq">LGBTQ+</div>
-          <div class="toggle-option" data-val="graphic-novel">Graphic Novel</div>
-          <div class="toggle-option" data-val="short-stories">Short Stories</div>
-          <div class="toggle-option" data-val="crime">Crime</div>
-          <div class="toggle-option" data-val="true-crime">True Crime</div>
-          <div class="toggle-option" data-val="adventure">Adventure</div>
-        </div>
-      </div>
-    </details>
+    <!-- Genres -->
+<details class="chip-toggle" id="genresBox">
+  <summary>Genres</summary>
+  <div class="chip-scroll">
+    <div id="genres">
+      <div class="toggle-option" data-val="adventure">Adventure</div>
+      <div class="toggle-option" data-val="biography">Biography</div>
+      <div class="toggle-option" data-val="business">Business</div>
+      <div class="toggle-option" data-val="classics">Classics</div>
+      <div class="toggle-option" data-val="contemporary">Contemporary</div>
+      <div class="toggle-option" data-val="crime">Crime</div>
+      <div class="toggle-option" data-val="dystopian">Dystopian</div>
+      <div class="toggle-option" data-val="fantasy">Fantasy</div>
+      <div class="toggle-option" data-val="graphic-novel">Graphic Novel</div>
+      <div class="toggle-option" data-val="historical">Historical</div>
+      <div class="toggle-option" data-val="horror">Horror</div>
+      <div class="toggle-option" data-val="lgbtq">LGBTQ+</div>
+      <div class="toggle-option" data-val="memoir">Memoir</div>
+      <div class="toggle-option" data-val="mystery">Mystery</div>
+      <div class="toggle-option" data-val="new-adult">New Adult</div>
+      <div class="toggle-option" data-val="nonfiction">Non-fiction</div>
+      <div class="toggle-option" data-val="paranormal">Paranormal</div>
+      <div class="toggle-option" data-val="poetry">Poetry</div>
+      <div class="toggle-option" data-val="romance">Romance</div>
+      <div class="toggle-option" data-val="sci-fi">Sci-Fi</div>
+      <div class="toggle-option" data-val="self-help">Self-Help</div>
+      <div class="toggle-option" data-val="short-stories">Short Stories</div>
+      <div class="toggle-option" data-val="thriller">Thriller</div>
+      <div class="toggle-option" data-val="true-crime">True Crime</div>
+      <div class="toggle-option" data-val="urban-fantasy">Urban Fantasy</div>
+      <div class="toggle-option" data-val="ya">YA</div>
+    </div>
+  </div>
+</details>
 
-    <!-- Moods (collapsible) -->
-    <details class="chip-toggle" id="moodsBox">
-      <summary>Moods</summary>
-      <div class="chip-scroll">
-        <div id="moods">
-          <div class="toggle-option" data-val="cozy">🧡 Cozy</div>
-          <div class="toggle-option" data-val="funny">🤣 Funny</div>
-          <div class="toggle-option" data-val="feel-good">🥰 Feel-good</div>
-          <div class="toggle-option" data-val="tearjerker">😢 Tearjerker</div>
-          <div class="toggle-option" data-val="dark">🧟‍♀️ Dark</div>
-          <div class="toggle-option" data-val="creepy">😱 Creepy</div>
-          <div class="toggle-option" data-val="twisty">🌀 Twisty</div>
-          <div class="toggle-option" data-val="thoughtful">🧠 Thought-provoking</div>
-          <div class="toggle-option" data-val="whimsical">🧭 Whimsical</div>
-          <div class="toggle-option" data-val="atmospheric">🌊 Atmospheric</div>
-          <div class="toggle-option" data-val="fast">⚡ Fast-paced</div>
-          <div class="toggle-option" data-val="slow-burn">🐢 Slow-burn</div>
-          <div class="toggle-option" data-val="action">💥 Action-heavy</div>
-          <div class="toggle-option" data-val="steamy">😍 Steamy</div>
-          <div class="toggle-option" data-val="spicy">🌶️ Spicy</div>
-          <div class="toggle-option" data-val="morally-grey">🐍 Morally grey</div>
-          <div class="toggle-option" data-val="toxic">🥵 Toxic</div>
-          <div class="toggle-option" data-val="magical">🧙‍♂️ Magical</div>
-          <div class="toggle-option" data-val="spacey">🚀 Spacey</div>
-          <div class="toggle-option" data-val="academic">🎓 Academic</div>
-          <div class="toggle-option" data-val="pastoral">🏞️ Pastoral</div>
-          <div class="toggle-option" data-val="mind-bending">🧩 Mind-bending</div>
-          <div class="toggle-option" data-val="heartbreaking">💔 Heartbreaking</div>
-        </div>
-      </div>
-    </details>
+
+    <!-- Moods -->
+<details class="chip-toggle" id="moodsBox">
+  <summary>Moods</summary>
+  <div class="chip-scroll">
+    <div id="moods">
+      <div class="toggle-option" data-val="academic">🎓 Academic</div>
+      <div class="toggle-option" data-val="action">💥 Action-heavy</div>
+      <div class="toggle-option" data-val="atmospheric">🌊 Atmospheric</div>
+      <div class="toggle-option" data-val="cozy">🧡 Cozy</div>
+      <div class="toggle-option" data-val="creepy">😱 Creepy</div>
+      <div class="toggle-option" data-val="dark">🧟‍♀️ Dark</div>
+      <div class="toggle-option" data-val="fast">⚡ Fast-paced</div>
+      <div class="toggle-option" data-val="feel-good">🥰 Feel-good</div>
+      <div class="toggle-option" data-val="funny">🤣 Funny</div>
+      <div class="toggle-option" data-val="heartbreaking">💔 Heartbreaking</div>
+      <div class="toggle-option" data-val="magical">🧙‍♂️ Magical</div>
+      <div class="toggle-option" data-val="mind-bending">🧩 Mind-bending</div>
+      <div class="toggle-option" data-val="morally-grey">🐍 Morally grey</div>
+      <div class="toggle-option" data-val="pastoral">🏞️ Pastoral</div>
+      <div class="toggle-option" data-val="sad">😢 Sad</div>
+      <div class="toggle-option" data-val="slow-burn">🐢 Slow-burn</div>
+      <div class="toggle-option" data-val="spacey">🚀 Spacey</div>
+      <div class="toggle-option" data-val="spicy">🌶️ Spicy</div>
+      <div class="toggle-option" data-val="steamy">😍 Steamy</div>
+      <div class="toggle-option" data-val="thoughtful">🧠 Thought-provoking</div>
+      <div class="toggle-option" data-val="toxic">🥵 Toxic</div>
+      <div class="toggle-option" data-val="twisty">🌀 Twisty</div>
+      <div class="toggle-option" data-val="whimsical">🧭 Whimsical</div>
+    </div>
+  </div>
+</details>
+
+
+    <!-- Tropes -->
+<details class="chip-toggle" id="tropesBox">
+  <summary>Tropes</summary>
+  <div class="chip-scroll">
+    <div id="tropes">
+      <div class="toggle-option" data-val="age-gap">Age Gap</div>
+      <div class="toggle-option" data-val="antihero">Antihero</div>
+      <div class="toggle-option" data-val="arranged-marriage">Arranged Marriage</div>
+      <div class="toggle-option" data-val="billionaire">Billionaire</div>
+      <div class="toggle-option" data-val="celebrity">Celebrity</div>
+      <div class="toggle-option" data-val="chosen-one">Chosen One</div>
+      <div class="toggle-option" data-val="courtroom">Courtroom Drama</div>
+      <div class="toggle-option" data-val="cult">Cult / Secret Society</div>
+      <div class="toggle-option" data-val="cyberpunk">Cyberpunk</div>
+      <div class="toggle-option" data-val="dark-academia">Dark Academia</div>
+      <div class="toggle-option" data-val="domestic-thriller">Domestic Thriller</div>
+      <div class="toggle-option" data-val="dystopia-rebellion">Dystopia / Rebellion</div>
+      <div class="toggle-option" data-val="enemies-to-lovers">Enemies to Lovers</div>
+      <div class="toggle-option" data-val="epistolary">Epistolary / Found Footage</div>
+      <div class="toggle-option" data-val="fairy-tale-retelling">Fairy-Tale Retelling</div>
+      <div class="toggle-option" data-val="fake-dating">Fake Dating</div>
+      <div class="toggle-option" data-val="first-contact">First Contact</div>
+      <div class="toggle-option" data-val="fish-out-of-water">Fish Out of Water</div>
+      <div class="toggle-option" data-val="forbidden-love">Forbidden Love</div>
+      <div class="toggle-option" data-val="forced-proximity">Forced Proximity</div>
+      <div class="toggle-option" data-val="friends-to-lovers">Friends to Lovers</div>
+      <div class="toggle-option" data-val="gothic">Gothic</div>
+      <div class="toggle-option" data-val="grumpy-sunshine">Grumpy x Sunshine</div>
+      <div class="toggle-option" data-val="guardian-charge">Guardian / Charge</div>
+      <div class="toggle-option" data-val="haunted-house">Haunted House</div>
+      <div class="toggle-option" data-val="heist">Heist</div>
+      <div class="toggle-option" data-val="hidden-royalty">Hidden Royalty</div>
+      <div class="toggle-option" data-val="locked-room">Locked-Room Mystery</div>
+      <div class="toggle-option" data-val="love-triangle">Love Triangle</div>
+      <div class="toggle-option" data-val="magic-school">Magic School</div>
+      <div class="toggle-option" data-val="marriage-of-convenience">Marriage of Convenience</div>
+      <div class="toggle-option" data-val="medical">Medical Drama</div>
+      <div class="toggle-option" data-val="mentor">Wise Mentor</div>
+      <div class="toggle-option" data-val="mentor-protege">Mentor / Protégé</div>
+      <div class="toggle-option" data-val="myth-retelling">Myth Retelling</div>
+      <div class="toggle-option" data-val="one-bed">Only One Bed</div>
+      <div class="toggle-option" data-val="opposites-attract">Opposites Attract</div>
+      <div class="toggle-option" data-val="pirates">Pirates / Seafaring</div>
+      <div class="toggle-option" data-val="police-procedural">Police Procedural</div>
+      <div class="toggle-option" data-val="political-intrigue">Political Intrigue</div>
+      <div class="toggle-option" data-val="portal-fantasy">Portal Fantasy</div>
+      <div class="toggle-option" data-val="post-apoc">Post-Apocalyptic</div>
+      <div class="toggle-option" data-val="prophecy">Prophecy</div>
+      <div class="toggle-option" data-val="quest">Quest</div>
+      <div class="toggle-option" data-val="redemption-arc">Redemption Arc</div>
+      <div class="toggle-option" data-val="reincarnation">Reincarnation</div>
+      <div class="toggle-option" data-val="revenge">Revenge</div>
+      <div class="toggle-option" data-val="rivals-to-lovers">Rivals to Lovers</div>
+      <div class="toggle-option" data-val="road-trip">Road Trip</div>
+      <div class="toggle-option" data-val="roommates">Roommates</div>
+      <div class="toggle-option" data-val="royal-romance">Royal Romance</div>
+      <div class="toggle-option" data-val="second-chance">Second Chance</div>
+      <div class="toggle-option" data-val="secret-baby">Secret Baby</div>
+      <div class="toggle-option" data-val="secret-identity">Secret Identity</div>
+      <div class="toggle-option" data-val="single-parent">Single Parent</div>
+      <div class="toggle-option" data-val="slow-burn">Slow Burn</div>
+      <div class="toggle-option" data-val="small-town">Small-Town</div>
+      <div class="toggle-option" data-val="soulmates">Soulmates</div>
+      <div class="toggle-option" data-val="space-opera">Space Opera</div>
+      <div class="toggle-option" data-val="sports-romance">Sports Romance</div>
+      <div class="toggle-option" data-val="spy">Spy / Espionage</div>
+      <div class="toggle-option" data-val="time-loop">Time Loop</div>
+      <div class="toggle-option" data-val="time-travel">Time Travel</div>
+      <div class="toggle-option" data-val="tournament">Game / Tournament</div>
+      <div class="toggle-option" data-val="trapped-together">Trapped Together</div>
+      <div class="toggle-option" data-val="trip-from-hell">Trip from Hell</div>
+      <div class="toggle-option" data-val="unreliable-narrator">Unreliable Narrator</div>
+      <div class="toggle-option" data-val="villain-pov">Villain POV</div>
+      <div class="toggle-option" data-val="western">Western</div>
+      <div class="toggle-option" data-val="whodunnit">Whodunnit</div>
+      <div class="toggle-option" data-val="workplace-romance">Workplace Romance</div>
+    </div>
+  </div>
+</details>
+
+
+
 
     <div class="form-group">
       <label for="review">Review</label>
@@ -224,12 +298,16 @@
       <div id="read-book-btn" class="btn btn-primary">Read Book</div>
     </div>
 
+    <!-- Bottom nav -->
     <nav class="bottom-nav">
       <div class="nav-item" onclick="location.href='index.html'">
         <i class="fas fa-book"></i> Library
       </div>
       <div class="nav-item" onclick="location.href='stats.html'">
         <i class="fas fa-chart-line"></i> Stats
+      </div>
+      <div class="nav-item" onclick="location.href='buddy-read.html'">
+        <i class="fas fa-users"></i> Buddy Read
       </div>
     </nav>
   </div>
@@ -260,7 +338,29 @@
     </div>
   </div>
 
-  <!-- epub.js er allerede lastet i <head>; ingen duplikat her -->
+  <!-- (Some builds like both; keeping as-is) -->
+  <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
   <script src="script.js"></script>
+
+  <!-- Bottom-nav auto-active -->
+  <script>
+  (function(){
+    var path = location.pathname;
+    var file = path.substring(path.lastIndexOf('/') + 1) || 'index.html';
+    var map = {
+      'index.html': 0,
+      'add-book.html': 0,
+      'edit-page.html': 0,
+      'stats.html': 1,
+      'buddy-read.html': 2
+    };
+    var idx = (file in map) ? map[file] : 0;
+    var items = document.querySelectorAll('.bottom-nav .nav-item');
+    for (var i=0;i<items.length;i++){
+      if (i === idx) items[i].classList.add('active');
+      else items[i].classList.remove('active');
+    }
+  })();
+  </script>
 </body>
 </html>

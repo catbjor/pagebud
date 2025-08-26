@@ -295,9 +295,12 @@ function initAddPage(){
     renderQuotesList(QUOTES, qList);
   });
 
-  /* Chips (optional if present) */
-  $$('#genres .toggle-option').forEach(ch => on(ch,'click',()=>ch.classList.toggle('selected')));
-  $$('#moods  .toggle-option').forEach(ch => on(ch,'click',()=>ch.classList.toggle('selected')));
+  // chips
+    $$('#genres .toggle-option').forEach(ch => on(ch,'click',()=>ch.classList.toggle('selected')));
+    $$('#moods  .toggle-option').forEach(ch => on(ch,'click',()=>ch.classList.toggle('selected')));
+    $$('#tropes .toggle-option').forEach(ch => on(ch,'click',()=>ch.classList.toggle('selected'))); // NEW
+
+
 
   /* File upload + auto-cover */
   let localFile = null;
@@ -327,6 +330,7 @@ function initAddPage(){
 
     const genres = $$('#genres .toggle-option.selected').map(x=>x.textContent.trim());
     const moods  = $$('#moods  .toggle-option.selected').map(x=>x.textContent.trim());
+    const tropes = $$('#tropes .toggle-option.selected').map(x=>x.textContent.trim());
 
     const book = {
       id: String(Date.now()),
@@ -388,6 +392,10 @@ function initEditPage(){
   $$('#moods  .toggle-option').forEach(ch=>{
     if ((book.moods||[]).includes(ch.textContent.trim())) ch.classList.add('selected');
     on(ch,'click',()=>ch.classList.toggle('selected'));
+  });
+  $$('#tropes .toggle-option').forEach(ch=>{                     // NEW
+  if ((book.tropes||[]).includes(ch.textContent.trim())) ch.classList.add('selected');
+  on(ch,'click',()=>ch.classList.toggle('selected'));
   });
 
   /* Change cover */
@@ -460,6 +468,7 @@ function initEditPage(){
       cover:  coverData || '',
       genres: $$('#genres .toggle-option.selected').map(x=>x.textContent.trim()),
       moods:  $$('#moods  .toggle-option.selected').map(x=>x.textContent.trim()),
+      tropes: $$('#tropes .toggle-option.selected').map(x=>x.textContent.trim()),
       fileName: localFile ? localFile.name : (book.fileName || null),
       finishedAt: book.finishedAt || null
     };

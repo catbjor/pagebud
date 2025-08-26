@@ -1,5 +1,5 @@
 // sw.js
-const CACHE = 'pb-v4'; // ⬅️ bump this on every release
+const CACHE = 'pb-v6'; // ⬅️ bump this on every release
 
 const CORE = [
   './','index.html','add-book.html','edit-page.html','stats.html','buddy-read.html',

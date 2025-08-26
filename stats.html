@@ -141,10 +141,17 @@
     </div>
 
     <nav class="bottom-nav">
-      <a class="nav-item" href="index.html"><i class="fa-solid fa-book"></i> Library</a>
-      <a class="nav-item active" href="stats.html"><i class="fa-solid fa-chart-line"></i> Stats</a>
-    </nav>
+  <div class="nav-item" onclick="location.href='index.html'">
+    <i class="fas fa-book"></i> Library
   </div>
+  <div class="nav-item active" onclick="location.href='stats.html'">
+    <i class="fas fa-chart-line"></i> Stats
+  </div>
+  <div class="nav-item" onclick="location.href='buddy-read.html'">
+    <i class="fas fa-users"></i> Buddy Read
+  </div>
+</nav>
+
 
   <script src="script.js"></script>
   <script>
@@ -445,5 +452,22 @@
     setActiveRange('year');
   })();
   </script>
+  <script>
+(function(){
+  const map = {
+    '': 0,                 // when path ends with /
+    'index.html': 0,
+    'add-book.html': 0,
+    'edit-page.html': 0,
+    'stats.html': 1,
+    'buddy-read.html': 2
+  };
+  const file = location.pathname.split('/').pop();
+  const idx = map[file] ?? 0;
+  document.querySelectorAll('.bottom-nav .nav-item')
+    .forEach((el,i)=>el.classList.toggle('active', i===idx));
+})();
+</script>
+
 </body>
 </html>

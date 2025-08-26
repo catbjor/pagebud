@@ -2,32 +2,29 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <!-- one viewport, includes safe areas -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
   <title>PageBud</title>
 
   <!-- Icons + Styles -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
   <link rel="stylesheet" href="style.css"/>
-
-  <!-- PWA -->
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#111111">
+  <link rel="manifest" href="manifest.json">
 
-  <!-- iOS install polish -->
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <!-- use the file you actually have (192.png is fine; iOS will scale) -->
-  <link rel="apple-touch-icon" href="icons/192.png">
-
+  <!-- PWA SW -->
   <script>
-    // Register the service worker with a relative path & scope for /pagebud/
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js', { scope: './' });
       });
     }
   </script>
+
+  <!-- iOS install polish -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <meta name="theme-color" content="#111111">
 </head>
 <body>
   <div class="app-container">
@@ -74,15 +71,39 @@
 
     <!-- Bottom Nav -->
     <nav class="bottom-nav">
-      <div class="nav-item active" onclick="location.href='index.html'">
+      <div class="nav-item" onclick="location.href='index.html'">
         <i class="fas fa-book"></i> Library
       </div>
       <div class="nav-item" onclick="location.href='stats.html'">
         <i class="fas fa-chart-line"></i> Stats
       </div>
+      <div class="nav-item" onclick="location.href='buddy-read.html'">
+        <i class="fas fa-users"></i> Buddy Read
+      </div>
     </nav>
   </div>
 
   <script src="script.js"></script>
+
+  <!-- Bottom-nav auto-active -->
+  <script>
+  (function(){
+    var path = location.pathname;
+    var file = path.substring(path.lastIndexOf('/') + 1) || 'index.html';
+    var map = {
+      'index.html': 0,
+      'add-book.html': 0,
+      'edit-page.html': 0,
+      'stats.html': 1,
+      'buddy-read.html': 2
+    };
+    var idx = (file in map) ? map[file] : 0;
+    var items = document.querySelectorAll('.bottom-nav .nav-item');
+    for (var i=0;i<items.length;i++){
+      if (i === idx) items[i].classList.add('active');
+      else items[i].classList.remove('active');
+    }
+  })();
+  </script>
 </body>
 </html>
