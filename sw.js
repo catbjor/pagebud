@@ -1,40 +1,69 @@
-const CACHE_NAME = "pagebud-cache-v1";
+// sw.js
+const CACHE = 'pb-v12'; // bump ved hver ny release
 
-// Install: pre-cache important files if you want (optional)
-self.addEventListener("install", (event) => {
-  self.skipWaiting(); // activate immediately
+const CORE = [
+  './','index.html','add-book.html','edit-page.html','stats.html','buddy-read.html',
+  'style.css','script.js','manifest.json',
+  'icons/192.png','icons/512.png','icons/icon-192.png','icons/icon-512.png'
+];
+
+// Install: pre-cache core shell
+self.addEventListener('install', (event) => {
+  event.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)));
+  self.skipWaiting();
 });
 
-// Activate: clean up old caches if needed
-self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((key) => key !== CACHE_NAME)
-          .map((key) => caches.delete(key))
-      )
-    )
-  );
-  clients.claim(); // take control right away
-});
-
-// Fetch: try network first, fallback to cache
-self.addEventListener("fetch", (event) => {
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-        return response;
-      })
-      .catch(() => caches.match(event.request))
-  );
-});
-
-// Listen for skipWaiting message
-self.addEventListener("message", (event) => {
-  if (event.data.action === "skipWaiting") {
+// Lytt på "skipWaiting" fra appen
+self.addEventListener('message', (event) => {
+  const m = event.data || {};
+  if (m.type === 'SKIP_WAITING' || m.action === 'skipWaiting') {
     self.skipWaiting();
+  }
+});
+
+// Activate: clean + claim + ping klienter
+self.addEventListener('activate', (event) => {
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)));
+    await self.clients.claim();
+    const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    clients.forEach(c => c.postMessage({ type: 'SW_ACTIVATED' }));
+  })());
+});
+
+// Fetch: network-first for HTML, ellers cache-first
+self.addEventListener('fetch', (event) => {
+  const req = event.request;
+  if (req.method !== 'GET') return;
+
+  const accept = req.headers.get('accept') || '';
+  const isHTML = accept.includes('text/html');
+
+  if (isHTML) {
+    event.respondWith(
+      fetch(req).then(res => {
+        caches.open(CACHE).then(c => c.put(req, res.clone()));
+        return res;
+      }).catch(() => caches.match(req).then(r => r || caches.match('index.html')))
+    );
+    return;
+  }
+
+  const url = new URL(req.url);
+  if (url.origin === location.origin) {
+    event.respondWith(
+      caches.match(req).then(hit => hit || fetch(req).then(res => {
+        caches.open(CACHE).then(c => c.put(req, res.clone()));
+        return res;
+      }))
+    );
+  } else {
+    event.respondWith(
+      fetch(req).then(res => {
+        caches.open(CACHE).then(c => c.put(req, res.clone()));
+        return res;
+      }).catch(() => caches.match(req))
+    );
   }
 });

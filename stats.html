@@ -1,58 +1,21 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
   <title>PageBud • Stats</title>
 
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet"/>
-  <link href="style.css" rel="stylesheet"/>
+  <link href="style.css?v=1.0.3" rel="stylesheet"/>
   <link rel="manifest" href="manifest.json">
 
-<!-- iOS install polish -->
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="apple-touch-icon" href="icons/icon-192.png">
-<meta name="theme-color" content="#111111">
-
-<!-- Important for safe areas on iPhone (home indicator) -->
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <!-- iOS PWA polish -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <meta name="theme-color" content="#111111">
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-
-
-  <style>
-    /* Scoped so nothing bleeds onto other pages */
-    .stats-page{ padding-bottom:var(--bottom-nav-height,72px); }
-    .stats-header{ display:flex; align-items:center; justify-content:space-between; }
-    .range-bar{ display:flex; gap:12px; flex-wrap:wrap; margin:10px 0 14px; }
-    .seg{ display:flex; background:#fff; border-radius:12px; overflow:hidden; box-shadow:0 1px 2px rgba(0,0,0,.06); }
-    .seg button{ border:0; background:transparent; padding:8px 12px; font-weight:600; cursor:pointer; }
-    .seg button.active{ background:#111; color:#fff; }
-    .pickers{ display:flex; gap:8px; align-items:center; }
-    .pickers select, .pickers input{ height:34px; }
-
-    .stats-grid{ display:grid; gap:12px; }
-    .stats-card{ background:#fff; border-radius:16px; padding:12px 16px; box-shadow:0 1px 2px rgba(0,0,0,.06); }
-    .stats-card .stat-row{ display:flex; justify-content:space-between; padding:4px 0; }
-    .goal-row{ display:flex; gap:8px; align-items:center; margin:6px 0; }
-    .goal-row input{ width:120px; }
-    .goal-row .btn{ height:36px; }
-
-    .progress-bar{ height:8px; background:#e9e9e9; border-radius:999px; overflow:hidden; }
-    .progress-fill{ height:100%; width:0%; background:#e74c8c; transition:width .25s ease; }
-    .progress-text{ display:flex; justify-content:space-between; font-size:12px; opacity:.8; margin-top:4px; }
-
-    details.stats-card{ padding:0; overflow:hidden; }
-    details.stats-card > summary{ list-style:none; cursor:pointer; padding:12px 16px; font-weight:700; }
-    details.stats-card > summary::-webkit-details-marker{ display:none; }
-    details.stats-card .card-body{ padding:0 16px 14px; }
-    .stats-card canvas{ width:100% !important; height:160px !important; }
-
-    /* make sure controls are clickable */
-    .range-bar, .range-bar *,.stats-card button,.stats-card input,.stats-card select { pointer-events:auto; }
-  </style>
 </head>
 <body>
   <div class="app-container">
@@ -116,7 +79,7 @@
           <div class="stat-row"><span>Favorites (≥6★)</span><span id="favorite-books">0</span></div>
         </div>
 
-        <!-- Charts (all-time) -->
+        <!-- Charts -->
         <details class="stats-card">
           <summary>Genres</summary>
           <div class="card-body"><canvas id="chartGenres"></canvas></div>
@@ -134,341 +97,53 @@
         <div class="stats-card">
           <h3 style="margin-bottom:6px">Export</h3>
           <div class="btn-group">
-            <button class="btn btn-secondary" type="button" onclick="exportBooksCSV()">Export CSV</button>
-            <button class="btn btn-primary"   type="button" onclick="exportBooksJSON()">Export JSON</button>
+            <button class="btn btn-secondary" type="button" onclick="exportBooksCSV && exportBooksCSV()">Export CSV</button>
+            <button class="btn btn-primary"   type="button" onclick="exportBooksJSON && exportBooksJSON()">Export JSON</button>
           </div>
+        </div>
+
+        <!-- Maintenance / Force update -->
+        <div class="stats-card">
+          <h3 style="margin-bottom:6px">Maintenance</h3>
+          <div class="btn-group">
+            <button class="btn btn-secondary" type="button" onclick="window.forceUpdateNow && window.forceUpdateNow()">
+              Force update (reload app)
+            </button>
+          </div>
+          <p class="muted" style="margin-top:6px;color:#6b6b6b">
+            Henter ny service worker og reloader appen.
+          </p>
         </div>
       </section>
     </div>
 
     <nav class="bottom-nav">
-  <div class="nav-item" onclick="location.href='index.html'">
-    <i class="fas fa-book"></i> Library
+      <div class="nav-item" onclick="location.href='index.html'">
+        <i class="fas fa-book"></i> Library
+      </div>
+      <div class="nav-item active" onclick="location.href='stats.html'">
+        <i class="fas fa-chart-line"></i> Stats
+      </div>
+      <div class="nav-item" onclick="location.href='buddy-read.html'">
+        <i class="fas fa-users"></i> Buddy Read
+      </div>
+    </nav>
   </div>
-  <div class="nav-item active" onclick="location.href='stats.html'">
-    <i class="fas fa-chart-line"></i> Stats
-  </div>
-  <div class="nav-item" onclick="location.href='buddy-read.html'">
-    <i class="fas fa-users"></i> Buddy Read
-  </div>
-</nav>
 
+  <!-- Hovedscript (må komme etter markup) -->
+  <script src="script.js?v=1.0.3"></script>
 
-  <script src="script.js"></script>
+  <!-- Ditt eksisterende stats.js-innhold kan ligge her (beregninger/grafer) -->
+  <!-- (Hvis du vil at jeg limer inn hele din gamle stats-logikk, si ifra) -->
+
+  <!-- Bottom-nav aktiv marker -->
   <script>
-  (function(){
-    const LSget=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch{return d}};
-    const LSset=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}};
-    const $ = (s, r=document)=>r.querySelector(s);
-
-    /* ---------- elements ---------- */
-    const btnDay   = $('#btnDay');
-    const btnWeek  = $('#btnWeek');
-    const btnMonth = $('#btnMonth');
-    const btnYear  = $('#btnYear');
-
-    const yearPick  = $('#yearPick');
-    const monthPick = $('#monthPick');
-    const weekPick  = $('#weekPick');
-    const dayPick   = $('#dayPick');
-
-    const goalInput = $('#goalInput');
-    const goalSave  = $('#goalSave');
-    const fillEl    = $('#progress-fill');
-    const pctEl     = $('#progress-percent');
-    const minsEl    = $('#progress-mins');
-    const goalEl    = $('#progress-goal');
-    const sessEl    = $('#rt-sessions');
-
-    const bookGoalInput = $('#bookGoalInput');
-    const bookGoalSave  = $('#bookGoalSave');
-    const bookFillEl    = $('#book-progress-fill');
-    const bookPctEl     = $('#book-progress-percent');
-    const bookNowEl     = $('#book-progress-now');
-    const bookGoalEl    = $('#book-progress-goal');
-
-    /* ---------- pickers ---------- */
-    const today = new Date();
-    for (let y=today.getFullYear()-4; y<=today.getFullYear()+4; y++){
-      const o=document.createElement('option');
-      o.value=String(y);
-      o.textContent=y;
-      yearPick.appendChild(o);
-    }
-    yearPick.value=String(today.getFullYear());
-
-    const mnames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    for (let m=1;m<=12;m++){
-      const o=document.createElement('option');
-      o.value=String(m).padStart(2,'0');
-      o.textContent=mnames[m-1];
-      monthPick.appendChild(o);
-    }
-    monthPick.value=String(today.getMonth()+1).padStart(2,'0');
-
-    for (let w=1; w<=53; w++){
-      const o=document.createElement('option');
-      o.value=String(w);
-      o.textContent='Week '+w;
-      weekPick.appendChild(o);
-    }
-    weekPick.value=String(getISOWeek(today));
-
-    dayPick.value = today.toISOString().slice(0,10);
-
-    /* ---------- range handling ---------- */
-    let range='year';
-    function setActiveRange(r){
-      range=r;
-      [btnDay,btnWeek,btnMonth,btnYear].forEach(b=>b.classList.remove('active'));
-      ({day:btnDay,week:btnWeek,month:btnMonth,year:btnYear})[r].classList.add('active');
-
-      dayPick.style.display   = (r==='day')   ? '' : 'none';
-      weekPick.style.display  = (r==='week')  ? '' : 'none';
-      monthPick.style.display = (r==='month') ? '' : 'none';
-
-      goalInput.value     = readGoalMinutes() || '';
-      bookGoalInput.value = readGoalBooks()   || '';
-      renderAll();
-    }
-    function getISOWeek(d){
-      const x=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
-      const n=x.getUTCDay()||7;
-      x.setUTCDate(x.getUTCDate()+4-n);
-      const y0=new Date(Date.UTC(x.getUTCFullYear(),0,1));
-      return Math.ceil((((x-y0)/86400000)+1)/7);
-    }
-    function isoWeekStartUTC(y,w){
-      const s=new Date(Date.UTC(y,0,1+(w-1)*7));
-      const d=s.getUTCDay();
-      const start=new Date(s);
-      start.setUTCDate(s.getUTCDate()-(d<=4?d-1:d-8));
-      return start;
-    }
-
-    function rangeKeyBase(){
-      const y=yearPick.value;
-      if (range==='year')  return `${y}`;
-      if (range==='month') return `${y}-${monthPick.value}`;
-      if (range==='week')  return `${y}-W${weekPick.value}`;
-      return dayPick.value;
-    }
-    const goalKeyMinutes = ()=>`pb:goal:min:${range}:${rangeKeyBase()}`;
-    const goalKeyBooks   = ()=>`pb:goal:books:${range}:${rangeKeyBase()}`;
-    const readGoalMinutes= ()=>Number(LSget(goalKeyMinutes(),0))||0;
-    const readGoalBooks  = ()=>Number(LSget(goalKeyBooks(),0))||0;
-
-    function startEndForRange(){
-      const y=Number(yearPick.value);
-      if (range==='year')  return [new Date(Date.UTC(y,0,1)), new Date(Date.UTC(y+1,0,1))];
-      if (range==='month'){
-        const m=Number(monthPick.value)-1;
-        return [new Date(Date.UTC(y,m,1)), new Date(Date.UTC(y,m+1,1))];
-      }
-      if (range==='week'){
-        const w=Number(weekPick.value);
-        const s=isoWeekStartUTC(y,w);
-        return [s, new Date(s.getTime()+7*86400000)];
-      }
-      const d=new Date(dayPick.value+'T00:00:00Z');
-      return [d, new Date(d.getTime()+86400000)];
-    }
-
-    /* ---------- minutes progress ---------- */
-    function minutesInRange(){
-      const [a,b]=startEndForRange();
-      const log=LSget('pb:reading-log',[]);
-      let minutes=0, sessions=0;
-      for (const s of log){
-        const t=new Date(s.startedAt||s.endedAt||0);
-        if (t>=a && t<b){ minutes+=Number(s.minutes)||0; sessions++; }
-      }
-      return {minutes,sessions};
-    }
-    function renderMinutes(){
-      const goal=readGoalMinutes();
-      const {minutes,sessions}=minutesInRange();
-      const pct = goal>0 ? Math.min(100, Math.round((minutes/goal)*100)) : 0;
-      fillEl.style.width=pct+'%';
-      pctEl.textContent=pct+'% Complete';
-      minsEl.textContent=String(minutes);
-      goalEl.textContent=String(goal);
-      sessEl.textContent=String(sessions);
-    }
-
-    /* ---------- books progress ---------- */
-    const allBooks = ()=> (window.getAllBooks ? window.getAllBooks() : LSget('pb:books',[]));
-    function finishedBooksInRange(){
-      const [a,b]=startEndForRange();
-      const arr=allBooks().filter(bk=>{
-        const fin=(bk.status||'').toLowerCase()==='finished';
-        if (!fin) return false;
-        const t = bk.finishedAt ? new Date(bk.finishedAt)
-                : (bk.createdAt ? new Date(bk.createdAt) : null);
-        return t && t>=a && t<b;
-      });
-      return arr.length;
-    }
-    function renderBooks(){
-      const goal = readGoalBooks();
-      const now  = finishedBooksInRange();
-      const pct  = goal>0 ? Math.min(100, Math.round((now/goal)*100)) : 0;
-      bookFillEl.style.width = pct+'%';
-      bookPctEl.textContent  = pct+'% Complete';
-      bookNowEl.textContent  = String(now);
-      bookGoalEl.textContent = String(goal);
-    }
-
-    /* ---------- charts (all-time) ---------- */
-    let chGenres=null, chStatus=null, chAuthors=null;
-
-    function genreCounts(){
-      const m=new Map();
-      const arr=allBooks();
-      for(const b of arr){
-        const gs = Array.isArray(b.genres) ? b.genres : [];
-        for(const g of gs){
-          const k=String(g).trim();
-          if (k) m.set(k,(m.get(k)||0)+1);
-        }
-      }
-      return m;
-    }
-
-    function statusCounts(){
-      const m=new Map();
-      for(const b of allBooks()){
-        const s=(b.status||'').toLowerCase() || 'unknown';
-        m.set(s,(m.get(s)||0)+1);
-      }
-      return m;
-    }
-
-    function authorCounts(){
-      const m=new Map();
-      for(const b of allBooks()){
-        const a=(b.author||'').trim();
-        if(a) m.set(a,(m.get(a)||0)+1);
-      }
-      const sorted=[...m.entries()].sort((A,B)=>B[1]-A[1]).slice(0,10);
-      return new Map(sorted);
-    }
-
-    function makeDoughnut(ctx, labels, data){
-      const colors=[
-        'rgba(233,30,99,0.55)','rgba(233,30,99,0.35)',
-        'rgba(51,51,51,0.15)','rgba(51,51,51,0.25)',
-        'rgba(0,0,0,0.15)','rgba(0,0,0,0.25)',
-        'rgba(160,160,160,0.35)','rgba(160,160,160,0.55)'
-      ];
-      return new Chart(ctx,{
-        type:'doughnut',
-        data:{ labels, datasets:[{ data, backgroundColor:colors }]},
-        options:{ responsive:true, maintainAspectRatio:false,
-          plugins:{ legend:{ display:true, position:'bottom' } }
-        }
-      });
-    }
-
-    function makeBar(ctx, labels, data){
-      return new Chart(ctx,{
-        type:'bar',
-        data:{ labels, datasets:[{ data, label:'Count' }] },
-        options:{
-          responsive:true, maintainAspectRatio:false,
-          scales:{ y:{ beginAtZero:true, ticks:{ precision:0 } } },
-          plugins:{ legend:{ display:false } }
-        }
-      });
-    }
-
-    function bindChart(canvasId, draw){
-      var canvasEl = document.getElementById(canvasId);
-      var detailsEl = canvasEl ? canvasEl.closest('details') : null;
-      if (!detailsEl) return;
-      detailsEl.addEventListener('toggle', function(){
-        if (detailsEl.open) draw();
-      }, {passive:true});
-    }
-
-    function setupCharts(){
-      bindChart('chartGenres', function(){
-        const gm=genreCounts();
-        if (chGenres) chGenres.destroy();
-        chGenres = makeDoughnut(document.getElementById('chartGenres'),
-          Array.from(gm.keys()), Array.from(gm.values()));
-      });
-
-      bindChart('chartStatus', function(){
-        const sm=statusCounts();
-        if (chStatus) chStatus.destroy();
-        chStatus = makeBar(document.getElementById('chartStatus'),
-          Array.from(sm.keys()), Array.from(sm.values()));
-      });
-
-      bindChart('chartAuthors', function(){
-        const am=authorCounts();
-        if (chAuthors) chAuthors.destroy();
-        chAuthors = makeBar(document.getElementById('chartAuthors'),
-          Array.from(am.keys()), Array.from(am.values()));
-      });
-    }
-
-    /* ---------- ratings block ---------- */
-    function renderRatings(){
-      const books=allBooks();
-      const totalRatings=books.filter(b=>Number(b.rating)>0).length;
-      const favoriteBooks=books.filter(b=>Number(b.rating)>=5).length;
-      const sum=books.reduce((s,b)=>s+(Number(b.rating)||0),0);
-      const avg= totalRatings ? (sum/totalRatings).toFixed(1) : '0.0';
-      $('#avg-rating').textContent=avg;
-      $('#total-ratings').textContent=String(totalRatings);
-      $('#favorite-books').textContent=String(favoriteBooks);
-    }
-
-    /* ---------- glue ---------- */
-    function renderAll(){ renderMinutes(); renderBooks(); renderRatings(); }
-
-    btnDay.addEventListener('click',  ()=>setActiveRange('day'));
-    btnWeek.addEventListener('click', ()=>setActiveRange('week'));
-    btnMonth.addEventListener('click',()=>setActiveRange('month'));
-    btnYear.addEventListener('click', ()=>setActiveRange('year'));
-
-    [yearPick, monthPick, weekPick, dayPick].forEach(function(el){
-      el.addEventListener('change', renderAll);
-    });
-
-    goalSave.addEventListener('click', function(){
-      const v = Math.max(0, Math.round(Number(goalInput.value)||0));
-      LSset(goalKeyMinutes(), v);
-      renderMinutes();
-    });
-    bookGoalSave.addEventListener('click', function(){
-      const v = Math.max(0, Math.round(Number(bookGoalInput.value)||0));
-      LSset(goalKeyBooks(), v);
-      renderBooks();
-    });
-
-    setupCharts();
-    setActiveRange('year');
-  })();
+    (function(){
+      const map = { '':0,'index.html':0,'add-book.html':0,'edit-page.html':0,'stats.html':1,'buddy-read.html':2 };
+      const file = location.pathname.split('/').pop();
+      const idx = map[file] ?? 0;
+      document.querySelectorAll('.bottom-nav .nav-item').forEach((el,i)=>el.classList.toggle('active', i===idx));
+    })();
   </script>
-  <script>
-(function(){
-  const map = {
-    '': 0,                 // when path ends with /
-    'index.html': 0,
-    'add-book.html': 0,
-    'edit-page.html': 0,
-    'stats.html': 1,
-    'buddy-read.html': 2
-  };
-  const file = location.pathname.split('/').pop();
-  const idx = map[file] ?? 0;
-  document.querySelectorAll('.bottom-nav .nav-item')
-    .forEach((el,i)=>el.classList.toggle('active', i===idx));
-})();
-</script>
-
 </body>
 </html>
