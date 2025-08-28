@@ -2,92 +2,79 @@
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Buddy Read - PageBud</title>
-
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-  <link rel="stylesheet" href="style.css?v=2025-08-26-20" />
+  <link rel="stylesheet" href="style.css?v=2025-08-28-2">
   <link rel="manifest" href="manifest.json">
-
-  <!-- iOS PWA polish -->
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <link rel="apple-touch-icon" href="icons/icon-192.png">
   <meta name="theme-color" content="#111111">
 </head>
 
 <body>
   <div class="app-container">
-    <!-- Header -->
     <div class="header">
       <h1>Buddy Read</h1>
       <div class="back-button" onclick="location.href='index.html'"><i class="fas fa-arrow-left"></i></div>
     </div>
 
-    <div class="main-content">
-      <!-- Create group -->
+    <div class="content-wrapper">
       <div class="card group-creation">
         <h2 style="margin-bottom:10px">Start a Buddy Read</h2>
-        <div class="form-group">
-          <label for="group-name">Group Name</label>
-          <input id="group-name" type="text" placeholder="Enter group name">
-        </div>
-        <div class="form-group">
-          <label for="group-book">Select Book</label>
-          <select id="group-book">
-            <option value="">Choose a book from your library</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="group-schedule">Reading Schedule (optional)</label>
-          <input id="group-schedule" type="text" placeholder="e.g., 20 pages per day">
-        </div>
+        <div class="form-group"><label>Group Name</label><input id="group-name" class="form-control"></div>
+        <div class="form-group"><label>Select Book</label><select id="group-book" class="form-control"></select></div>
+        <div class="form-group"><label>Reading Schedule (optional)</label><input id="group-schedule"
+            class="form-control" placeholder="e.g., 20 pages per day"></div>
         <button class="btn btn-primary" id="create-btn">Create Group</button>
       </div>
 
-      <!-- Groups list -->
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
           <h2 style="font-size:1.2rem">Your Reading Groups</h2>
           <button class="btn btn-secondary" id="refresh-btn" style="width:auto;padding:8px 12px">Refresh</button>
         </div>
-        <div class="groups-list" id="groups-list"></div>
-        <div id="empty-groups" style="text-align:center;color:#6b6b6b;display:none;padding:14px">
-          <div style="font-size:2rem;opacity:.4;margin-bottom:6px">📚</div>
-          No groups yet — create one above.
+        <div id="groups-list" class="groups-list"></div>
+        <div id="empty-groups" style="display:none;text-align:center;color:#6b6b6b;padding:14px">
+          <div style="font-size:2rem;opacity:.4;margin-bottom:6px">📚</div>No groups yet — create one above.
         </div>
       </div>
 
-      <!-- Group detail -->
-      <div class="group-detail" id="group-detail">
+      <div id="group-detail" class="group-detail" style="display:none">
         <div class="card" id="detail-card">
           <div style="display:flex;align-items:center;justify-content:space-between">
             <h2 id="detail-name">Group</h2>
             <div class="row" style="width:auto">
-              <button id="delete-group" class="btn danger" style="width:auto;padding:8px 12px"><i
+              <button id="delete-group" class="btn btn-danger" style="width:auto;padding:8px 12px"><i
                   class="fa fa-trash"></i></button>
               <button id="back-to-list" class="btn btn-secondary" style="width:auto;padding:8px 12px">Back</button>
             </div>
           </div>
-
           <div id="detail-members" style="margin-top:8px"></div>
-
           <div class="group-book" style="margin-top:12px">
             <div class="group-book-cover"><i class="fas fa-book"></i></div>
             <div>
               <div class="group-book-title" id="detail-book-title"></div>
-              <div style="color:#6b6b6b" id="detail-book-author"></div>
+              <div id="detail-book-author" style="color:#6b6b6b"></div>
             </div>
           </div>
-
           <div style="margin-top:10px">
             <div class="progress-bar">
               <div class="progress-fill" id="detail-progress"></div>
             </div>
-            <div style="font-size:.85rem;color:#6b6b6b;margin-top:4px" id="detail-progress-text">Group progress: 0%
-            </div>
+            <div id="detail-progress-text" class="muted" style="margin-top:4px">Group progress: 0%</div>
           </div>
+        </div>
+
+        <div class="card chat-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <h3>Group Chat</h3><span id="online-count" class="muted">—</span>
+          </div>
+          <div class="chat-messages" id="chat-messages" aria-live="polite"></div>
+          <div class="chat-input"><button id="emoji-btn" class="btn" aria-label="Emoji">😊</button>
+            <input id="chat-input" placeholder="Write a message…">
+            <button class="send-btn" id="send-btn" title="Send"><i class="fas fa-paper-plane"></i></button>
+          </div>
+          <div id="emoji-picker" class="emoji-picker"></div>
         </div>
 
         <div class="card">
@@ -96,23 +83,10 @@
             <div id="btnTogether" class="session-btn active"><i class="fas fa-book-open"></i> Read Together</div>
             <div id="btnSync" class="session-btn"><i class="fas fa-user-friends"></i> Sync Reading</div>
           </div>
-          <div style="font-size:.85rem;color:#6b6b6b;margin-bottom:8px">
-            <b>Read Together</b> = everyone reads at own pace (chat-enabled).
-            <b>Sync Reading</b> = leader flips pages for everyone.
+          <div class="muted" style="margin-bottom:8px"><b>Read Together</b>: everyone reads at own pace (chat-enabled).
+            <b>Sync Reading</b>: leader flips pages for everyone.
           </div>
           <button class="btn btn-primary" id="start-session"><i class="fas fa-play"></i> Start Reading Session</button>
-        </div>
-
-        <div class="card">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-            <h3>Group Chat</h3>
-            <span id="online-count" style="color:#6b6b6b">0 online</span>
-          </div>
-          <div class="chat-messages" id="chat-messages"></div>
-          <div class="chat-input">
-            <input id="chat-input" placeholder="Type a message…">
-            <button class="send-btn" id="send-btn"><i class="fas fa-paper-plane"></i></button>
-          </div>
         </div>
       </div>
     </div>
@@ -125,7 +99,10 @@
     </nav>
   </div>
 
-  <script src="script.js?v=2025-08-26-20"></script>
+  <script src="firebase.js"></script>
+  <script src="script.js?v=2025-08-28-2"></script>
+  <script src="buddy-chat.js"></script>
+  <script>requireAuth(() => { });</script>
 </body>
 
 </html>

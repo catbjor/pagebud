@@ -2,32 +2,26 @@
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PageBud</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-  <link rel="stylesheet" href="style.css?v=2025-08-26-20" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="style.css?v=2025-08-28-2">
   <link rel="manifest" href="manifest.json">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <link rel="apple-touch-icon" href="icons/icon-192.png">
   <meta name="theme-color" content="#111111">
 </head>
 
 <body>
   <div class="app-container">
-    <!-- Header -->
     <header class="header">
       <h1>PageBud</h1>
     </header>
 
-    <!-- Search -->
-    <div class="categories" style="border-top:1px solid var(--border); padding-top:12px;">
-      <input id="search-input" class="form-control" placeholder="Search by title or author…" />
+    <div class="categories" style="border-top:1px solid var(--border);padding-top:12px;">
+      <input id="search-input" class="form-control" placeholder="Search by title or author…">
     </div>
 
-    <!-- Category chips -->
-    <div class="categories scroll-x" id="filter-chips">
+    <div class="categories scroll-x" id="filter-chips" style="position:relative;z-index:2;">
       <div class="category active" data-filter="all">All Books</div>
       <div class="category" data-filter="reading">Reading</div>
       <div class="category" data-filter="finished">Finished</div>
@@ -38,40 +32,45 @@
       <div class="category" data-filter="wishlist">Wishlist</div>
     </div>
 
-    <!-- Library -->
+    <div class="categories" style="padding-top:0">
+      <a class="btn" style="flex:1;text-decoration:none" href="discover.html">
+        <div style="font-weight:800">Discover</div>
+        <div class="muted" style="font-size:.85rem;margin-top:2px">Trending & recommendations</div>
+      </a>
+      <a class="btn" style="flex:1;text-decoration:none" href="friends.html">
+        <div style="font-weight:800">Friends</div>
+        <div class="muted" style="font-size:.85rem;margin-top:2px">See what friends read</div>
+      </a>
+    </div>
+
     <section class="library">
       <h2>My Library</h2>
       <div id="empty-state" class="empty-state" style="display:none">
         <div class="empty-icon"><i class="fas fa-book-open"></i></div>
-        <h3>Oh-oh! Your library is empty...</h3>
+        <h3>Your library is empty</h3>
         <p>Add your first book to get started</p>
       </div>
       <div id="book-grid" class="book-grid"></div>
     </section>
 
-    <!-- FAB -->
-    <button id="add-book-btn" class="add-book" title="Add Book" aria-label="Add Book">
+    <button id="add-book-btn" class="add-book" title="Add Book" aria-label="Add Book" style="z-index:999;">
       <i class="fas fa-plus"></i>
     </button>
 
-    <!-- Bottom Nav -->
     <nav class="bottom-nav">
-      <div class="nav-item active" onclick="location.href='index.html'">
-        <i class="fas fa-book"></i> Library
-      </div>
-      <div class="nav-item" onclick="location.href='stats.html'">
-        <i class="fas fa-chart-line"></i> Stats
-      </div>
-      <div class="nav-item" onclick="location.href='buddy-read.html'">
-        <i class="fas fa-users"></i> Buddy Read
-      </div>
-      <div class="nav-item" onclick="location.href='settings.html'">
-        <i class="fas fa-cog"></i> Settings
-      </div>
+      <div class="nav-item active"><i class="fas fa-book"></i> Library</div>
+      <div class="nav-item" onclick="location.href='stats.html'"><i class="fas fa-chart-line"></i> Stats</div>
+      <div class="nav-item" onclick="location.href='buddy-read.html'"><i class="fas fa-users"></i> Buddy Read</div>
+      <div class="nav-item" onclick="location.href='settings.html'"><i class="fas fa-cog"></i> Settings</div>
     </nav>
   </div>
 
-  <script src="script.js?v=2025-08-26-18"></script>
+  <script src="firebase.js"></script>
+  <script src="sync.js"></script>
+  <script src="script.js?v=2025-08-28-2"></script>
+  <script>
+    requireAuth(async () => { PBSync.subscribe(); await PBSync.pushAll(); });
+  </script>
 </body>
 
 </html>

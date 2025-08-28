@@ -7,8 +7,12 @@
   <title>Edit Book - PageBud</title>
 
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-  <link rel="stylesheet" href="style.css?v=2025-08-26-20" />
+  <link rel="stylesheet" href="style.css?v=2025-08-26-22" />
   <link rel="manifest" href="manifest.json">
+  <script>
+    document.documentElement.setAttribute('data-theme', localStorage.getItem('pb:theme') || 'default');
+  </script>
+
 
   <!-- Reader libs -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -48,10 +52,11 @@
       <label for="status">Status</label>
       <select id="status">
         <option value="reading">Reading</option>
+        <option value="finished">Favorites</option>
         <option value="finished">Finished</option>
-        <option value="want">Want</option>
+        <option value="want">TBR</option>
         <option value="dnf">DNF</option>
-        <option value="owned">Owned</option>
+        <option value="owned">Books I Own</option>
         <option value="wishlist">Wishlist</option>
       </select>
     </div>
@@ -61,6 +66,21 @@
       <div id="stars" class="star-rating"></div>
       <div id="ratingVal" class="rating-value">Selected: 0</div>
     </div>
+
+    <div class="form-group">
+      <label>Reading Dates</label>
+      <div class="row" style="display:flex;gap:8px">
+        <div style="flex:1">
+          <label for="startedAt" style="font-weight:600">Started</label>
+          <input id="startedAt" type="date" />
+        </div>
+        <div style="flex:1">
+          <label for="finishedAt" style="font-weight:600">Finished</label>
+          <input id="finishedAt" type="date" />
+        </div>
+      </div>
+    </div>
+
 
     <!-- Chips -->
     <details class="chip-toggle" id="genresBox">
@@ -290,7 +310,17 @@
 
 
 
-  <script src="script.js?v=2025-08-26-20"></script>
+  <script src="script.js?v=2025-08-26-22"></script>
+  <script src="firebase.js"></script>
+  <script src="sync.js"></script>
+  <script>
+    // Kjør på sider som viser/lagrer bøker (f.eks. index.html, add-book.html)
+    requireAuth(async () => {
+      PBSync.subscribe();        // live fra sky → lokal
+      await PBSync.pushAll();    // første push av lokale → sky
+    });
+  </script>
+
 </body>
 
 </html>

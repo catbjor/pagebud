@@ -2,250 +2,195 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Settings - PageBud</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-    <link rel="stylesheet" href="style.css?v=2025-08-26-20" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css?v=2025-08-28-1">
     <link rel="manifest" href="manifest.json">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="apple-touch-icon" href="icons/icon-192.png">
     <meta name="theme-color" content="#111111">
 </head>
 
 <body>
     <div class="app-container">
-        <!-- Header -->
         <div class="stats-header">
-            <div class="back-button" onclick="location.href='index.html'">
-                <i class="fas fa-arrow-left"></i>
-            </div>
+            <div class="back-button" onclick="location.href='index.html'"><i class="fas fa-arrow-left"></i></div>
             <h1>Settings</h1>
-            <div style="width: 32px;"></div> <!-- Spacer for alignment -->
+            <div style="width:32px"></div>
         </div>
 
         <div class="content-wrapper">
-            <!-- Theme Selection -->
+
+            <!-- Appearance -->
             <div class="stats-section">
                 <div class="section-header">
-                    <div class="section-title">
-                        <i class="fas fa-palette"></i>
-                        <span>Appearance</span>
-                    </div>
+                    <div class="section-title"><i class="fas fa-palette"></i><span>Appearance</span></div>
                 </div>
 
-                <div class="form-group">
-                    <label for="theme-select">Color Theme</label>
-
-                    <div class="theme-previews">
-                        <div class="theme-preview" data-theme="default">
-                            <div class="theme-colors">
-                                <div class="color-swatch" style="background-color: #7BDFF2;"></div>
-                                <div class="color-swatch" style="background-color: #B4F8C8;"></div>
-                                <div class="color-swatch" style="background-color: #F7D6E0;"></div>
-                            </div>
-                            <div class="theme-name">Pink & Blue</div>
+                <div class="theme-previews" id="themeGrid">
+                    <!-- Default -->
+                    <div class="theme-preview" data-theme="default">
+                        <div class="theme-colors">
+                            <div class="color-swatch" style="background:#7BDFF2"></div>
+                            <div class="color-swatch" style="background:#B4F8C8"></div>
+                            <div class="color-swatch" style="background:#F7D6E0"></div>
                         </div>
-
-                        <div class="theme-preview" data-theme="dark-academia">
-                            <div class="theme-colors">
-                                <div class="color-swatch" style="background-color: #1c1c1c;"></div>
-                                <div class="color-swatch" style="background-color: #daddd8;"></div>
-                                <div class="color-swatch" style="background-color: #ecebe4;"></div>
-                            </div>
-                            <div class="theme-name">Dark Academia</div>
-                        </div>
-
-                        <div class="theme-preview" data-theme="pink-beige">
-                            <div class="theme-colors">
-                                <div class="color-swatch" style="background-color: #F3B3CD;"></div>
-                                <div class="color-swatch" style="background-color: #F1C4A5;"></div>
-                                <div class="color-swatch" style="background-color: #F7DDCE;"></div>
-                            </div>
-                            <div class="theme-name">Pink & Beige</div>
-                        </div>
-
-                        <div class="theme-preview" data-theme="black-white">
-                            <div class="theme-colors">
-                                <div class="color-swatch" style="background-color: #000000;"></div>
-                                <div class="color-swatch" style="background-color: #EFF0EE;"></div>
-                                <div class="color-swatch" style="background-color: #F6D3DD;"></div>
-                            </div>
-                            <div class="theme-name">Black & White</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Data Management -->
-                <div class="stats-section">
-                    <div class="section-header">
-                        <div class="section-title">
-                            <i class="fas fa-database"></i>
-                            <span>Data Management</span>
-                        </div>
+                        <div class="theme-name">Pink & Blue</div>
                     </div>
 
-                    <div class="settings-actions">
-                        <button class="btn btn-secondary full-width" id="exportDataBtn">
-                            <i class="fas fa-download"></i> Export All Data
-                        </button>
-
-                        <button class="btn btn-secondary full-width" id="importDataBtn">
-                            <i class="fas fa-upload"></i> Import Data
-                        </button>
-
-                        <button class="btn btn-secondary full-width" id="backupDataBtn">
-                            <i class="fas fa-cloud"></i> Backup to Cloud
-                        </button>
-
-                        <button class="btn btn-danger full-width" id="resetDataBtn">
-                            <i class="fas fa-trash"></i> Reset All Data
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Reading Goals -->
-                <div class="stats-section">
-                    <div class="section-header">
-                        <div class="section-title">
-                            <i class="fas fa-bullseye"></i>
-                            <span>Reading Goals</span>
+                    <!-- Barbie -->
+                    <div class="theme-preview" data-theme="barbie">
+                        <div class="theme-colors">
+                            <div class="color-swatch" style="background:#FE9DD0"></div>
+                            <div class="color-swatch" style="background:#8BD2F1"></div>
+                            <div class="color-swatch" style="background:#F8C9EB"></div>
                         </div>
+                        <div class="theme-name">Barbie</div>
                     </div>
 
-                    <div class="form-group">
-                        <label for="yearly-goal">Yearly Reading Goal</label>
-                        <input type="number" id="yearly-goal" class="form-control" placeholder="Number of books" min="1"
-                            max="1000">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="daily-goal">Daily Reading Goal (minutes)</label>
-                        <input type="number" id="daily-goal" class="form-control" placeholder="Minutes per day" min="5"
-                            max="1000">
-                    </div>
-
-                    <button class="btn btn-primary full-width" id="saveGoalsBtn">Save Goals</button>
-                </div>
-
-                <!-- Notifications -->
-                <div class="stats-section">
-                    <div class="section-header">
-                        <div class="section-title">
-                            <i class="fas fa-bell"></i>
-                            <span>Notifications</span>
+                    <!-- Barbie Blue -->
+                    <div class="theme-preview" data-theme="barbie-blue">
+                        <div class="theme-colors">
+                            <div class="color-swatch" style="background:#57CAFC"></div>
+                            <div class="color-swatch" style="background:#B3E6FF"></div>
+                            <div class="color-swatch" style="background:#FFB6E6"></div>
                         </div>
+                        <div class="theme-name">Barbie Blue</div>
                     </div>
 
-                    <div class="toggle-setting">
-                        <div class="toggle-label">
-                            <span>Daily Reading Reminders</span>
-                            <span class="toggle-desc">Get reminded to read every day</span>
+                    <!-- Pink Classic -->
+                    <div class="theme-preview" data-theme="pink-classic">
+                        <div class="theme-colors">
+                            <div class="color-swatch" style="background:#FF9BC6"></div>
+                            <div class="color-swatch" style="background:#F269A4"></div>
+                            <div class="color-swatch" style="background:#E53781"></div>
                         </div>
-                        <label class="switch">
-                            <input type="checkbox" id="daily-reminders">
-                            <span class="slider round"></span>
-                        </label>
+                        <div class="theme-name">Pink Classic</div>
                     </div>
 
-                    <div class="toggle-setting">
-                        <div class="toggle-label">
-                            <span>Goal Progress Updates</span>
-                            <span class="toggle-desc">Receive notifications about your reading progress</span>
+                    <!-- Soft Pink-Beige -->
+                    <div class="theme-preview" data-theme="soft-pink-beige">
+                        <div class="theme-colors">
+                            <div class="color-swatch" style="background:#F3B3CD"></div>
+                            <div class="color-swatch" style="background:#F1C4A5"></div>
+                            <div class="color-swatch" style="background:#F7DDCE"></div>
                         </div>
-                        <label class="switch">
-                            <input type="checkbox" id="goal-updates" checked>
-                            <span class="slider round"></span>
-                        </label>
+                        <div class="theme-name">Soft Pink-Beige</div>
                     </div>
 
-                    <div class="toggle-setting">
-                        <div class="toggle-label">
-                            <span>New Features</span>
-                            <span class="toggle-desc">Get notified about new app features</span>
+                    <!-- Goth -->
+                    <div class="theme-preview" data-theme="goth">
+                        <div class="theme-colors">
+                            <div class="color-swatch" style="background:#3E2D36"></div>
+                            <div class="color-swatch" style="background:#1E1E22"></div>
+                            <div class="color-swatch" style="background:#5C3F49"></div>
                         </div>
-                        <label class="switch">
-                            <input type="checkbox" id="new-features" checked>
-                            <span class="slider round"></span>
-                        </label>
-                    </div>
-                </div>
-
-                <!-- About -->
-                <div class="stats-section">
-                    <div class="section-header">
-                        <div class="section-title">
-                            <i class="fas fa-info-circle"></i>
-                            <span>About PageBud</span>
-                        </div>
+                        <div class="theme-name">Goth</div>
                     </div>
 
-                    <div class="about-content">
-                        <p>PageBud v1.0.0</p>
-                        <p>Your personal reading companion to track, organize, and enjoy your books.</p>
-
-                        <div class="about-links">
-                            <a href="#" class="about-link">
-                                <i class="fas fa-question-circle"></i> Help & Support
-                            </a>
-                            <a href="#" class="about-link">
-                                <i class="fas fa-star"></i> Rate PageBud
-                            </a>
-                            <a href="#" class="about-link">
-                                <i class="fas fa-share-alt"></i> Share with Friends
-                            </a>
-                            <a href="#" class="about-link">
-                                <i class="fas fa-lock"></i> Privacy Policy
-                            </a>
+                    <!-- Dark Academia -->
+                    <div class="theme-preview" data-theme="dark-academia">
+                        <div class="theme-colors">
+                            <div class="color-swatch" style="background:#1c1c1c"></div>
+                            <div class="color-swatch" style="background:#daddd8"></div>
+                            <div class="color-swatch" style="background:#ecebe4"></div>
                         </div>
+                        <div class="theme-name">Dark Academia</div>
+                    </div>
+
+                    <!-- Black & White -->
+                    <div class="theme-preview" data-theme="black-white">
+                        <div class="theme-colors">
+                            <div class="color-swatch" style="background:#000"></div>
+                            <div class="color-swatch" style="background:#EFF0EE"></div>
+                            <div class="color-swatch" style="background:#F6D3DD"></div>
+                        </div>
+                        <div class="theme-name">Black & White</div>
                     </div>
                 </div>
             </div>
 
-
-            <!-- PageBud – Engagement Settings -->
-            <section id="engagementSettings" class="card">
-                <h3>Engagement</h3>
-
-                <label style="display:flex;align-items:center;gap:8px;margin:8px 0;">
-                    <input type="checkbox" id="reminderToggle" />
-                    Daily Reading Reminder
-                    <span style="margin-left:auto;">at</span>
-                    <input type="time" id="reminderTime" value="20:00" />
-                </label>
-
-                <label style="display:flex;align-items:center;gap:8px;margin:8px 0;">
-                    <input type="checkbox" id="goalToggle" checked />
-                    Goal Progress Updates (25/50/75/100 %)
-                </label>
-
-                <label style="display:flex;align-items:center;gap:8px;margin:8px 0;">
-                    <input type="checkbox" id="newFeaturesToggle" checked />
-                    New features announcements
-                </label>
-            </section>
-
-
-            <!-- Bottom Navigation -->
-            <nav class="bottom-nav">
-                <div class="nav-item" onclick="location.href='index.html'">
-                    <i class="fas fa-book"></i> Library
+            <!-- Notifications -->
+            <div class="stats-section">
+                <div class="section-header">
+                    <div class="section-title"><i class="fas fa-bell"></i><span>Notifications (FCM)</span></div>
                 </div>
-                <div class="nav-item" onclick="location.href='stats.html'">
-                    <i class="fas fa-chart-line"></i> Stats
+                <button class="btn btn-primary full-width" id="enablePushBtn">Enable Push (FCM)</button>
+                <div class="muted" style="margin-top:8px">Requires browser permission + your VAPID public key.</div>
+            </div>
+
+            <!-- Data -->
+            <div class="stats-section">
+                <div class="section-header">
+                    <div class="section-title"><i class="fas fa-database"></i><span>Data</span></div>
                 </div>
-                <div class="nav-item" onclick="location.href='buddy-read.html'">
-                    <i class="fas fa-users"></i> Buddy Read
+                <div class="settings-actions">
+                    <button class="btn btn-secondary full-width" id="exportDataBtn"><i class="fas fa-download"></i>
+                        Export All Data</button>
+                    <button class="btn btn-secondary full-width" id="importDataBtn"><i class="fas fa-upload"></i> Import
+                        Data</button>
+                    <button class="btn btn-danger full-width" id="resetDataBtn"><i class="fas fa-trash"></i> Reset All
+                        Data</button>
                 </div>
-                <div class="nav-item active" onclick="location.href='settings.html'">
-                    <i class="fas fa-cog"></i> Settings
-                </div>
-            </nav>
+            </div>
         </div>
 
-        <script src="script.js?v=2025-08-26-20"></script>
-        <script src="engagement.js"></script>
+        <nav class="bottom-nav">
+            <div class="nav-item" onclick="location.href='index.html'"><i class="fas fa-book"></i> Library</div>
+            <div class="nav-item" onclick="location.href='stats.html'"><i class="fas fa-chart-line"></i> Stats</div>
+            <div class="nav-item" onclick="location.href='buddy-read.html'"><i class="fas fa-users"></i> Buddy Read
+            </div>
+            <div class="nav-item active"><i class="fas fa-cog"></i> Settings</div>
+        </nav>
+    </div>
+
+    <!-- App -->
+    <script src="firebase.js"></script>
+    <script src="script.js?v=2025-08-28-1"></script>
+
+    <!-- FCM -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
+    <script>
+        const VAPID_PUBLIC_KEY = "BJuvG6f4DO9_FG-tk1h9gQ5Ry1yeU9CYcrnZ-qRcIAbn4BgNnG73dHur62WbtBu_t9-XqeTHuGmR7UsASZPe0_g";
+
+        // Temavelger
+        (function () {
+            const grid = document.getElementById('themeGrid');
+            const saved = localStorage.getItem('pb:theme') || 'default';
+            document.documentElement.setAttribute('data-theme', saved);
+            [...grid.children].forEach(x => x.classList.toggle('active', x.dataset.theme === saved));
+            grid.addEventListener('click', e => {
+                const card = e.target.closest('.theme-preview'); if (!card) return;
+                const t = card.dataset.theme;
+                localStorage.setItem('pb:theme', t);
+                document.documentElement.setAttribute('data-theme', t);
+                [...grid.children].forEach(x => x.classList.toggle('active', x === card));
+            });
+        })();
+
+        // Enable push
+        document.getElementById('enablePushBtn').addEventListener('click', async () => {
+            try {
+                const perm = await Notification.requestPermission();
+                if (perm !== 'granted') { alert('Notifications blocked.'); return; }
+                const messaging = firebase.messaging(); // krever at firebase.js er lastet (fikser "No Firebase App")
+                // Henter token (firebase-messaging-sw.js plukkes automatisk opp)
+                const token = await messaging.getToken({ vapidKey: VAPID_PUBLIC_KEY });
+                if (!token) { alert('No token'); return; }
+                const u = fb.auth.currentUser;
+                if (u) {
+                    await fb.db.collection('users').doc(u.uid).collection('webPushTokens')
+                        .doc(token).set({ token, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+                }
+                alert('Push enabled ✓');
+            } catch (e) {
+                console.error(e); alert('Push feilet – se console');
+            }
+        });
+
+        // Krev innlogging (for å kunne lagre token på bruker)
+        requireAuth(() => { });
+    </script>
 </body>
 
 </html>

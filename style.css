@@ -49,6 +49,66 @@ PageBud – Global styles (mobile-first)
   --border: #dddddd;
 }
 
+/* Barbie (pink + sky blue) */
+[data-theme="barbie"] {
+  --primary: #FE9DD0;
+  --secondary: #8BD2F1;
+  --accent: #F8C9EB;
+  --background: #FEF4F0;
+  --card: #ffffff;
+  --text: #333;
+  --text-light: #666;
+  --border: #f0dce6;
+}
+
+/* Barbie Blue (mer blått UI) */
+[data-theme="barbie-blue"] {
+  --primary: #57CAFC;
+  --secondary: #B3E6FF;
+  --accent: #FFB6E6;
+  --background: #F7FBFF;
+  --card: #ffffff;
+  --text: #213042;
+  --text-light: #5b6b7c;
+  --border: #e1f1ff;
+}
+
+/* Pink Classic (tre rosa nyanser) */
+[data-theme="pink-classic"] {
+  --primary: #FF9BC6;
+  --secondary: #F269A4;
+  --accent: #E53781;
+  --background: #FFF7FB;
+  --card: #ffffff;
+  --text: #3a2a35;
+  --text-light: #6a5a64;
+  --border: #ffd8ea;
+}
+
+/* Soft Pink-Beige */
+[data-theme="soft-pink-beige"] {
+  --primary: #F3B3CD;
+  --secondary: #F1C4A5;
+  --accent: #F7DDCE;
+  --background: #FEF4F0;
+  --card: #ffffff;
+  --text: #333;
+  --text-light: #666;
+  --border: #e9d0c7;
+}
+
+/* Goth */
+[data-theme="goth"] {
+  --primary: #3E2D36;
+  --secondary: #1E1E22;
+  --accent: #5C3F49;
+  --background: #121214;
+  --card: #1b1b1f;
+  --text: #eaeaec;
+  --text-light: #a8a8b3;
+  --border: #26262b;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -1313,4 +1373,479 @@ input:checked+.slider:before {
 #pb-reader-theme-toggle {
   position: relative;
   z-index: 2;
+}
+
+.calendar-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px
+}
+
+.calendar-grid .cell {
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  min-height: 72px;
+  padding: 6px;
+  position: relative
+}
+
+.calendar-grid .date {
+  font-size: 12px;
+  color: var(--text-light)
+}
+
+.calendar-grid .cell.out {
+  opacity: .45
+}
+
+.calendar-grid .cell.today {
+  outline: 2px solid var(--primary)
+}
+
+.calendar-grid .list {
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.25
+}
+
+.badge {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  display: flex;
+  gap: 4px
+}
+
+.badge span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%
+}
+
+.badge .start {
+  background: #4CAF50
+}
+
+.badge .finish {
+  background: #f44336
+}
+
+.chat-messages {
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  height: 260px;
+  overflow: auto
+}
+
+.msg {
+  max-width: 78%;
+  margin: 6px 0;
+  padding: 8px 12px;
+  border-radius: 16px;
+  position: relative
+}
+
+.msg.me {
+  margin-left: auto;
+  background: #2b4cff;
+  color: #fff
+}
+
+.msg.other {
+  margin-right: auto;
+  background: #e9ebf0;
+  color: #111
+}
+
+.msg .time {
+  font-size: 10px;
+  opacity: .7;
+  margin-top: 4px
+}
+
+.reactions {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px
+}
+
+.react {
+  font-size: 14px;
+  cursor: pointer
+}
+
+.chat-input {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px
+}
+
+.emoji-picker {
+  position: absolute;
+  bottom: 44px;
+  right: 54px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px;
+  display: none;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px
+}
+
+.emoji-picker .e {
+  cursor: pointer
+}
+
+/* ===== Buddy Read – Chat makeover ===== */
+.chat-shell {
+  background: #eef2f7;
+  padding: 16px;
+  border-radius: 16px;
+}
+
+.chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 12px 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .05);
+  margin-bottom: 12px;
+}
+
+.chat-header .title {
+  font-weight: 800;
+}
+
+.chat-header .avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex: 0 0 36px;
+}
+
+.chat-messages {
+  background: #f6f8fb;
+  border: 0;
+  border-radius: 18px;
+  padding: 12px;
+  height: 360px;
+  /* litt høyere */
+  overflow: auto;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6),
+    inset 0 -1px 0 rgba(0, 0, 0, .03),
+    0 10px 30px rgba(0, 0, 0, .06);
+}
+
+.msg {
+  max-width: 78%;
+  margin: 8px 0;
+  padding: 10px 14px;
+  border-radius: 18px;
+  position: relative;
+  font-weight: 500;
+}
+
+.msg.me {
+  margin-left: auto;
+  background: #ff9bc6;
+  /* rosa boble */
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(255, 155, 198, .35);
+}
+
+.msg.other {
+  margin-right: auto;
+  background: #ffffff;
+  color: #141414;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .06);
+}
+
+.msg .time {
+  font-size: 10px;
+  opacity: .8;
+  margin-top: 4px;
+}
+
+.chat-input {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.chat-input input {
+  flex: 1;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  padding: 12px 14px;
+}
+
+.send-btn {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  background: #ff69b4;
+  /* knappen i hot pink */
+  color: #fff;
+  font-size: 18px;
+  box-shadow: 0 8px 20px rgba(255, 105, 180, .35);
+}
+
+.emoji-picker {
+  bottom: 64px;
+  right: 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 8px;
+  display: none;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .08);
+}
+
+.emoji-picker .e {
+  cursor: pointer;
+  font-size: 20px;
+}
+
+/* === Calendar (month/weekly) === */
+.calendar-nav .btn {
+  padding: 6px 10px;
+}
+
+.cal-shell {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.cal-head,
+.cal-week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.cal-head {
+  padding: 8px 10px;
+  color: var(--text-light);
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  padding: 8px 10px 12px;
+}
+
+.cal-day {
+  min-height: 76px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--background);
+  padding: 6px;
+  position: relative;
+  overflow: hidden;
+}
+
+.cal-day.out {
+  opacity: .45;
+}
+
+.cal-day.today {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+.cal-date {
+  font-size: 12px;
+  color: var(--text-light);
+}
+
+.cal-list {
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.cal-badges {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  display: flex;
+  gap: 4px;
+}
+
+.cal-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.cal-dot.start {
+  background: #4CAF50;
+}
+
+.cal-dot.finish {
+  background: #f44336;
+}
+
+.week-shell {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+}
+
+.week-col {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--background);
+  padding: 8px;
+  min-height: 90px;
+}
+
+.week-title {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-light);
+  margin-bottom: 6px;
+}
+
+.small-bars {
+  margin-top: 10px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--background);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.promo-row {
+  display: flex;
+  gap: 12px;
+  padding: 4px 16px 12px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.promo-card {
+  flex: 0 0 78%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .04);
+}
+
+.promo-card .title {
+  font-weight: 800;
+}
+
+.promo-card .cta {
+  border: 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--primary);
+  color: #fff;
+  font-weight: 700;
+}
+
+/* Barbie */
+[data-theme="barbie"] {
+  --primary: #FE9DD0;
+  --secondary: #8BD2F1;
+  --accent: #F8C9EB;
+  --background: #fff7fb;
+  --card: #ffffff;
+  --text: #332233;
+  --text-light: #7a6d7a;
+  --border: #f4d7e8;
+}
+
+/* Barbie Blue */
+[data-theme="barbie-blue"] {
+  --primary: #57CAFC;
+  --secondary: #B3E6FF;
+  --accent: #FFB6E6;
+  --background: #f7fbff;
+  --card: #ffffff;
+  --text: #1b2a3a;
+  --text-light: #6a7a88;
+  --border: #dfeaf6;
+}
+
+/* Pink Classic */
+[data-theme="pink-classic"] {
+  --primary: #F269A4;
+  --secondary: #FF9BC6;
+  --accent: #E53781;
+  --background: #fff7fb;
+  --card: #ffffff;
+  --text: #351a29;
+  --text-light: #7a5a6b;
+  --border: #f7d1e4;
+}
+
+/* Soft Pink-Beige */
+[data-theme="soft-pink-beige"] {
+  --primary: #F3B3CD;
+  --secondary: #F1C4A5;
+  --accent: #F7DDCE;
+  --background: #FEF4F0;
+  --card: #ffffff;
+  --text: #333;
+  --text-light: #666;
+  --border: #e9d0c7;
+}
+
+/* Goth */
+[data-theme="goth"] {
+  --primary: #3E2D36;
+  --secondary: #5C3F49;
+  --accent: #1E1E22;
+  --background: #141316;
+  --card: #1a171b;
+  --text: #f0eaf1;
+  --text-light: #c0b6c4;
+  --border: #2b2630;
 }

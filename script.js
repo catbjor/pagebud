@@ -227,20 +227,16 @@ Datamodell for bok
 =========================== */
 const DEFAULT_BOOK = () => ({
   id: uid(),
-  title: "",
-  author: "",
-  status: "reading",
-  rating: 0,
-  genres: [],
-  moods: [],
-  tropes: [],
-  review: "",
-  notes: "",
+  title: "", author: "", status: "reading",
+  rating: 0, genres: [], moods: [], tropes: [],
+  review: "", notes: "",
   coverDataUrl: "",
-  fileId: "",
-  fileType: "",
-  quotes: []
+  fileId: "", fileType: "",
+  quotes: [],
+  startedAt: "",   // <-- NYTT
+  finishedAt: ""   // <-- NYTT
 });
+
 
 /* ===========================
 Index (bibliotek)
@@ -352,6 +348,12 @@ function initAddEditPage() {
   const coverBox = byId("cover");
   if (!titleEl || !starsWrap || !coverBox) return;
 
+  startedAtEl.value = current.startedAt || "";
+  finishedAtEl.value = current.finishedAt || "";
+
+  current.startedAt = startedAtEl.value || "";
+  current.finishedAt = finishedAtEl.value || "";
+
   const authorEl = byId("author");
   const statusEl = byId("status");
   const ratingValEl = byId("ratingVal");
@@ -367,6 +369,8 @@ function initAddEditPage() {
   const qTextOpt = byId("qText");
   const qGalleryOpt = byId("qGallery");
   const quotesWrap = byId("quotes");
+  const startedAtEl = byId("startedAt");
+  const finishedAtEl = byId("finishedAt");
 
   const btnUpdate = byId("update-book-btn");
   const btnDelete = byId("delete-book-btn");
@@ -664,6 +668,7 @@ async function pdfReader(blob, { pdfCanvas, rSlider, rCount, tapLeft, tapRight }
     canvas.width = Math.floor(vp.width);
     canvas.height = Math.floor(vp.height);
     await page.render({ canvasContext: ctx, viewport: vp }).promise;
+    try { window.pbNotifyProgress && window.pbNotifyProgress(Math.round((pageNo / pdf.numPages) * 100)); } catch { }
     rSlider.value = pageNo;
     rCount.textContent = `${pageNo} / ${pdf.numPages}`;
   }
@@ -718,6 +723,7 @@ async function epubReader(blob, { epubWrap, rSlider, rCount, tapLeft, tapRight }
     rSlider.value = pct;
     rCount.textContent = `${pct}%`;
   });
+  try { window.pbNotifyProgress && window.pbNotifyProgress(pct); } catch { }
 
   on(tapLeft, "click", () => rendition.prev());
   on(tapRight, "click", () => rendition.next());
@@ -729,105 +735,234 @@ async function epubReader(blob, { epubWrap, rSlider, rCount, tapLeft, tapRight }
 Stats (oversikt + minidiagram)
 =========================== */
 function initStatsPage() {
+  if (location.pathname.toLowerCase().indexOf("stats.html") === -1) return;
+
   const wrap = $(".content-wrapper");
-  if (!wrap || location.pathname.toLowerCase().indexOf("stats.html") === -1) return;
+  const btns = $$(".time-btn");
+  const calTitle = byId("calTitle");
+  const calPrev = byId("calPrev");
+  const calNext = byId("calNext");
+  const calToday = byId("calToday");
+  const calContainer = byId("calContainer");
 
   const books = loadBooks();
   const finished = books.filter(b => b.status === "finished");
   const reading = books.filter(b => b.status === "reading");
-  const avgRating = finished.length ? (finished.reduce((a, b) => a + (Number(b.rating) || 0), 0) / finished.length).toFixed(2) : "0.00";
+  const avgRating = finished.length ? (finished.reduce((a, b) => a + (+b.rating || 0), 0) / finished.length).toFixed(2) : "0.00";
 
-  wrap.innerHTML = `
-    <div class="stats-section">
-      <div class="section-header">
-        <div class="section-title"><i class="fas fa-chart-pie"></i><span>Overview</span></div>
-      </div>
-      <div class="overview-grid">
-        <div class="stat-card"><div class="stat-number">${fmt(books.length)}</div><div class="stat-label">Total Books</div></div>
-        <div class="stat-card rating-stat"><div class="stat-number">${avgRating}</div><div class="stat-label">Avg Rating</div></div>
-        <div class="stat-card"><div class="stat-number">${fmt(finished.length)}</div><div class="stat-label">Finished</div></div>
-        <div class="stat-card"><div class="stat-number">${fmt(reading.length)}</div><div class="stat-label">Reading</div></div>
-      </div>
-      <div class="reading-timeline">
-        <div class="section-header"><div class="section-title"><i class="fas fa-calendar"></i><span>Last 12 Months</span></div></div>
-        <div id="timelineChart" class="chart-container"></div>
-        <div class="timeline-stats" id="timelineStats"></div>
-      </div>
-    </div>
-    <div class="stats-section">
-      <div class="section-header"><div class="section-title"><i class="fas fa-user-edit"></i><span>Top Authors</span></div></div>
-      <div class="authors-list" id="authorsList"></div>
-    </div>
-    <div class="stats-section">
-      <div class="section-header"><div class="section-title"><i class="fas fa-fire"></i><span>Reading Streak</span></div></div>
-      <div class="streak-container">
-        <div class="streak-number" id="streakNum">0</div>
-        <div class="streak-label">Day streak</div>
-        <div class="streak-calendar" id="streakCal"></div>
-      </div>
-    </div>
-  `;
+  // overview
+  byId("ovTotal").textContent = fmt(books.length);
+  byId("ovAvg").textContent = avgRating;
+  byId("ovFinished").textContent = fmt(finished.length);
+  byId("ovReading").textContent = fmt(reading.length);
 
-  const months = [];
-  const now = new Date();
-  for (let i = 11; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    months.push({ key: d.toLocaleString(undefined, { month: "short" }), count: 0 });
+  // streak (samme som før)
+  const st = getStreakData();
+  byId("streakNum").textContent = fmt(st.current || 0);
+  const cal = byId("streakCal");
+  cal.innerHTML = "";
+  for (let i = 27; i >= 0; i--) {
+    const cell = document.createElement("div");
+    cell.className = "streak-day " + (i < st.current ? "active" : "inactive");
+    cal.appendChild(cell);
   }
-  finished.forEach((_, idx) => {
-    const bucket = Math.floor(idx / Math.max(1, Math.ceil(finished.length / 12)));
-    const m = months[Math.min(bucket, months.length - 1)];
-    if (m) m.count++;
+
+  // ---- Calendar state
+  const state = {
+    mode: "monthly",         // daily | weekly | monthly | yearly
+    anchor: new Date()       // hva "nå" er
+  };
+
+  // helper: events fra bøker
+  function toISO(d) { return d.toISOString().slice(0, 10); }
+  function parseDate(s) { if (!s) return null; const d = new Date(s); return isNaN(d) ? null : d; }
+  function eventsMap() {
+    const map = {};
+    books.forEach(b => {
+      const s = parseDate(b.startedAt), f = parseDate(b.finishedAt);
+      if (s) { const k = toISO(s); (map[k] ??= []).push({ t: "start", book: b }); }
+      if (f) { const k = toISO(f); (map[k] ??= []).push({ t: "finish", book: b }); }
+    });
+    return map;
+  }
+  const ev = eventsMap();
+
+  // helper: uke-start (mandag)
+  function startOfWeek(d) {
+    const x = new Date(d); const wd = (x.getDay() + 6) % 7; x.setDate(x.getDate() - wd); x.setHours(0, 0, 0, 0); return x;
+  }
+  function ymLabel(d) { return d.toLocaleString(undefined, { month: "long", year: "numeric" }); }
+  function yLabel(d) { return d.getFullYear(); }
+
+  // ---- Renders
+  function renderMonthGrid(anchor) {
+    const y = anchor.getFullYear(), m = anchor.getMonth();
+    const first = new Date(y, m, 1);
+    const startDay = (first.getDay() + 6) % 7;
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    const cellsTotal = Math.ceil((startDay + daysInMonth) / 7) * 7;
+
+    calTitle.textContent = ymLabel(anchor);
+
+    const head = `<div class="cal-head"><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div></div>`;
+    const grid = [];
+    const todayStr = toISO(new Date());
+    for (let i = 0; i < cellsTotal; i++) {
+      const dayNum = i - startDay + 1;
+      const date = new Date(y, m, dayNum);
+      const inMonth = dayNum >= 1 && dayNum <= daysInMonth;
+      const dStr = toISO(date);
+      const dayEv = ev[dStr] || [];
+      grid.push(
+        `<div class="cal-day ${inMonth ? "" : "out"} ${dStr === todayStr ? "today" : ""}">
+          <div class="cal-date">${date.getDate()}</div>
+          <div class="cal-list">
+            ${dayEv.map(e => `${e.t === "start" ? "📗" : "🏁"} ${escapeHTML(e.book.title || "Untitled")}`).join("<br>")}
+          </div>
+          <div class="cal-badges">
+            ${dayEv.some(e => e.t === "start") ? '<span class="cal-dot start"></span>' : ""}
+            ${dayEv.some(e => e.t === "finish") ? '<span class="cal-dot finish"></span>' : ""}
+          </div>
+        </div>`
+      );
+    }
+    calContainer.innerHTML = `<div class="cal-shell">${head}<div class="cal-grid">${grid.join("")}</div></div>`;
+  }
+
+  function renderWeekRow(anchor) {
+    const start = startOfWeek(anchor);
+    calTitle.textContent = `Week ${start.toLocaleDateString()} – ${toISO(new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6))}`;
+    const days = [...Array(7)].map((_, i) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + i));
+    const head = `<div class="cal-head"><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div></div>`;
+    const cols = days.map(d => {
+      const dStr = toISO(d);
+      const dayEv = ev[dStr] || [];
+      return `<div class="week-col">
+        <div class="week-title">${d.getDate()}.${d.getMonth() + 1}</div>
+        ${dayEv.map(e => `<div>${e.t === "start" ? "📗" : "🏁"} ${escapeHTML(e.book.title || "")}</div>`).join("")}
+      </div>`;
+    }).join("");
+    calContainer.innerHTML = `<div class="week-shell">${head}<div class="week-grid">${cols}</div></div>`;
+  }
+
+  function renderMonthBars(anchor) {
+    // 12 mnd fra anchor sin måned-11 → anchor
+    const months = [];
+    const a = new Date(anchor);
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(a.getFullYear(), a.getMonth() - i, 1);
+      months.push({ key: d.toLocaleString(undefined, { month: "short" }), year: d.getFullYear(), month: d.getMonth(), count: 0 });
+    }
+    Object.keys(ev).forEach(k => {
+      const d = new Date(k);
+      const idx = months.findIndex(m => m.year === d.getFullYear() && m.month === d.getMonth());
+      if (idx >= 0) months[idx].count += (ev[k].filter(e => e.t === "finish").length); // “finished per month”
+    });
+
+    calTitle.textContent = `Last 12 Months`;
+    const wrap = document.createElement("div");
+    wrap.className = "small-bars";
+    calContainer.innerHTML = "";
+    calContainer.appendChild(wrap);
+    drawMiniBars(wrap, months.map(m => m.count));
+    // legg labels under
+    const labels = document.createElement("div");
+    labels.style.cssText = "display:grid;grid-template-columns:repeat(12,1fr);gap:6px;margin-top:6px;font-size:11px;color:var(--text-light);";
+    labels.innerHTML = months.map(m => `<div style="text-align:center">${m.key}</div>`).join("");
+    calContainer.appendChild(labels);
+  }
+
+  function renderYearBars(anchor) {
+    const years = [];
+    const y0 = anchor.getFullYear();
+    for (let i = 4; i >= 0; i--) {
+      years.push({ y: y0 - i, count: 0 });
+    }
+    Object.keys(ev).forEach(k => {
+      const y = new Date(k).getFullYear();
+      const it = years.find(r => r.y === y); if (it) it.count += ev[k].filter(e => e.t === "finish").length;
+    });
+    calTitle.textContent = `By Year`;
+    const wrap = document.createElement("div");
+    wrap.className = "small-bars";
+    calContainer.innerHTML = "";
+    calContainer.appendChild(wrap);
+    drawMiniBars(wrap, years.map(r => r.count));
+    const labels = document.createElement("div");
+    labels.style.cssText = "display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:6px;font-size:11px;color:var(--text-light);";
+    labels.innerHTML = years.map(r => `<div style="text-align:center">${r.y}</div>`).join("");
+    calContainer.appendChild(labels);
+  }
+
+  function renderCalendar() {
+    if (state.mode === "daily") return renderMonthGrid(state.anchor);
+    if (state.mode === "weekly") return renderWeekRow(state.anchor);
+    if (state.mode === "monthly") return renderMonthBars(state.anchor);
+    if (state.mode === "yearly") return renderYearBars(state.anchor);
+  }
+
+  // filter buttons
+  btns.forEach(b => {
+    b.addEventListener("click", () => {
+      btns.forEach(x => x.classList.remove("active"));
+      b.classList.add("active");
+      state.mode = b.getAttribute("data-mode");
+      renderCalendar();
+    });
   });
 
-  drawMiniBars($("#timelineChart"), months.map(m => m.count));
-  $("#timelineStats").innerHTML = months.map(m => `<div class="timeline-item"><div class="timeline-number">${fmt(m.count)}</div><div class="timeline-label">${m.key}</div></div>`).join("");
+  // nav
+  calPrev.addEventListener("click", () => {
+    if (state.mode === "daily") state.anchor.setMonth(state.anchor.getMonth() - 1);
+    if (state.mode === "weekly") state.anchor.setDate(state.anchor.getDate() - 7);
+    if (state.mode === "monthly") state.anchor.setMonth(state.anchor.getMonth() - 12);
+    if (state.mode === "yearly") state.anchor.setFullYear(state.anchor.getFullYear() - 1);
+    renderCalendar();
+  });
+  calNext.addEventListener("click", () => {
+    if (state.mode === "daily") state.anchor.setMonth(state.anchor.getMonth() + 1);
+    if (state.mode === "weekly") state.anchor.setDate(state.anchor.getDate() + 7);
+    if (state.mode === "monthly") state.anchor.setMonth(state.anchor.getMonth() + 12);
+    if (state.mode === "yearly") state.anchor.setFullYear(state.anchor.getFullYear() + 1);
+    renderCalendar();
+  });
+  calToday.addEventListener("click", () => { state.anchor = new Date(); renderCalendar(); });
+
+  // ---- Top lists (authors/genres/moods)
+  function renderTopList(targetId, entries, labelKey = "name") {
+    const el = byId(targetId); el.innerHTML = "";
+    const top = entries.slice(0, 8);
+    const max = Math.max(1, ...top.map(x => x.count));
+    el.innerHTML = top.map(({ name, count }) =>
+      `<div class="author-item">
+         <div class="author-name">${escapeHTML(name)}</div>
+         <div class="author-bar"><div class="author-fill" style="width:${(count / max) * 100}%"></div></div>
+         <div class="author-count">${count}</div>
+       </div>`).join("");
+  }
 
   const authorCount = {};
   books.forEach(b => {
     const a = (b.author || "").trim() || "Unknown";
     authorCount[a] = (authorCount[a] || 0) + 1;
   });
-  const top = Object.entries(authorCount).sort((a, b) => b[1] - a[1]).slice(0, 6);
-  const maxA = Math.max(1, ...top.map(x => x[1]));
-  byId("authorsList").innerHTML = top.map(([name, count]) => `<div class="author-item"><div class="author-name">${escapeHTML(name)}</div><div class="author-bar"><div class="author-fill" style="width:${(count / maxA) * 100}%"></div></div><div class="author-count">${count}</div></div>`).join("");
+  const authors = Object.entries(authorCount).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
+  renderTopList("authorsList", authors);
 
-  const st = getStreakData();
-  byId("streakNum").textContent = fmt(st.current || 0);
-  const cal = byId("streakCal");
-  for (let i = 27; i >= 0; i--) {
-    const cell = document.createElement("div");
-    cell.className = "streak-day " + (i < st.current ? "active" : "inactive");
-    cal.appendChild(cell);
-  }
+  const genreCount = {};
+  books.forEach(b => (b.genres || []).forEach(g => genreCount[g] = (genreCount[g] || 0) + 1));
+  const genres = Object.entries(genreCount).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
+  renderTopList("genresList", genres);
+
+  const moodCount = {};
+  books.forEach(b => (b.moods || []).forEach(m => moodCount[m] = (moodCount[m] || 0) + 1));
+  const moods = Object.entries(moodCount).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
+  renderTopList("moodsList", moods);
+
+  // initial draw
+  renderCalendar();
 }
-function drawMiniBars(container, arr) {
-  if (!container) return;
-  const max = Math.max(1, ...arr);
-  const width = container.clientWidth || 320;
-  const height = 200;
-  const barW = Math.max(4, Math.floor(width / (arr.length * 1.5)));
-  const gap = Math.max(2, Math.floor(barW / 3));
-  const svgW = arr.length * (barW + gap) + gap;
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("width", "100%");
-  svg.setAttribute("height", height);
-  svg.setAttribute("viewBox", `0 0 ${svgW} ${height}`);
-  arr.forEach((v, i) => {
-    const h = Math.round((v / max) * (height - 20));
-    const x = gap + i * (barW + gap);
-    const y = height - h - 10;
-    const rect = document.createElementNS(svg.namespaceURI, "rect");
-    rect.setAttribute("x", x); rect.setAttribute("y", y);
-    rect.setAttribute("width", barW); rect.setAttribute("height", h);
-    rect.setAttribute("rx", 4);
-    rect.setAttribute("fill", "currentColor");
-    svg.appendChild(rect);
-  });
-  container.innerHTML = "";
-  container.style.color = "var(--primary)";
-  container.appendChild(svg);
-}
+
 
 /* ===========================
 Innstillinger
@@ -1001,9 +1136,41 @@ function initBuddyReadPage() {
 
   function renderChat(groupId) {
     const msgs = getChat(groupId);
-    chatMessages.innerHTML = msgs.map(m => `<div style="padding:6px 8px;margin:6px 0;background:var(--background);border-radius:8px"><div style="font-size:.75rem;color:#999">${new Date(m.t).toLocaleString()}</div><div>${escapeHTML(m.text)}</div></div>`).join("");
+    chatMessages.innerHTML = msgs.map(m => {
+      const me = true; // alt er «meg» lokalt – utvid når du får backend
+      const reacts = Object.entries(m.reacts || {}).map(([emo, c]) => `<span class="react" title="${c}">${emo} ${c}</span>`).join("");
+      return `<div class="msg ${me ? "me" : "other"}" data-id="${m.id}">
+        <div>${escapeHTML(m.text)}</div>
+        <div class="reactions">${reacts}</div>
+        <div class="time">${new Date(m.t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
+      </div>`;
+    }).join("");
     chatMessages.scrollTop = chatMessages.scrollHeight;
   }
+
+  const emoBtn = byId("emoji-btn");
+  const picker = byId("emoji-picker");
+  const EMOJIS = ["👍", "❤️", "🔥", "😂", "👏", "😮", "😢", "🤯", "🫶", "🎉", "✅", "⭐️"];
+  if (picker) picker.innerHTML = EMOJIS.map(e => `<span class="e">${e}</span>`).join("");
+
+  on(emoBtn, "click", () => {
+    picker.style.display = picker.style.display === "grid" ? "none" : "grid";
+  });
+
+  picker?.addEventListener("click", (e) => {
+    const el = e.target.closest(".e"); if (!el) return;
+    const gid = detail.dataset.id; if (!gid) return;
+    const msgs = getChat(gid); if (!msgs.length) return;
+    const last = msgs[msgs.length - 1];
+    last.reacts = last.reacts || {};
+    const emo = el.textContent;
+    last.reacts[emo] = (last.reacts[emo] || 0) + 1;
+    setChat(gid, msgs);
+    picker.style.display = "none";
+    renderChat(gid);
+  });
+
+
 
   on(sendBtn, "click", () => {
     const gid = detail.dataset.id;
@@ -1011,11 +1178,12 @@ function initBuddyReadPage() {
     const txt = (chatInput.value || "").trim();
     if (!txt) return;
     const msgs = getChat(gid);
-    msgs.push({ t: Date.now(), text: txt });
+    msgs.push({ id: uid(), t: Date.now(), text: txt, reacts: {} });
     setChat(gid, msgs);
     chatInput.value = "";
     renderChat(gid);
   });
+
 
   on(createBtn, "click", () => {
     const name = (groupName.value || "").trim();

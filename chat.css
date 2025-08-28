@@ -1,0 +1,120 @@
+/* chat.css */
+.chat-shell {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 14px;
+    margin: 14px 0;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, .04);
+}
+
+.chat-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 2px 12px;
+}
+
+.chat-header .title {
+    font-weight: 800;
+    font-size: 1.05rem;
+    color: var(--text);
+}
+
+.chat-header .avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+}
+
+.chat-messages {
+    background: var(--background);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 10px;
+    height: 320px;
+    overflow: auto;
+}
+
+.bubble {
+    max-width: 78%;
+    margin: 8px 0;
+    padding: 10px 14px;
+    border-radius: 18px;
+    line-height: 1.35;
+    font-size: .95rem;
+    position: relative;
+}
+
+.bubble .meta {
+    font-size: 10px;
+    opacity: .65;
+    margin-top: 4px;
+}
+
+.bubble.me {
+    margin-left: auto;
+    background: var(--primary);
+    color: #fff;
+    border-bottom-right-radius: 6px;
+}
+
+.bubble.them {
+    margin-right: auto;
+    background: #f3f5fa;
+    color: #111;
+    border-bottom-left-radius: 6px;
+}
+
+.chat-input {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.chat-input input {
+    flex: 1;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+}
+
+.send-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 14px;
+    border-radius: 12px;
+    border: 1px solid var(--primary);
+    background: var(--primary);
+    color: #fff;
+    font-weight: 700;
+}
+
+.emoji-picker {
+    position: absolute;
+    bottom: 72px;
+    right: 22px;
+    display: none;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 4px;
+    padding: 8px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.emoji-picker .e {
+    cursor: pointer;
+    font-size: 18px;
+}
+
+.reacts {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+    font-size: 14px;
+    opacity: .9;
+}
