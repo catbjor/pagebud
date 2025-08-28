@@ -2,26 +2,39 @@
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>PageBud</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-  <link rel="stylesheet" href="style.css?v=2025-08-28-2">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link rel="stylesheet" href="style.css?v=2025-08-28-25" />
   <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
   <meta name="theme-color" content="#111111">
 </head>
 
 <body>
   <div class="app-container">
+
+    <!-- Header -->
     <header class="header">
       <h1>PageBud</h1>
+      <div style="display:flex;gap:8px">
+        <button class="back-button" onclick="location.href='discover.html'" title="Discover"><i
+            class="fa-solid fa-compass"></i></button>
+        <button class="back-button" onclick="location.href='friends.html'" title="Friends"><i
+            class="fa-solid fa-user-group"></i></button>
+      </div>
     </header>
 
-    <div class="categories" style="border-top:1px solid var(--border);padding-top:12px;">
-      <input id="search-input" class="form-control" placeholder="Search by title or author…">
+    <!-- Search -->
+    <div class="categories" style="border-top:1px solid var(--border); padding-top:12px;">
+      <input id="search-input" class="form-control" placeholder="Search by title or author…" />
     </div>
 
-    <div class="categories scroll-x" id="filter-chips" style="position:relative;z-index:2;">
+    <!-- Filter chips -->
+    <div class="categories scroll-x" id="filter-chips">
       <div class="category active" data-filter="all">All Books</div>
       <div class="category" data-filter="reading">Reading</div>
       <div class="category" data-filter="finished">Finished</div>
@@ -32,31 +45,41 @@
       <div class="category" data-filter="wishlist">Wishlist</div>
     </div>
 
-    <div class="categories" style="padding-top:0">
-      <a class="btn" style="flex:1;text-decoration:none" href="discover.html">
+    <!-- Discover / Friends short-cuts -->
+    <div class="categories promo-row" style="gap:12px">
+      <div class="btn btn-secondary" style="flex:1" onclick="location.href='discover.html'">
         <div style="font-weight:800">Discover</div>
-        <div class="muted" style="font-size:.85rem;margin-top:2px">Trending & recommendations</div>
-      </a>
-      <a class="btn" style="flex:1;text-decoration:none" href="friends.html">
+        <div class="muted" style="font-size:.85rem">Trending & recommendations</div>
+      </div>
+      <div class="btn btn-secondary" style="flex:1" onclick="location.href='friends.html'">
         <div style="font-weight:800">Friends</div>
-        <div class="muted" style="font-size:.85rem;margin-top:2px">See what friends read</div>
-      </a>
+        <div class="muted" style="font-size:.85rem">See what friends read</div>
+      </div>
     </div>
 
+    <!-- Library -->
     <section class="library">
       <h2>My Library</h2>
       <div id="empty-state" class="empty-state" style="display:none">
         <div class="empty-icon"><i class="fas fa-book-open"></i></div>
-        <h3>Your library is empty</h3>
+        <h3>Oh-oh! Your library is empty…</h3>
         <p>Add your first book to get started</p>
       </div>
       <div id="book-grid" class="book-grid"></div>
     </section>
 
-    <button id="add-book-btn" class="add-book" title="Add Book" aria-label="Add Book" style="z-index:999;">
+    <!-- Friends feed -->
+    <section class="library">
+      <h2>Friends activity</h2>
+      <div id="friends-feed" class="card" style="padding:12px"></div>
+    </section>
+
+    <!-- FAB -->
+    <button id="add-book-btn" class="add-book" title="Add Book" aria-label="Add Book">
       <i class="fas fa-plus"></i>
     </button>
 
+    <!-- Bottom Nav -->
     <nav class="bottom-nav">
       <div class="nav-item active"><i class="fas fa-book"></i> Library</div>
       <div class="nav-item" onclick="location.href='stats.html'"><i class="fas fa-chart-line"></i> Stats</div>
@@ -65,11 +88,31 @@
     </nav>
   </div>
 
-  <script src="firebase.js"></script>
+  <!-- App JS -->
+  <script src="script.js?v=2025-08-28-25"></script>
+
+  <!-- Firebase (compat) + init + sync + feed -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="firebase-init.js"></script>
   <script src="sync.js"></script>
-  <script src="script.js?v=2025-08-28-2"></script>
+  <script src="social-feed.js"></script>
+  <script src="firebase-init.js"></script>
+  <script src="sync.js"></script>
   <script>
-    requireAuth(async () => { PBSync.subscribe(); await PBSync.pushAll(); });
+    requireAuth(async (user) => {
+      PBSync.subscribe();
+      await PBSync.pushAll();
+    });
+  </script>
+
+  <script>
+    requireAuth(async (user) => {
+      PBSync.subscribe();
+      await PBSync.pushAll();
+      startSocialFeed(); // venne-aktivitet
+    });
   </script>
 </body>
 

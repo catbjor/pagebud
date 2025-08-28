@@ -535,6 +535,7 @@ function initAddEditPage() {
     if (idx >= 0) books[idx] = b; else books.push(b);
     saveBooks(books);
     alert("Saved ✓");
+    window.publishActivity && publishActivity(b);
     location.href = "index.html";
   });
 

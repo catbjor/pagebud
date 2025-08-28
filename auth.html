@@ -2,58 +2,89 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Sign in – PageBud</title>
-    <link rel="stylesheet" href="style.css?v=2025-08-28-2">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="auth.css">
+
+    <!-- Firebase compat SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+
+    <!-- Bootstrap our global fb helper -->
+    <script src="firebase-init.js"></script>
 </head>
 
-<body>
-    <div class="app-container">
-        <div class="stats-header">
-            <h1>Sign in</h1>
-        </div>
-        <div class="content-wrapper">
-            <div class="stats-section">
-                <button id="googleBtn" class="btn btn-primary full-width"><i class="fab fa-google"
-                        style="margin-right:8px"></i> Sign in with Google</button>
-            </div>
+<body style="background:#fff;">
+    <div class="auth-shell">
+        <div class="auth-card">
+            <h1 class="auth-title">PageBud</h1>
 
-            <div class="stats-section">
-                <div class="section-header">
-                    <div class="section-title"><i class="fas fa-envelope"></i><span>Email</span></div>
+            <button id="googleBtn" class="btn btn-google">
+                <i class="fab fa-google"></i> Sign in with Google
+            </button>
+
+            <div class="auth-sep"><span>or</span></div>
+
+            <form id="emailForm" class="auth-form">
+                <label>Email</label>
+                <input id="email" type="email" required placeholder="you@example.com" />
+
+                <label>Password</label>
+                <input id="password" type="password" minlength="6" required placeholder="••••••••" />
+
+                <div class="row">
+                    <button type="submit" class="btn btn-primary">Sign in</button>
+                    <button type="button" id="createBtn" class="btn btn-muted">Create account</button>
                 </div>
-                <div class="form-group"><label>Email</label><input id="em" class="form-control" type="email"></div>
-                <div class="form-group"><label>Password</label><input id="pw" class="form-control" type="password">
-                </div>
-                <div class="btn-group">
-                    <button id="emailIn" class="btn btn-primary">Sign in</button>
-                    <button id="emailUp" class="btn">Create account</button>
-                </div>
-            </div>
+            </form>
+
+            <p class="muted small" style="margin-top:10px">
+                Trouble signing in? Make sure your domain is whitelisted in Firebase → Auth → Settings → Authorized
+                domains.
+            </p>
         </div>
     </div>
 
-    <script src="firebase.js"></script>
     <script>
-        // Tillatte domener (gjort i Firebase-konsollen). Her bare sign-in.
-        document.getElementById('googleBtn').addEventListener('click', async () => {
+        // --- Auth handlers (runs AFTER firebase-init.js, so fb is defined) ---
+        const emailEl = document.getElementById("email");
+        const passEl = document.getElementById("password");
+
+        document.getElementById("googleBtn").addEventListener("click", async () => {
             try {
-                await fb.auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+                const provider = new firebase.auth.GoogleAuthProvider();
+                await fb.auth.signInWithPopup(provider);
                 location.href = "index.html";
-            } catch (e) { alert(e.message); }
+            } catch (e) {
+                alert(e.message || "Google sign-in failed");
+            }
         });
 
-        document.getElementById('emailIn').addEventListener('click', async () => {
-            const em = em.value || document.getElementById('em').value, pw = document.getElementById('pw').value;
-            try { await fb.auth.signInWithEmailAndPassword(em, pw); location.href = "index.html"; } catch (e) { alert(e.message); }
+        document.getElementById("emailForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            try {
+                await fb.auth.signInWithEmailAndPassword(emailEl.value.trim(), passEl.value);
+                location.href = "index.html";
+            } catch (e) {
+                alert(e.message || "Sign in failed");
+            }
         });
-        document.getElementById('emailUp').addEventListener('click', async () => {
-            const em = document.getElementById('em').value, pw = document.getElementById('pw').value;
-            try { await fb.auth.createUserWithEmailAndPassword(em, pw); location.href = "index.html"; } catch (e) { alert(e.message); }
+
+        document.getElementById("createBtn").addEventListener("click", async () => {
+            try {
+                await fb.auth.createUserWithEmailAndPassword(emailEl.value.trim(), passEl.value);
+                location.href = "index.html";
+            } catch (e) {
+                alert(e.message || "Create account failed");
+            }
         });
     </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js" defer></script>
 </body>
 
 </html>

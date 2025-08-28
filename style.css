@@ -1849,3 +1849,36 @@ input:checked+.slider:before {
   --text-light: #c0b6c4;
   --border: #2b2630;
 }
+
+/* --- Clickability hotfixes --- */
+.promo-row {
+  position: relative;
+  z-index: 1;
+}
+
+.add-book {
+  position: fixed;
+  right: 16px;
+  bottom: 88px;
+  z-index: 3000;
+}
+
+.bottom-nav {
+  z-index: 2000;
+}
+
+.header,
+.categories {
+  position: relative;
+  z-index: 2;
+}
+
+/* Floating Add Book button over alt */
+.add-book {
+  position: fixed;
+  /* hvis den ikke allerede er fixed */
+  right: 20px;
+  bottom: 84px;
+  /* over tab-baren */
+  z-index: 1100;
+}

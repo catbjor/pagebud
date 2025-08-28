@@ -1,45 +1,86 @@
-const q = document.getElementById("q");
-const results = document.getElementById("results");
+// discover.js – Open Library
+const GENRES = [
+    "All genres", "Romance", "Fantasy", "Mystery", "Horror", "Science fiction", "Young adult",
+    "Historical fiction", "Thriller", "Nonfiction", "Poetry", "Comics"
+];
 
-q.addEventListener("input", debounce(search, 300));
+const els = {
+    list: document.getElementById("results"),
+    g: document.getElementById("genreList"),
+    q: document.getElementById("q"),
+    qBtn: document.getElementById("qBtn"),
+    sortPopular: document.getElementById("sortPopular"),
+    sortNew: document.getElementById("sortNew"),
+};
 
-function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
+function coverUrl(obj) {
+    const id = obj.cover_i || obj.cover_id;
+    return id ? `https://covers.openlibrary.org/b/id/${id}-M.jpg`
+        : "https://covers.openlibrary.org/b/id/240727-M.jpg";
+}
+function tile(b) {
+    const title = (b.title || "Untitled").slice(0, 140);
+    const author = (b.author_name?.[0] || b.authors?.[0]?.name || "").slice(0, 120);
+    const year = b.first_publish_year || b.first_publish_date || "";
+    return `<div class="tile">
+    <img class="cover" src="${coverUrl(b)}" alt="">
+    <div>
+      <div class="t">${title}</div>
+      <div class="a">${author}</div>
+    </div>
+    <div class="meta">${year ? `First published<br><b>${year}</b>` : ""}</div>
+  </div>`;
+}
+function setLoading() { els.list.innerHTML = `<div class="muted">Loading…</div>`; }
 
-async function search() {
-    const s = (q.value || "").trim();
-    if (!s) { results.innerHTML = ""; return; }
-    const url = `https://openlibrary.org/search.json?q=${encodeURIComponent(s)}&limit=20`;
-    const res = await fetch(url);
-    const data = await res.json();
-    const items = (data.docs || []).map(d => ({
-        key: d.key, title: d.title, author: (d.author_name || [])[0] || "",
-        cover: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : ""
-    }));
-    results.innerHTML = items.map(b => `
-    <div class="card" style="display:flex;gap:12px;align-items:center">
-      <img src="${b.cover || ''}" alt="" style="width:48px;height:72px;object-fit:cover;border-radius:8px;background:#eee">
-      <div style="flex:1">
-        <div style="font-weight:800">${b.title}</div>
-        <div style="color:#6b6b6b">${b.author}</div>
-      </div>
-      <button class="btn btn-primary" data-add='${JSON.stringify(b).replace(/'/g, "&apos;")}'>Add</button>
-    </div>`).join("");
+async function fetchPopular(subject) { // “Popular” ≈ mange utgaver
+    const s = subject && subject !== "All genres" ? `&subject=${encodeURIComponent(subject)}` : "";
+    const url = `https://openlibrary.org/search.json?sort=editions&limit=20${s}`;
+    const r = await fetch(url); const j = await r.json();
+    return (j.docs || []).slice(0, 20);
+}
+async function fetchNewThisYear(subject) {
+    const year = new Date().getFullYear();
+    const s = subject && subject !== "All genres" ? `&subject=${encodeURIComponent(subject)}` : "";
+    const url = `https://openlibrary.org/search.json?published_in=${year}-${year}&limit=20${s}`;
+    const r = await fetch(url); const j = await r.json();
+    return (j.docs || []).slice(0, 20);
+}
+async function searchAny(q) {
+    const url = `https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=20`;
+    const r = await fetch(url); const j = await r.json();
+    return (j.docs || []).slice(0, 20);
+}
 
-    results.querySelectorAll("[data-add]").forEach(btn => {
-        btn.addEventListener("click", () => {
-            const b = JSON.parse(btn.getAttribute("data-add").replace(/&apos;/g, "'"));
-            const books = JSON.parse(localStorage.getItem("pb:books") || "[]");
-            books.push({
-                id: Math.random().toString(36).slice(2),
-                title: b.title, author: b.author,
-                status: "want", rating: 0,
-                coverDataUrl: b.cover, fileId: "", fileType: "",
-                genres: [], moods: [], tropes: [], review: "", notes: "",
-                quotes: [], startedAt: "", finishedAt: ""
-            });
-            localStorage.setItem("pb:books", JSON.stringify(books));
-            btn.textContent = "Added ✓";
-            btn.disabled = true;
-        });
+let currentGenre = "All genres";
+let currentFetcher = fetchPopular;
+
+async function render() {
+    setLoading();
+    try {
+        const rows = await currentFetcher(currentGenre);
+        if (!rows.length) { els.list.innerHTML = `<div class="muted">No results.</div>`; return; }
+        els.list.innerHTML = rows.map(tile).join("");
+    } catch (e) { els.list.innerHTML = `<div class="muted">Failed to load.</div>`; }
+}
+
+function renderGenres() {
+    els.g.innerHTML = GENRES.map(g => `<span class="side-link ${g === currentGenre ? 'active' : ''}" data-g="${g}">${g}</span>`).join("");
+    els.g.querySelectorAll(".side-link").forEach(el => {
+        el.onclick = () => { currentGenre = el.dataset.g; renderGenres(); render(); };
     });
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+    renderGenres();
+    els.qBtn.onclick = async () => {
+        const q = els.q.value.trim();
+        if (!q) return;
+        setLoading();
+        const rows = await searchAny(q);
+        els.list.innerHTML = rows.map(tile).join("");
+    };
+    els.sortPopular.onclick = () => { currentFetcher = fetchPopular; render(); };
+    els.sortNew.onclick = () => { currentFetcher = fetchNewThisYear; render(); };
+    render();
+});

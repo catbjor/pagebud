@@ -2,39 +2,151 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Discover – PageBud</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <link rel="stylesheet" href="style.css?v=2025-08-28-1">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .disc-shell {
+            display: grid;
+            grid-template-columns: 220px 1fr;
+            gap: 16px;
+            padding: 16px;
+        }
+
+        @media (max-width:860px) {
+            .disc-shell {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .disc-side {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 12px;
+        }
+
+        .disc-main {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 12px;
+        }
+
+        .side-title {
+            font-weight: 900;
+            margin: 4px 0 10px;
+        }
+
+        .side-link {
+            display: block;
+            padding: 8px 10px;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+
+        .side-link:hover {
+            background: var(--hover);
+        }
+
+        .active.side-link {
+            background: var(--primary-soft);
+            color: var(--primary-ink);
+            font-weight: 800;
+        }
+
+        .search-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .search-row input {
+            flex: 1;
+        }
+
+        .list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .tile {
+            display: grid;
+            grid-template-columns: 92px 1fr auto;
+            gap: 12px;
+            align-items: center;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 8px;
+        }
+
+        .cover {
+            width: 92px;
+            height: 125px;
+            object-fit: cover;
+            border-radius: 8px;
+            background: #eee;
+        }
+
+        .t {
+            font-weight: 900;
+            margin-bottom: 4px;
+        }
+
+        .a {
+            color: var(--text-light);
+            font-size: .9rem;
+        }
+
+        .meta {
+            text-align: right;
+            color: var(--text-light);
+            font-size: .85rem;
+        }
+
+        .pill {
+            display: inline-block;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            padding: 4px 8px;
+            font-size: .75rem;
+        }
+    </style>
+
+    <!-- Firebase (optional her – kun for requireAuth hvis du vil låse siden) -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="firebase-init.js"></script>
 </head>
 
 <body>
     <div class="app-container">
-        <div class="stats-header">
-            <div class="back-button" onclick="location.href='index.html'"><i class="fas fa-arrow-left"></i></div>
+        <div class="header">
             <h1>Discover</h1>
-            <div style="width:32px"></div>
         </div>
 
-        <div class="content-wrapper">
-            <div class="form-group">
-                <input id="dSearch" class="form-control" placeholder="Search books… (title, author)">
-            </div>
+        <div class="disc-shell">
+            <aside class="disc-side">
+                <div class="side-title">Browse popular genres</div>
+                <div id="genreList"></div>
+            </aside>
 
-            <div class="stats-section">
-                <div class="section-header">
-                    <div class="section-title"><i class="fas fa-fire"></i><span>Curated Shelves</span></div>
+            <main class="disc-main">
+                <div class="search-row">
+                    <input id="q" class="form-control" placeholder="Search by keyword…" />
+                    <button id="qBtn" class="btn btn-secondary" style="width:auto">Search</button>
                 </div>
-                <div class="overview-grid" id="shelves">
-                    <a class="btn" href="#sec-classics">Classics</a>
-                    <a class="btn" href="#sec-dark">Dark Romance</a>
-                    <a class="btn" href="#sec-banned">Banned Books</a>
-                    <a class="btn" href="#sec-comedy">Comedy</a>
-                </div>
-            </div>
 
-            <div id="results"></div>
+                <div style="display:flex;gap:8px;margin:6px 2px 12px;">
+                    <span class="pill" id="sortPopular">Popular</span>
+                    <span class="pill" id="sortNew">New this year</span>
+                </div>
+
+                <div id="results" class="list" aria-live="polite"></div>
+            </main>
         </div>
 
         <nav class="bottom-nav">
@@ -44,49 +156,8 @@
         </nav>
     </div>
 
-    <script src="firebase.js"></script>
-    <script>
-        const R = document.getElementById('results');
-        const cover = (b) => b.cover_i ? `https://covers.openlibrary.org/b/id/${b.cover_i}-M.jpg` : '';
-        const card = (b) => `<div class="book-card" style="display:flex;gap:12px;align-items:center">
-          <img src="${cover(b)}" alt="" style="width:56px;height:84px;object-fit:cover;border-radius:8px;background:var(--background)">
-          <div><div class="book-title">${(b.title || 'Untitled')}</div>
-          <div class="book-author">${(b.author_name || [''])[0] || ''}</div></div>
-        </div>`;
-
-        async function q(query, title) {
-            const url = `https://openlibrary.org/search.json?q=${encodeURIComponent(query)}&limit=12`;
-            const res = await fetch(url); const json = await res.json();
-            const items = (json.docs || []).slice(0, 12);
-            return `<div class="stats-section" id="sec-${title.toLowerCase().replace(/\s+/g, '-')}">
-          <div class="section-header"><div class="section-title"><i class="fas fa-tag"></i><span>${title}</span></div></div>
-          <div class="authors-list">${items.map(card).join('')}</div>
-        </div>`;
-        }
-
-        async function loadDefault() {
-            R.innerHTML = (await Promise.all([
-                q('subject:classics', 'Classics'),
-                q('dark romance', 'Dark Romance'),
-                q('banned books', 'Banned Books'),
-                q('funny OR humor', 'Comedy'),
-            ])).join('');
-        }
-
-        document.getElementById('dSearch').addEventListener('keydown', async (e) => {
-            if (e.key !== 'Enter') return;
-            const t = e.target.value.trim(); if (!t) return loadDefault();
-            const url = `https://openlibrary.org/search.json?q=${encodeURIComponent(t)}&limit=20`;
-            const res = await fetch(url); const json = await res.json();
-            const items = (json.docs || []);
-            R.innerHTML = `<div class="stats-section"><div class="section-header">
-          <div class="section-title"><i class="fas fa-search"></i><span>Results</span></div></div>
-          <div class="authors-list">${items.map(card).join('')}</div></div>`;
-        });
-
-        loadDefault();
-        requireAuth(() => { });
-    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js" defer></script>
+    <script src="discover.js"></script>
 </body>
 
 </html>

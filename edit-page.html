@@ -7,7 +7,7 @@
   <title>Edit Book - PageBud</title>
 
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-  <link rel="stylesheet" href="style.css?v=2025-08-26-22" />
+  <link rel="stylesheet" href="style.css?v=2025-08-26-25" />
   <link rel="manifest" href="manifest.json">
   <script>
     document.documentElement.setAttribute('data-theme', localStorage.getItem('pb:theme') || 'default');
@@ -15,9 +15,12 @@
 
 
   <!-- Reader libs -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <!-- (legg til messaging-compat der du trenger web push) -->
+  <script src="firebase-init.js"></script>
+
 </head>
 
 <body>
@@ -310,7 +313,7 @@
 
 
 
-  <script src="script.js?v=2025-08-26-22"></script>
+  <script src="script.js?v=2025-08-26-25"></script>
   <script src="firebase.js"></script>
   <script src="sync.js"></script>
   <script>

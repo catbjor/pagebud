@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Buddy Read - PageBud</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-  <link rel="stylesheet" href="style.css?v=2025-08-28-2">
+  <link rel="stylesheet" href="style.css?v=2025-08-28-25">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#111111">
 </head>
@@ -100,9 +100,18 @@
   </div>
 
   <script src="firebase.js"></script>
-  <script src="script.js?v=2025-08-28-2"></script>
+  <script src="script.js?v=2025-08-28-25"></script>
   <script src="buddy-chat.js"></script>
   <script>requireAuth(() => { });</script>
+  <script src="firebase-init.js"></script>
+  <script src="sync.js"></script>
+  <script>
+    requireAuth(async (user) => {
+      PBSync.subscribe();
+      await PBSync.pushAll();
+    });
+  </script>
+
 </body>
 
 </html>

@@ -1,8 +1,8 @@
 // sync.js
 const LS_BOOKS_KEY = "pb:books";
-
 const nowIso = () => new Date().toISOString();
 const safeLoad = () => { try { return JSON.parse(localStorage.getItem(LS_BOOKS_KEY) || "[]"); } catch { return []; } };
+const saveLocal = (arr) => localStorage.setItem(LS_BOOKS_KEY, JSON.stringify(arr));
 const byUserBooks = (uid) => fb.db.collection("users").doc(uid).collection("books");
 
 function mergeByUpdated(localArr, cloudArr) {
@@ -19,13 +19,14 @@ function mergeByUpdated(localArr, cloudArr) {
 }
 
 window.PBSync = {
+    _unsub: null,
     subscribe() {
         const u = fb.auth.currentUser; if (!u) return;
         this._unsub && this._unsub();
-        this._unsub = byUserBooks(u.uid).orderBy("lastUpdated", "desc").onSnapshot(s => {
+        this._unsub = byUserBooks(u.uid).onSnapshot(s => {
             const cloud = []; s.forEach(d => cloud.push({ id: d.id, ...d.data() }));
             const merged = mergeByUpdated(safeLoad(), cloud);
-            localStorage.setItem(LS_BOOKS_KEY, JSON.stringify(merged));
+            saveLocal(merged);
             document.dispatchEvent(new CustomEvent("pb:booksSynced"));
             console.log("[sync] pulled", cloud.length);
         }, err => console.error("[sync] sub error", err));

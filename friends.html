@@ -2,120 +2,75 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Friends – PageBud</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <link rel="stylesheet" href="style.css?v=2025-08-28-1">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <link rel="stylesheet" href="style.css?v=2025-08-28-25" />
 </head>
 
 <body>
     <div class="app-container">
-        <div class="stats-header">
-            <div class="back-button" onclick="location.href='index.html'"><i class="fas fa-arrow-left"></i></div>
+        <div class="header">
             <h1>Friends</h1>
-            <div style="width:32px"></div>
+            <div class="back-button" onclick="location.href='index.html'"><i class="fas fa-arrow-left"></i></div>
         </div>
 
         <div class="content-wrapper">
             <div class="stats-section">
                 <div class="section-header">
-                    <div class="section-title"><i class="fas fa-user-plus"></i><span>Add by email</span></div>
+                    <div class="section-title"><i class="fa-solid fa-user-plus"></i><span>Add a friend</span></div>
                 </div>
                 <div class="form-group">
-                    <input id="addEmail" class="form-control" placeholder="friend@example.com">
+                    <label for="friend-email">By email (must be a PageBud user)</label>
+                    <input id="friend-email" class="form-control" placeholder="friend@example.com" />
                 </div>
-                <button id="sendReq" class="btn btn-primary full-width">Send request</button>
-                <div class="muted" style="margin-top:8px">Bruker e-posten som er logget i Firebase. Vi lagrer email→uid
-                    indeks ved innlogging.</div>
+                <button id="send-req" class="btn btn-primary full-width">Send request</button>
+                <div id="req-status" class="muted" style="margin-top:8px"></div>
             </div>
 
             <div class="stats-section">
                 <div class="section-header">
-                    <div class="section-title"><i class="fas fa-inbox"></i><span>Requests</span></div>
+                    <div class="section-title"><i class="fa-solid fa-inbox"></i><span>Requests</span></div>
                 </div>
-                <div id="reqList" class="authors-list"></div>
+                <div id="incoming"></div>
             </div>
 
             <div class="stats-section">
                 <div class="section-header">
-                    <div class="section-title"><i class="fas fa-users"></i><span>Friends</span></div>
+                    <div class="section-title"><i class="fa-solid fa-user-group"></i><span>Your friends</span></div>
                 </div>
-                <div id="friendsList" class="authors-list"></div>
+                <div id="friend-list"></div>
             </div>
         </div>
 
         <nav class="bottom-nav">
             <div class="nav-item" onclick="location.href='index.html'"><i class="fas fa-book"></i> Library</div>
             <div class="nav-item" onclick="location.href='discover.html'"><i class="fas fa-compass"></i> Discover</div>
-            <div class="nav-item active"><i class="fas fa-user-friends"></i> Friends</div>
+            <div class="nav-item active"><i class="fas fa-users"></i> Friends</div>
             <div class="nav-item" onclick="location.href='settings.html'"><i class="fas fa-cog"></i> Settings</div>
         </nav>
     </div>
 
-    <script src="firebase.js"></script>
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <!-- (legg til messaging-compat der du trenger web push) -->
+    <script src="firebase-init.js"></script>
+
+    <script src="firebase-init.js"></script>
+    <script src="friends.js"></script>
+    <script> requireAuth(() => startFriends()); </script>
+    <script src="firebase-init.js"></script>
+    <script src="sync.js"></script>
     <script>
-        const reqList = document.getElementById('reqList');
-        const friendsList = document.getElementById('friendsList');
-
-        function row(left, right = '') { return `<div class="author-item"><div class="author-name">${left}</div><div class="author-count">${right}</div></div>`; }
-
-        requireAuth((u) => {
-            // Lytt på innkommende requests
-            fb.db.collection('users').doc(u.uid).collection('friendRequests')
-                .onSnapshot(s => {
-                    const arr = []; s.forEach(d => arr.push({ id: d.id, ...d.data() }));
-                    reqList.innerHTML = arr.length ? arr.map(r => {
-                        return `<div class="author-item">
-                <div class="author-name">${r.fromEmail || 'Unknown'}</div>
-                <div style="display:flex;gap:8px">
-                  <button class="btn btn-primary" data-acc="${r.from}">Accept</button>
-                  <button class="btn" data-rej="${r.from}">Decline</button>
-                </div></div>`;
-                    }).join('') : '<div class="muted">No requests</div>';
-                });
-
-            // Venneliste
-            fb.db.collection('users').doc(u.uid).collection('friends')
-                .onSnapshot(s => {
-                    const arr = []; s.forEach(d => arr.push(d.data()));
-                    friendsList.innerHTML = arr.length ? arr.map(f => row(f.email || f.uid)).join('') : '<div class="muted">No friends yet</div>';
-                });
-
-            // Send request
-            document.getElementById('sendReq').addEventListener('click', async () => {
-                const email = (document.getElementById('addEmail').value || '').trim().toLowerCase();
-                if (!email) return;
-                try {
-                    const map = await fb.db.collection('usersByEmail').doc(email).get();
-                    if (!map.exists) { alert('User not found'); return; }
-                    const to = map.data().uid;
-                    if (to === u.uid) { alert('That’s you 😉'); return; }
-
-                    await fb.db.collection('users').doc(to).collection('friendRequests').doc(u.uid)
-                        .set({ from: u.uid, fromEmail: u.email || "", createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-                    alert('Request sent ✓');
-                } catch (e) { console.error(e); alert('Failed'); }
-            });
-
-            // Accept/Decline (event-delegation)
-            reqList.addEventListener('click', async (e) => {
-                const acc = e.target.getAttribute('data-acc');
-                const rej = e.target.getAttribute('data-rej');
-                const other = acc || rej; if (!other) return;
-                try {
-                    if (acc) {
-                        const otherDoc = await fb.db.collection('users').doc(other).get();
-                        const otherEmail = (otherDoc.exists && otherDoc.data().email) || "";
-                        // legg begge veier
-                        await fb.db.collection('users').doc(u.uid).collection('friends').doc(other).set({ uid: other, email: otherEmail });
-                        await fb.db.collection('users').doc(other).collection('friends').doc(u.uid).set({ uid: u.uid, email: u.email || "" });
-                    }
-                    await fb.db.collection('users').doc(u.uid).collection('friendRequests').doc(other).delete();
-                } catch (err) { console.error(err); }
-            });
+        requireAuth(async (user) => {
+            PBSync.subscribe();
+            await PBSync.pushAll();
         });
     </script>
+
 </body>
 
 </html>
