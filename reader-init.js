@@ -1,10 +1,6 @@
 /* =========================================================
-   PageBud — EPUB init
-   - Oppretter ePub.js book+rendition
-   - Knytter font-størrelse og lukke-knapp
-   - KOBLER PÅ TEMA: PBReaderTheme.attach(rendition, { mount: '#reader-toolbar' })
+   PageBud — EPUB init (robust for dataURL → Blob)
    --------------------------------------------------------- */
-
 (function () {
     const shell = document.getElementById("epubReader");
     const viewer = document.getElementById("viewer");
@@ -16,61 +12,66 @@
     let rendition = null;
     let currentFontPct = parseInt(localStorage.getItem("pb:reader:fontPct") || "100", 10);
 
-    // Hjelpere
-    function showReader() { shell.removeAttribute("hidden"); }
-    function hideReader() { shell.setAttribute("hidden", ""); }
-
-    function applyFontSize(pct) {
-        currentFontPct = Math.max(70, Math.min(200, pct)); // 70%–200%
-        localStorage.setItem("pb:reader:fontPct", String(currentFontPct));
-        if (rendition) {
-            rendition.themes.fontSize(currentFontPct + "%");
-        }
+    const isDataURL = (s) => typeof s === "string" && s.startsWith("data:");
+    function dataURLtoBlob(dataUrl) {
+        const [header, b64] = dataUrl.split(',');
+        const mime = header.match(/data:(.*);base64/)[1] || "application/octet-stream";
+        const bin = atob(b64);
+        const len = bin.length;
+        const arr = new Uint8Array(len);
+        for (let i = 0; i < len; i++) arr[i] = bin.charCodeAt(i);
+        return new Blob([arr], { type: mime });
     }
 
-    // ===== INIT: kall denne med fil/URL når du vil åpne en EPUB =====
-    // f.eks. initEpubReader(fileInput.files[0]) ELLER initEpubReader('/books/my.epub')
+    function showReader() { shell && shell.removeAttribute("hidden"); }
+    function hideReader() { shell && shell.setAttribute("hidden", ""); }
+
+    function applyFontSize(pct) {
+        currentFontPct = Math.max(70, Math.min(200, pct));
+        localStorage.setItem("pb:reader:fontPct", String(currentFontPct));
+        if (rendition) rendition.themes.fontSize(currentFontPct + "%");
+    }
+
+    // PUBLIC
     window.initEpubReader = async function initEpubReader(fileOrUrl) {
         try {
             showReader();
 
-            // 1) Opprett bok (Blob eller URL)
-            book = ePub(fileOrUrl);
+            // 1) Blob/URL
+            const src = isDataURL(fileOrUrl) ? dataURLtoBlob(fileOrUrl) : fileOrUrl;
 
-            // 2) Render til viewer
+            // 2) Book + rendition
+            book = ePub(src);
             rendition = book.renderTo(viewer, {
                 width: "100%",
                 height: "100%",
-                spread: "auto",       // la ePub.js avgjøre oppslag
-                flow: "paginated"     // klassisk side-for-side scrolling
+                spread: "auto",
+                flow: "paginated"
             });
 
-            // 3) Koble på tema-knappen (Aa) — HER er linja du spurte etter
+            // 3) Tema-knapp
             PBReaderTheme.attach(rendition, { mount: "#reader-toolbar" });
 
-            // 4) Font-størrelse fra lagring
+            // 4) Font
             applyFontSize(currentFontPct);
 
-            // 5) Vis første lokasjon (eventuelt lagret)
+            // 5) Vent på readiness og vis
+            if (book.ready) { try { await book.ready; } catch { } }
             const savedCfi = localStorage.getItem("pb:reader:cfi");
             await rendition.display(savedCfi || undefined);
 
-            // 6) Oppdater lokasjon løpende
+            // 6) Lagre CFI ved flytting
             rendition.on("relocated", (location) => {
-                if (location && location.start && location.start.cfi) {
-                    localStorage.setItem("pb:reader:cfi", location.start.cfi);
-                }
+                if (location?.start?.cfi) localStorage.setItem("pb:reader:cfi", location.start.cfi);
             });
 
-            // 7) Piltaster venstre/høyre for side
+            // 7) Navigasjon
             document.addEventListener("keydown", keyHandler);
+            viewer.addEventListener("click", tapToTurn);
 
-            // 8) Font-kontroller
+            // 8) Font-knapper
             fontMinus.addEventListener("click", () => applyFontSize(currentFontPct - 10));
             fontPlus.addEventListener("click", () => applyFontSize(currentFontPct + 10));
-
-            // (valgfritt) Klikk venstre/høyre halvdel for forrige/neste
-            viewer.addEventListener("click", tapToTurn);
 
         } catch (err) {
             console.error("[EPUB init] error:", err);
@@ -79,42 +80,31 @@
         }
     };
 
-    // ----- Navigasjon -----
     function keyHandler(e) {
         if (!rendition) return;
-        const k = e.key;
-        if (k === "ArrowRight") { rendition.next(); }
-        else if (k === "ArrowLeft") { rendition.prev(); }
+        if (e.key === "ArrowRight") rendition.next();
+        else if (e.key === "ArrowLeft") rendition.prev();
     }
 
     function tapToTurn(e) {
         if (!rendition) return;
         const rect = viewer.getBoundingClientRect();
         const x = e.clientX - rect.left;
-        if (x < rect.width / 2) rendition.prev();
-        else rendition.next();
+        if (x < rect.width / 2) rendition.prev(); else rendition.next();
     }
 
-    // ----- Lukk leser -----
-    btnClose.addEventListener("click", () => {
+    btnClose?.addEventListener("click", () => {
         try {
             document.removeEventListener("keydown", keyHandler);
             viewer.removeEventListener("click", tapToTurn);
-            // Forsiktig opprydding; ePub.js har GC, men null stiller referanser
-            book = null;
-            rendition = null;
-        } finally {
-            hideReader();
-        }
+            book = null; rendition = null;
+        } finally { hideReader(); }
     });
 
-    // ===== BONUS: åpne via ?epub=URL =====
-    // Eks.: page.html?epub=/samples/alice.epub
+    // Bonus: ?epub=URL
     window.addEventListener("DOMContentLoaded", () => {
         const url = new URL(location.href);
         const epubUrl = url.searchParams.get("epub");
-        if (epubUrl) {
-            initEpubReader(epubUrl);
-        }
+        if (epubUrl) initEpubReader(epubUrl);
     });
 })();

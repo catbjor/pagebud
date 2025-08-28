@@ -4,23 +4,26 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>Edit Book - PageBud</title>
+  <title>Add Book - PageBud</title>
+
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-  <link rel="stylesheet" href="style.css?v=2025-08-26-25" />
-  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#111111" />
   <script>
     document.documentElement.setAttribute('data-theme', localStorage.getItem('pb:theme') || 'default');
   </script>
+
+  <!-- Reader libs (kan lese rett etter opplasting) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/epubjs@0.3/dist/epub.min.js"></script>
 </head>
 
-<body>
-  <div class="app-container edit-page">
+<body class="edit-page">
+  <div class="app-container">
     <!-- Header -->
-    <div class="add-book-header header">
-      <h1>Edit Book</h1>
+    <div class="header">
+      <h1>Add Book</h1>
       <div class="back-button" onclick="location.href='index.html'"><i class="fas fa-arrow-left"></i></div>
     </div>
 
@@ -42,18 +45,28 @@
       <label for="author">Author</label>
       <input id="author" type="text" placeholder="Author name…" />
     </div>
+
+    <!-- Single lifecycle status -->
     <div class="form-group">
       <label for="status">Status</label>
       <select id="status">
         <option value="reading">Reading</option>
-        <option value="finished">Favorites</option>
-        <option value="finished">Finished</option>
         <option value="want">TBR</option>
+        <option value="finished">Finished</option>
         <option value="dnf">DNF</option>
-        <option value="owned">Books I Own</option>
-        <option value="wishlist">Wishlist</option>
       </select>
     </div>
+
+    <!-- Multi-choice Tags -->
+    <details class="chip-toggle" id="tagsBox" open>
+      <summary>Tags</summary>
+      <div class="chip-scroll" id="tags">
+        <div class="toggle-option" data-val="favorite">Favorite</div>
+        <div class="toggle-option" data-val="owned">Owned</div>
+        <div class="toggle-option" data-val="wishlist">Wishlist</div>
+      </div>
+    </details>
+
     <div class="form-group">
       <label>Rating</label>
       <div id="stars" class="star-rating"></div>
@@ -74,38 +87,52 @@
       </div>
     </div>
 
-
-    <!-- Chips -->
+    <!-- Genres / Moods / Tropes -->
     <details class="chip-toggle" id="genresBox">
       <summary>Genres</summary>
       <div class="chip-scroll" id="genres">
-        <!-- Genre options will be populated by JavaScript -->
+        <div class="toggle-option">Romance</div>
+        <div class="toggle-option">Fantasy</div>
+        <div class="toggle-option">Mystery</div>
+        <div class="toggle-option">Horror</div>
+        <div class="toggle-option">Science fiction</div>
+        <div class="toggle-option">Young adult</div>
+        <div class="toggle-option">Thriller</div>
+        <div class="toggle-option">Historical fiction</div>
+        <div class="toggle-option">Non-fiction</div>
+        <div class="toggle-option">Dark Romance</div>
       </div>
     </details>
 
     <details class="chip-toggle" id="moodsBox">
       <summary>Moods</summary>
       <div class="chip-scroll" id="moods">
-        <!-- Mood options will be populated by JavaScript -->
+        <div class="toggle-option">💔 Angsty</div>
+        <div class="toggle-option">🧡 Cozy</div>
+        <div class="toggle-option">😱 Creepy</div>
+        <div class="toggle-option">🧟‍♀️ Dark</div>
+        <div class="toggle-option">⚡ Fast-paced</div>
+        <div class="toggle-option">🌸 Heartwarming</div>
+        <div class="toggle-option">🤯 Mind-bending</div>
+        <div class="toggle-option">🌙 Moody</div>
+        <div class="toggle-option">🐢 Slow-burn</div>
+        <div class="toggle-option">🌶️ Spicy</div>
       </div>
     </details>
 
-    <!-- Tropes -->
     <details class="chip-toggle" id="tropesBox">
       <summary>Tropes</summary>
       <div class="chip-scroll" id="tropes">
-        <!-- Trope options will be populated by JavaScript -->
+        <div class="toggle-option" data-val="enemies-to-lovers">Enemies to Lovers</div>
+        <div class="toggle-option" data-val="grumpy-sunshine">Grumpy x Sunshine</div>
+        <div class="toggle-option" data-val="friends-to-lovers">Friends to Lovers</div>
+        <div class="toggle-option" data-val="close-proximity">Close Proximity</div>
+        <div class="toggle-option" data-val="one-bed">Only One Bed</div>
+        <div class="toggle-option" data-val="billionaire">Billionaire</div>
+        <div class="toggle-option" data-val="royalty">Royalty</div>
+        <div class="toggle-option" data-val="slow-burn">Slow Burn</div>
       </div>
     </details>
-
-    <div class="form-group">
-      <label for="review">Review</label>
-      <textarea id="review" placeholder="Write your review…"></textarea>
-    </div>
-    <div class="form-group">
-      <label for="notes">Notes</label>
-      <textarea id="notes" placeholder="Add your notes…"></textarea>
-    </div>
 
     <div class="form-group">
       <label>Quotes</label>
@@ -132,30 +159,21 @@
     </div>
 
     <div class="btn-group">
-      <button id="delete-book-btn" class="btn btn-secondary">Delete Book</button>
       <button class="btn btn-secondary" onclick="location.href='index.html'">Cancel</button>
-      <button id="update-book-btn" class="btn btn-primary">Update Book</button>
+      <button id="update-book-btn" class="btn btn-primary">Save Book</button>
       <button id="read-book-btn" class="btn btn-primary">Read Book</button>
     </div>
 
     <!-- Bottom nav -->
     <nav class="bottom-nav">
-      <div class="nav-item" onclick="location.href='index.html'">
-        <i class="fas fa-book"></i> Library
-      </div>
-      <div class="nav-item" onclick="location.href='stats.html'">
-        <i class="fas fa-chart-line"></i> Stats
-      </div>
-      <div class="nav-item" onclick="location.href='buddy-read.html'">
-        <i class="fas fa-users"></i> Buddy Read
-      </div>
-      <div class="nav-item" onclick="location.href='settings.html'">
-        <i class="fas fa-cog"></i> Settings
-      </div>
+      <div class="nav-item" onclick="location.href='index.html'"><i class="fas fa-book"></i> Library</div>
+      <div class="nav-item" onclick="location.href='stats.html'"><i class="fas fa-chart-line"></i> Stats</div>
+      <div class="nav-item" onclick="location.href='buddy-read.html'"><i class="fas fa-users"></i> Buddy Read</div>
+      <div class="nav-item" onclick="location.href='settings.html'"><i class="fas fa-cog"></i> Settings</div>
     </nav>
   </div>
 
-  <!-- Reader Overlay -->
+  <!-- PDF/Generic Reader Overlay -->
   <div id="reader" class="reader-overlay" aria-hidden="true">
     <div class="reader-top">
       <div class="group">
@@ -179,17 +197,33 @@
     </div>
   </div>
 
-  <script src="script.js?v=2025-08-26-25"></script>
-  <script src="firebase.js"></script>
+  <!-- EPUB Reader -->
+  <section id="epubReader" class="reader-shell" aria-label="EPUB Reader" hidden>
+    <div id="reader-toolbar" class="reader-toolbar">
+      <button id="btnCloseReader" type="button" title="Close">✕</button>
+      <div class="spacer"></div>
+      <button id="fontMinus" type="button" title="Smaller text">A-</button>
+      <button id="fontPlus" type="button" title="Larger text">A+</button>
+    </div>
+    <div id="viewer" class="viewer" role="document" tabindex="0"></div>
+  </section>
+
+  <script src="reader-theme.js"></script>
+  <script src="reader-init.js"></script>
+
+  <!-- Firebase + app -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="firebase-init.js"></script>
   <script src="sync.js"></script>
+  <script src="script.js"></script>
   <script>
-    // Kjør på sider som viser/lagrer bøker (f.eks. index.html, add-book.html)
     requireAuth(async () => {
-      PBSync.subscribe();        // live fra sky → lokal
-      await PBSync.pushAll();    // første push av lokale → sky
+      PBSync.subscribe();
+      await PBSync.pushAll();
     });
   </script>
-
 </body>
 
 </html>

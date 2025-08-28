@@ -2,13 +2,16 @@
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Buddy Read - PageBud</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-  <link rel="stylesheet" href="style.css?v=2025-08-28-25">
-  <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#111111">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#111111" />
+  <script>
+    document.documentElement.setAttribute('data-theme', localStorage.getItem('pb:theme') || 'default');
+  </script>
 </head>
 
 <body>
@@ -26,12 +29,13 @@
         <div class="form-group"><label>Reading Schedule (optional)</label><input id="group-schedule"
             class="form-control" placeholder="e.g., 20 pages per day"></div>
         <button class="btn btn-primary" id="create-btn">Create Group</button>
+        <button class="btn btn-secondary" id="refresh-btn" style="margin-top:8px">Refresh Books</button>
       </div>
 
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
           <h2 style="font-size:1.2rem">Your Reading Groups</h2>
-          <button class="btn btn-secondary" id="refresh-btn" style="width:auto;padding:8px 12px">Refresh</button>
+          <span class="muted">Demo list</span>
         </div>
         <div id="groups-list" class="groups-list"></div>
         <div id="empty-groups" style="display:none;text-align:center;color:#6b6b6b;padding:14px">
@@ -54,7 +58,7 @@
             <div class="group-book-cover"><i class="fas fa-book"></i></div>
             <div>
               <div class="group-book-title" id="detail-book-title"></div>
-              <div id="detail-book-author" style="color:#6b6b6b"></div>
+              <div id="detail-book-author" class="muted"></div>
             </div>
           </div>
           <div style="margin-top:10px">
@@ -70,7 +74,8 @@
             <h3>Group Chat</h3><span id="online-count" class="muted">—</span>
           </div>
           <div class="chat-messages" id="chat-messages" aria-live="polite"></div>
-          <div class="chat-input"><button id="emoji-btn" class="btn" aria-label="Emoji">😊</button>
+          <div class="chat-input">
+            <button id="emoji-btn" class="btn" aria-label="Emoji">😊</button>
             <input id="chat-input" placeholder="Write a message…">
             <button class="send-btn" id="send-btn" title="Send"><i class="fas fa-paper-plane"></i></button>
           </div>
@@ -99,19 +104,23 @@
     </nav>
   </div>
 
-  <script src="firebase.js"></script>
-  <script src="script.js?v=2025-08-28-25"></script>
-  <script src="buddy-chat.js"></script>
-  <script>requireAuth(() => { });</script>
+  <!-- Firebase + app -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script src="firebase-init.js"></script>
   <script src="sync.js"></script>
+
+  <!-- Chat glue (lokalt per bruker, som i din fil) -->
+  <script src="buddy-chat.js"></script>
+
+  <script src="script.js"></script>
   <script>
-    requireAuth(async (user) => {
+    requireAuth(async () => {
       PBSync.subscribe();
       await PBSync.pushAll();
     });
   </script>
-
 </body>
 
 </html>
