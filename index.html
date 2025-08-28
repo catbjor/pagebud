@@ -1,21 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>PageBud</title>
-
-  <!-- Icons + Styles -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
-  <link rel="stylesheet" href="style.css?v=2025-08-26-19"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link rel="stylesheet" href="style.css?v=2025-08-26-18" />
   <link rel="manifest" href="manifest.json">
-
-  <!-- iOS PWA polish -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <meta name="theme-color" content="#111111">
 </head>
+
 <body>
   <div class="app-container">
     <!-- Header -->
@@ -25,23 +23,15 @@
 
     <!-- Search -->
     <div class="categories" style="border-top:1px solid var(--border); padding-top:12px;">
-      <input id="search-input" class="form-control" placeholder="Search by title or author…"/>
+      <input id="search-input" class="form-control" placeholder="Search by title or author…" />
     </div>
 
-    <div class="categories" style="gap:8px; padding-top:0">
-  <div class="view-toggle" id="viewToggle">
-    <button class="btn btn-secondary" data-view="grid">Grid</button>
-    <button class="btn btn-secondary" data-view="list">List</button>
-  </div>
-</div>
-
-
-    <!-- Category chips (horizontal scroll) -->
+    <!-- Category chips -->
     <div class="categories scroll-x" id="filter-chips">
       <div class="category active" data-filter="all">All Books</div>
       <div class="category" data-filter="reading">Reading</div>
       <div class="category" data-filter="finished">Finished</div>
-      <div class="category" data-filter="DNF">DNF</div>
+      <div class="category" data-filter="want">Want</div>
       <div class="category" data-filter="dnf">DNF</div>
       <div class="category" data-filter="favorites">Favorites</div>
       <div class="category" data-filter="owned">Owned</div>
@@ -51,13 +41,11 @@
     <!-- Library -->
     <section class="library">
       <h2>My Library</h2>
-
       <div id="empty-state" class="empty-state" style="display:none">
         <div class="empty-icon"><i class="fas fa-book-open"></i></div>
         <h3>Oh-oh! Your library is empty...</h3>
         <p>Add your first book to get started</p>
       </div>
-
       <div id="book-grid" class="book-grid"></div>
     </section>
 
@@ -77,9 +65,13 @@
       <div class="nav-item" onclick="location.href='buddy-read.html'">
         <i class="fas fa-users"></i> Buddy Read
       </div>
+      <div class="nav-item" onclick="location.href='settings.html'">
+        <i class="fas fa-cog"></i> Settings
+      </div>
     </nav>
   </div>
 
-  <script src="script.js?v=2025-08-26-19"></script>
+  <script src="script.js?v=2025-08-26-18"></script>
 </body>
+
 </html>

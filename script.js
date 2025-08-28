@@ -1,919 +1,1072 @@
 /* ============================================================
-   PageBud • script.js
-   - PWA update banner + Force Update
-   - LocalStorage (books) + IndexedDB (book files)
-   - Library (index.html): render, search, filter (+mini stars)
-   - Add/Edit: form, 6★ med halv-steg, chips, quotes, cover extraction
-   - Reader overlay: PDF/EPUB
-   - Stats: mål + charts + range-knapper
-   - Buddy Read: lokale grupper + “chat”
-   ============================================================ */
+PageBud • script.js
+--------------------------------------------------------------
+- PWA-oppdateringsbanner + force update
+- LocalStorage (bøker, mål, grupper, tema, streak) + IndexedDB (bokfiler)
+- Bibliotek (index.html): render, søk, filter, ministjerner
+- Add/Edit: skjema, 6★ med halv-trinn, chips, sitater, cover-ekstraksjon
+- Leser-overlay: PDF/EPUB
+- Stats: enkel oversikt + minidiagram (SVG)
+- Buddy Read: lokale grupper + "chat"
+- Innstillinger: tema, eksport/import/backup/reset, mål
+============================================================ */
 
 /* ===========================
-   Utilities
+Utils
 =========================== */
-const $  = (sel, root=document) => root.querySelector(sel);
-const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+const $ = (sel, root = document) => root.querySelector(sel);
+const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 const byId = id => document.getElementById(id);
-const on   = (el, ev, fn, opt) => el && el.addEventListener(ev, fn, opt);
-
-const clamp = (n,min,max)=>Math.max(min,Math.min(max,n));
-const uid   = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
-
-const LS_BOOKS_KEY    = "pb:books";
-const LS_GOALS_KEY    = "pb:goals";
-const LS_GROUPS_KEY   = "pb:groups";
-const LS_CHAT_PREFIX  = "pb:chat:";
-
-function loadBooks(){ try { return JSON.parse(localStorage.getItem(LS_BOOKS_KEY)||"[]"); } catch { return []; } }
-function saveBooks(v){ localStorage.setItem(LS_BOOKS_KEY, JSON.stringify(v)); }
-
-function getGoals(){ try { return JSON.parse(localStorage.getItem(LS_GOALS_KEY)||"{}"); } catch { return {}; } }
-function setGoals(v){ localStorage.setItem(LS_GOALS_KEY, JSON.stringify(v)); }
-
-function getGroups(){ try { return JSON.parse(localStorage.getItem(LS_GROUPS_KEY)||"[]"); } catch { return []; } }
-function setGroups(v){ localStorage.setItem(LS_GROUPS_KEY, JSON.stringify(v)); }
-
-function getChat(id){ try { return JSON.parse(localStorage.getItem(LS_CHAT_PREFIX+id)||"[]"); } catch { return []; } }
-function setChat(id, arr){ localStorage.setItem(LS_CHAT_PREFIX+id, JSON.stringify(arr)); }
-
-function qParam(name){ return new URL(location.href).searchParams.get(name); }
-function escapeHTML(s){ return (s||"").replace(/[&<>"']/g, c=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
+const on = (el, ev, fn, opt) => el && el.addEventListener(ev, fn, opt);
+const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+const ext = (name = '') => (name.split('.').pop() || '').toLowerCase();
+const fmt = n => Intl.NumberFormat().format(n);
+function qParam(name) { return new URL(location.href).searchParams.get(name); }
+function escapeHTML(s) {
+  return (s || "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
 
 /* ===========================
-   PWA: Service Worker + Update
+LocalStorage keys
+=========================== */
+const LS_BOOKS_KEY = "pb:books";
+const LS_GOALS_KEY = "pb:goals";
+const LS_GROUPS_KEY = "pb:groups";
+const LS_THEME_KEY = "pb:theme";
+const LS_STREAK_KEY = "pb:streak";
+const LS_CHAT_PREFIX = "pb:chat:";
+
+/* ===========================
+LocalStorage helpers
+=========================== */
+function loadBooks() { try { return JSON.parse(localStorage.getItem(LS_BOOKS_KEY) || "[]"); } catch { return []; } }
+function saveBooks(v) { localStorage.setItem(LS_BOOKS_KEY, JSON.stringify(v)); }
+function getGoals() { try { return JSON.parse(localStorage.getItem(LS_GOALS_KEY) || "{}"); } catch { return {}; } }
+function setGoals(v) { localStorage.setItem(LS_GOALS_KEY, JSON.stringify(v)); }
+function getGroups() { try { return JSON.parse(localStorage.getItem(LS_GROUPS_KEY) || "[]"); } catch { return []; } }
+function setGroups(v) { localStorage.setItem(LS_GROUPS_KEY, JSON.stringify(v)); }
+function getTheme() { return localStorage.getItem(LS_THEME_KEY) || "default"; }
+function setTheme(theme) { localStorage.setItem(LS_THEME_KEY, theme); document.documentElement.setAttribute("data-theme", theme); }
+function getStreakData() { try { return JSON.parse(localStorage.getItem(LS_STREAK_KEY) || '{"current":0,"lastDate":null}'); } catch { return { current: 0, lastDate: null }; } }
+function setStreakData(data) { localStorage.setItem(LS_STREAK_KEY, JSON.stringify(data)); }
+
+/* ===========================
+Lesestreak (pr. dag)
+=========================== */
+function updateReadingStreak() {
+  const today = new Date().toDateString();
+  const streakData = getStreakData();
+  if (streakData.lastDate === today) return streakData.current;
+  const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+  const ystr = yesterday.toDateString();
+  if (!streakData.lastDate) streakData.current = 1;
+  else if (streakData.lastDate === ystr) streakData.current += 1;
+  else streakData.current = 1;
+  streakData.lastDate = today;
+  setStreakData(streakData);
+  return streakData.current;
+}
+
+/* ===========================
+Chat-lagring pr. gruppe
+=========================== */
+function getChat(id) { try { return JSON.parse(localStorage.getItem(LS_CHAT_PREFIX + id) || "[]"); } catch { return []; } }
+function setChat(id, arr) { localStorage.setItem(LS_CHAT_PREFIX + id, JSON.stringify(arr)); }
+
+/* ===========================
+Tema: last ved start
+=========================== */
+document.addEventListener('DOMContentLoaded', () => {
+  const savedTheme = getTheme();
+  setTheme(savedTheme);
+  const themeSelect = byId('theme-select');
+  if (themeSelect) themeSelect.value = savedTheme;
+});
+
+/* ===========================
+PWA: Service Worker + Update
 =========================== */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js").then((reg)=>{
+  navigator.serviceWorker.register("./sw.js").then((reg) => {
     if (reg.waiting) showUpdateBanner(reg.waiting);
-    reg.addEventListener("updatefound", ()=>{
+    reg.addEventListener("updatefound", () => {
       const nw = reg.installing;
       if (!nw) return;
-      nw.addEventListener("statechange", ()=>{
-        if (nw.state==="installed" && navigator.serviceWorker.controller) showUpdateBanner(nw);
+      nw.addEventListener("statechange", () => {
+        if (nw.state === "installed" && navigator.serviceWorker.controller) showUpdateBanner(nw);
       });
     });
   });
-
   let refreshing = false;
-  navigator.serviceWorker.addEventListener("controllerchange", ()=>{
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
     if (refreshing) return;
-    refreshing = true; location.reload();
+    refreshing = true;
+    location.reload();
   });
 }
-
-function showUpdateBanner(worker){
+function showUpdateBanner(worker) {
   if (byId("pbUpdateBanner")) return;
   const btn = document.createElement("button");
   btn.id = "pbUpdateBanner";
   btn.className = "pb-update-banner";
   btn.textContent = "✨ New version available — tap to update";
-  btn.onclick = ()=> worker.postMessage({action:"skipWaiting"});
+  btn.onclick = () => worker.postMessage({ action: "skipWaiting" });
   document.body.appendChild(btn);
 }
-
-// Force update (med “nuclear” fallback)
 window.forceUpdateNow = async () => {
-  try{
+  try {
     const reg = await navigator.serviceWorker.getRegistration();
     if (!reg) { location.reload(); return; }
-    if (reg.waiting) { reg.waiting.postMessage({action:"skipWaiting"}); return; }
+    if (reg.waiting) { reg.waiting.postMessage({ action: "skipWaiting" }); return; }
     await reg.update();
-    if (reg.waiting) { reg.waiting.postMessage({action:"skipWaiting"}); return; }
+    if (reg.waiting) { reg.waiting.postMessage({ action: "skipWaiting" }); return; }
     await reg.unregister();
     location.reload();
-  }catch{ location.reload(); }
+  } catch {
+    location.reload();
+  }
 };
 
 /* ===========================
-   IndexedDB for book files
+IndexedDB (PDF/EPUB)
 =========================== */
 const DB_NAME = "pagebud-db";
 const DB_STORE = "files";
-
-function idbOpen(){
-  return new Promise((resolve,reject)=>{
+function idbOpen() {
+  return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, 1);
     req.onupgradeneeded = () => {
       const db = req.result;
-      if (!db.objectStoreNames.contains(DB_STORE)) db.createObjectStore(DB_STORE, { keyPath:"id" });
+      if (!db.objectStoreNames.contains(DB_STORE)) db.createObjectStore(DB_STORE, { keyPath: "id" });
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
 }
-async function idbPutFile(id, type, blob){
+async function idbPutFile(id, type, blob) {
   const db = await idbOpen();
-  return new Promise((resolve,reject)=>{
-    const tx = db.transaction(DB_STORE,"readwrite");
-    tx.objectStore(DB_STORE).put({id, type, blob});
-    tx.oncomplete = ()=> resolve(true);
-    tx.onerror = ()=> reject(tx.error);
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(DB_STORE, "readwrite");
+    tx.objectStore(DB_STORE).put({ id, type, blob });
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error);
   });
 }
-async function idbGetFile(id){
+async function idbGetFile(id) {
   const db = await idbOpen();
-  return new Promise((resolve,reject)=>{
-    const tx = db.transaction(DB_STORE,"readonly");
-    const r  = tx.objectStore(DB_STORE).get(id);
-    r.onsuccess = ()=> resolve(r.result || null);
-    r.onerror = ()=> reject(r.error);
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(DB_STORE, "readonly");
+    const r = tx.objectStore(DB_STORE).get(id);
+    r.onsuccess = () => resolve(r.result || null);
+    r.onerror = () => reject(r.error);
   });
 }
-async function idbDeleteFile(id){
+async function idbDeleteFile(id) {
   const db = await idbOpen();
-  return new Promise((resolve,reject)=>{
-    const tx = db.transaction(DB_STORE,"readwrite");
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(DB_STORE, "readwrite");
     tx.objectStore(DB_STORE).delete(id);
-    tx.oncomplete = ()=> resolve(true);
-    tx.onerror = ()=> reject(tx.error);
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error);
   });
 }
 
 /* ===========================
-   Stars (6 med halv)
+Stjerner (6 med halv-trinn)
 =========================== */
-function makeStars(container, initial = 0, onChange = ()=>{}){
+function makeStars(container, initial = 0, onChange = () => { }) {
   container.innerHTML = "";
   const total = 6;
-  const state = { v: clamp(Number(initial)||0, 0, 6) };
-
-  for (let i=1;i<=total;i++){
+  const state = { v: clamp(Number(initial) || 0, 0, 6) };
+  for (let i = 1; i <= total; i++) {
     const wrap = document.createElement("span");
-    wrap.className = "star-container" + (i===6 ? " special" : "");
-    wrap.innerHTML = `
-      <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M12 .587l3.668 7.568 8.332 1.151-6.064 5.74 1.59 8.267L12 18.896l-7.526 4.417 1.59-8.267L0 9.306l8.332-1.151z"/>
-      </svg>
-    `;
+    wrap.className = "star-container" + (i === 6 ? " special" : "");
+    wrap.title = `Star ${i}`;
+    wrap.innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .587l3.668 7.568 8.332 1.151-6.064 5.74 1.59 8.267L12 18.896l-7.526 4.417 1.59-8.267L0 9.306l8.332-1.151z"/></svg>`;
     container.appendChild(wrap);
   }
-
-  function sync(){
+  function sync() {
     const whole = Math.floor(state.v);
-    const half  = (state.v - whole) >= 0.5;
-    $$(".star-container", container).forEach((node, idx)=>{
-      const i = idx+1;
-      if (i<=whole) node.style.opacity = "1";
-      else if (i===whole+1 && half) node.style.opacity = "0.65";
-      else node.style.opacity = "0.3";
+    const half = (state.v - whole) >= 0.5;
+    $$(".star-container", container).forEach((node, idx) => {
+      const i = idx + 1;
+      if (i <= whole) node.style.opacity = "1";
+      else if (i === whole + 1 && half) node.style.opacity = "0.65";
+      else node.style.opacity = "0.25";
     });
   }
   sync();
-
-  $$(".star-container", container).forEach((wrap, idx)=>{
-    const i = idx+1;
-    wrap.addEventListener("click", (ev)=>{
-      const rect = wrap.getBoundingClientRect();
-      const leftHalf = (ev.clientX - rect.left) < rect.width/2;
-      state.v = clamp(leftHalf ? i-0.5 : i, 0, 6);
-      sync();
-      onChange(state.v);
-      if (i===6 && Math.round(state.v*2)/2 === 6){
-        wrap.style.animation = "pb-pulse .3s ease";
-        setTimeout(()=>wrap.style.animation="none", 320);
-      }
-    });
-  });
-
-  return {
-    get value(){ return state.v; },
-    set value(v){ state.v = clamp(Number(v)||0,0,6); sync(); }
-  };
-}
-
-/* Mini-stjerner for kort (6 tegn, halv-støtte) */
-function miniStarsHTML(v){
-  v = Number(v||0);
-  const whole = Math.floor(v);
-  const half  = (v - whole) >= 0.5;
-  let html = "";
-  for (let i=1;i<=6;i++){
-    if (i<=whole) html += `<span class="mini-star full">★</span>`;
-    else if (i===whole+1 && half) html += `<span class="mini-star half">★</span>`;
-    else html += `<span class="mini-star">★</span>`;
+  function setVal(v) {
+    state.v = clamp(Number(v) || 0, 0, 6);
+    sync();
+    container.dispatchEvent(new CustomEvent("pb:rating", { detail: { value: state.v } }));
+    onChange(state.v);
   }
-  return html;
+  on(container, "click", (e) => {
+    const node = e.target.closest(".star-container");
+    if (!node) return;
+    const idx = $$(".star-container", container).indexOf(node) + 1;
+    const rect = node.getBoundingClientRect();
+    const half = (e.clientX - rect.left) < rect.width / 2 ? 0.5 : 1;
+    const newVal = Math.min(idx - (half === 0.5 ? 0.5 : 0), 6);
+    node.style.animation = "pb-pulse .25s";
+    setTimeout(() => node.style.animation = "", 260);
+    setVal(newVal);
+  });
+  on(container, "keydown", (e) => {
+    if (e.key === "ArrowLeft") { e.preventDefault(); setVal(state.v - 0.5); }
+    if (e.key === "ArrowRight") { e.preventDefault(); setVal(state.v + 0.5); }
+  });
+  container.tabIndex = 0;
+  return { get value() { return state.v; }, set value(v) { setVal(v); } };
 }
 
 /* ===========================
-   Chips
+Datamodell for bok
 =========================== */
-function enableChipGroup(container){
-  if (!container) return;
-  $$(".toggle-option", container).forEach(opt=>{
-    opt.addEventListener("click", ()=> opt.classList.toggle("selected"));
-  });
-}
-function getSelectedChips(container){
-  return $$(".toggle-option.selected", container).map(el => el.dataset.val || el.textContent.trim());
-}
-function setSelectedChips(container, values){
-  if (!container) return;
-  $$(".toggle-option", container).forEach(el=>{
-    const v = el.dataset.val || el.textContent.trim();
-    el.classList.toggle("selected", values?.includes(v));
-  });
-}
+const DEFAULT_BOOK = () => ({
+  id: uid(),
+  title: "",
+  author: "",
+  status: "reading",
+  rating: 0,
+  genres: [],
+  moods: [],
+  tropes: [],
+  review: "",
+  notes: "",
+  coverDataUrl: "",
+  fileId: "",
+  fileType: "",
+  quotes: []
+});
 
 /* ===========================
-   Cover helpers
+Index (bibliotek)
 =========================== */
-async function fileToDataURL(file){
-  return new Promise((resolve,reject)=>{
-    const fr = new FileReader();
-    fr.onload = ()=> resolve(fr.result);
-    fr.onerror = ()=> reject(fr.error);
-    fr.readAsDataURL(file);
-  });
-}
-async function extractCoverFromPDF(file){
-  try{
-    const data = await file.arrayBuffer();
-    const pdf  = await pdfjsLib.getDocument({data}).promise;
-    const page = await pdf.getPage(1);
-    const viewport = page.getViewport({scale: 1.5});
-    const canvas = document.createElement("canvas");
-    canvas.width = viewport.width; canvas.height = viewport.height;
-    await page.render({canvasContext: canvas.getContext("2d"), viewport}).promise;
-    return canvas.toDataURL("image/jpeg", 0.8);
-  }catch{ return null; }
-}
-async function extractCoverFromEPUB(file){
-  try{
-    const book = ePub(file);
-    await book.ready;
-    let url = await book.coverUrl();
-    if (url){
-      const res = await fetch(url);
-      const blob = await res.blob();
-      return await fileToDataURL(blob);
-    }
-    const zip = await JSZip.loadAsync(await file.arrayBuffer());
-    const entry = Object.keys(zip.files).find(k=>{
-      const low = k.toLowerCase();
-      return low.includes("cover") && (low.endsWith(".jpg")||low.endsWith(".jpeg")||low.endsWith(".png"));
-    }) || Object.keys(zip.files).find(k=>{
-      const low = k.toLowerCase();
-      return low.endsWith(".jpg")||low.endsWith(".jpeg")||low.endsWith(".png");
-    });
-    if (entry){
-      const blob = await zip.files[entry].async("blob");
-      return await fileToDataURL(blob);
-    }
-    return null;
-  }catch{ return null; }
-}
-function guessMimeFromName(name=""){
-  if (/\.pdf$/i.test(name)) return "application/pdf";
-  if (/\.epub$/i.test(name)) return "application/epub+zip";
-  return "application/octet-stream";
-}
-
-/* ===========================
-   LIBRARY (index.html)
-=========================== */
-function initLibrary(){
-  const grid   = byId("book-grid");
-  const empty  = byId("empty-state");
-  const search = byId("search-input");
+function initLibraryPage() {
+  const grid = byId("book-grid");
+  const emptyState = byId("empty-state");
+  const searchInput = byId("search-input");
+  const chipsWrap = byId("filter-chips");
   const addBtn = byId("add-book-btn");
-  const chipRow= byId("filter-chips");
+  if (!grid || !addBtn) return;
 
-  on(addBtn, "click", ()=> location.href = "add-book.html");
+  on(addBtn, "click", () => location.href = "add-book.html");
 
-  let filter = "all";
-  chipRow && chipRow.addEventListener("click",(e)=>{
-    const btn = e.target.closest(".category");
-    if (!btn) return;
-    $$(".category", chipRow).forEach(c=>c.classList.remove("active"));
-    btn.classList.add("active");
-    filter = btn.dataset.filter || "all";
-    render();
-  });
-  on(search, "input", render);
+  let books = loadBooks();
+  let activeFilter = "all";
+  let searchTerm = "";
 
-  function render(){
-    const books = loadBooks();
-    const q = (search?.value||"").trim().toLowerCase();
-
-    let list = books.slice();
-    if (filter !== "all"){
-      if (filter==="favorites") list = list.filter(b => (b.rating||0) >= 6);
-      else list = list.filter(b => (b.status||"").toLowerCase()===filter);
+  function miniStarsHTML(r) {
+    r = Number(r) || 0;
+    let html = "";
+    for (let i = 1; i <= 6; i++) {
+      if (i <= Math.floor(r)) html += `<span class="mini-star full">★</span>`;
+      else if (i === Math.floor(r) + 1 && (r % 1) >= 0.5) html += `<span class="mini-star half">★</span>`;
+      else html += `<span class="mini-star">★</span>`;
     }
-    if (q){
-      list = list.filter(b =>
-        (b.title||"").toLowerCase().includes(q) ||
-        (b.author||"").toLowerCase().includes(q)
-      );
-    }
-
-    if (!list.length){
-      empty.style.display = "block";
+    return html;
+  }
+  function matchesFilter(b) {
+    if (activeFilter === "all") return true;
+    if (activeFilter === "favorites") return (b.rating || 0) >= 5;
+    return (b.status === activeFilter);
+  }
+  function matchesSearch(b) {
+    if (!searchTerm) return true;
+    const hay = (b.title + " " + b.author).toLowerCase();
+    return hay.includes(searchTerm);
+  }
+  function render() {
+    books = loadBooks();
+    const visible = books.filter(b => matchesFilter(b) && matchesSearch(b));
+    if (!visible.length) {
       grid.innerHTML = "";
+      emptyState.style.display = "";
       return;
     }
-    empty.style.display = "none";
-
-    grid.innerHTML = list.map(b=>{
-      const cover = b.coverDataURL
-        ? `<img src="${b.coverDataURL}" alt="" class="book-cover">`
-        : `<div class="book-cover"><i class="fas fa-book"></i></div>`;
-      const stars = (b.rating||0) ? miniStarsHTML(b.rating) : "";
-      return `
-        <div class="book-card" data-id="${b.id}">
-          ${cover}
-          <div class="book-info">
-            <div class="book-title">${escapeHTML(b.title||"Untitled")}</div>
-            <div class="book-author">${escapeHTML(b.author||"")}</div>
-            <div class="book-rating">${stars}</div>
-          </div>
-        </div>
-      `;
+    emptyState.style.display = "none";
+    grid.innerHTML = visible.map(b => {
+      const cover = b.coverDataUrl
+        ? `<img class="book-cover" src="${b.coverDataUrl}" alt="Cover">`
+        : `<div class="book-cover"><i class="fas fa-image"></i></div>`;
+      return `<div class="book-card" data-id="${b.id}">${cover}<div class="book-info"><div class="book-title">${escapeHTML(b.title || "Untitled")}</div><div class="book-author">${escapeHTML(b.author || "")}</div><div class="book-rating">${miniStarsHTML(b.rating || 0)}</div></div></div>`;
     }).join("");
+    $$(".book-card", grid).forEach(card => {
+      on(card, "click", () => {
+        const id = card.getAttribute("data-id");
+        location.href = `add-book.html?id=${encodeURIComponent(id)}`;
+      });
+    });
+  }
+  render();
+  on(searchInput, "input", () => {
+    searchTerm = searchInput.value.trim().toLowerCase();
+    render();
+  });
+  if (chipsWrap) {
+    $$(".category", chipsWrap).forEach(ch => {
+      on(ch, "click", () => {
+        $$(".category", chipsWrap).forEach(c => c.classList.remove("active"));
+        ch.classList.add("active");
+        activeFilter = ch.getAttribute("data-filter");
+        render();
+      });
+    });
+  }
+}
 
-    $$(".book-card", grid).forEach(card=>{
-      card.addEventListener("click", ()=>{
-        const id = card.dataset.id;
-        location.href = `edit-page.html?id=${encodeURIComponent(id)}`;
+/* ===========================
+Add/Edit – skjema/chips/quotes/filer
+=========================== */
+const GENRES = [
+  "Adventure", "Apocalypse", "Biography", "Business", "Children", "Christian", "Classics", "Comic",
+  "Contemporary", "Crime", "Dark Romance", "Drama", "Dystopian", "Erotic", "Fairytale Retellings", "Fantasy",
+  "Folklore", "Gothic", "History", "Holiday / Seasonal", "Horror", "Humor", "LGBTQ+", "Lost World", "Memoir",
+  "Mystery", "Mythology", "New Adult", "Non-fiction", "Novel", "Novella", "Paranormal", "Philosophy", "Poetry",
+  "Political", "Psychological", "Religious", "Romance", "Satire", "Sci-Fi", "Self-Help", "Short Stories",
+  "Space", "Spiritual", "Splatterpunk", "Sports Fiction", "Steampunk", "Superhero", "Suspense", "Thriller",
+  "Urban Legend", "Western", "Witchy", "YA"
+];
+const MOODS = [
+  "💔 Angsty", "🌅 Bittersweet", "🧡 Cozy", "😱 Creepy", "🧟‍♀️ Dark", "😭 Emotional", "⚡ Fast-paced", "🥰 Feel-good", "🤣 Funny",
+  "🌸 Heartwarming", "🤯 Mind-bending", "🌙 Moody", "✨ Magical", "😌 Relaxing", "😭 Sad/Crying", "🐢 Slow-burn", "🌶️ Spicy",
+  "🌀 Twisty", "🧠 Thought-provoking", "🔥 Tense", "💖 Wholesome"
+];
+const TROPES = [
+  ["age-gap", "Age Gap"], ["arranged-marriage", "Arranged Marriage"], ["billionaire", "Billionaire"],
+  ["celebrity", "Celebrity"], ["childhood-friends", "Childhood Friends"], ["close-proximity", "Close Proximity"],
+  ["coworkers", "Coworkers"], ["dark-secrets", "Dark Secrets"], ["destined-mates", "Destined Mates"],
+  ["enemies-to-lovers", "Enemies to Lovers"], ["fake-dating", "Fake Dating"], ["forbidden-love", "Forbidden Love"],
+  ["friends-to-lovers", "Friends to Lovers"], ["grumpy-sunshine", "Grumpy x Sunshine"], ["love-triangle", "Love Triangle"],
+  ["marriage-of-convenience", "Marriage of Convenience"], ["one-bed", "Only One Bed"], ["opposites-attract", "Opposites Attract"],
+  ["pen-pals", "Pen Pals"], ["rivals-to-lovers", "Rivals to Lovers"], ["royalty", "Royalty"], ["second-chance", "Second Chance"],
+  ["slow-burn", "Slow Burn"], ["soulmates", "Soulmates"], ["time-travel", "Time Travel"], ["unrequited-love", "Unrequited Love"]
+];
+
+function initAddEditPage() {
+  const titleEl = byId("title");
+  const starsWrap = byId("stars");
+  const coverBox = byId("cover");
+  if (!titleEl || !starsWrap || !coverBox) return;
+
+  const authorEl = byId("author");
+  const statusEl = byId("status");
+  const ratingValEl = byId("ratingVal");
+  const pickCoverBtn = byId("pickCover");
+  const coverInput = byId("coverInput");
+  const uploadFileBtn = byId("upload-file-btn");
+  const fileInput = byId("bookFile");
+  const fileNameEl = byId("fileName");
+  const reviewEl = byId("review");
+  const notesEl = byId("notes");
+  const addQuoteBtn = byId("addQuote");
+  const quoteTextEl = byId("quoteText");
+  const qTextOpt = byId("qText");
+  const qGalleryOpt = byId("qGallery");
+  const quotesWrap = byId("quotes");
+
+  const btnUpdate = byId("update-book-btn");
+  const btnDelete = byId("delete-book-btn");
+  const btnRead = byId("read-book-btn");
+
+  const genresBox = byId("genres");
+  const moodsBox = byId("moods");
+  const tropesBox = byId("tropes");
+
+  if (genresBox && !genresBox.children.length) {
+    genresBox.innerHTML = GENRES.map(g => `<div class="toggle-option" data-val="${escapeHTML(g)}">${escapeHTML(g)}</div>`).join("");
+  }
+  if (moodsBox && !moodsBox.children.length) {
+    moodsBox.innerHTML = MOODS.map(m => `<div class="toggle-option" data-val="${escapeHTML(m)}">${escapeHTML(m)}</div>`).join("");
+  }
+  if (tropesBox && !tropesBox.children.length) {
+    tropesBox.innerHTML = TROPES.map(([val, lab]) => `<div class="toggle-option" data-val="${val}">${escapeHTML(lab)}</div>`).join("");
+  }
+
+  function parseSelected(root) { return $$(".toggle-option.selected", root).map(n => n.getAttribute("data-val") || n.textContent.trim()); }
+  function setSelected(root, values) {
+    if (!root) return;
+    const set = new Set(values || []);
+    $$(".toggle-option", root).forEach(n => {
+      const val = n.getAttribute("data-val") || n.textContent.trim();
+      if (set.has(val)) n.classList.add("selected");
+    });
+  }
+  $$(".toggle-option", genresBox).forEach(n => on(n, "click", () => n.classList.toggle("selected")));
+  $$(".toggle-option", moodsBox).forEach(n => on(n, "click", () => n.classList.toggle("selected")));
+  $$(".toggle-option", tropesBox).forEach(n => on(n, "click", () => n.classList.toggle("selected")));
+
+  function setCoverDataUrl(dataUrl) {
+    coverBox.style.backgroundImage = `url(${dataUrl})`;
+    coverBox.style.backgroundSize = "cover";
+    coverBox.style.backgroundPosition = "center";
+    const icon = byId("coverIcon");
+    if (icon) icon.style.display = "none";
+    current.coverDataUrl = dataUrl;
+  }
+  on(pickCoverBtn, "click", () => coverInput.click());
+  on(coverInput, "change", () => {
+    const file = coverInput.files && coverInput.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setCoverDataUrl(reader.result);
+    reader.readAsDataURL(file);
+  });
+
+  const STAR = makeStars(starsWrap, 0, v => {
+    ratingValEl.textContent = `Selected: ${v}`;
+    current.rating = v;
+  });
+
+  let quoteMode = "text";
+  on(qTextOpt, "click", () => { quoteMode = "text"; qTextOpt.classList.add("selected"); qGalleryOpt.classList.remove("selected"); });
+  on(qGalleryOpt, "click", () => { quoteMode = "image"; qGalleryOpt.classList.add("selected"); qTextOpt.classList.remove("selected"); });
+
+  function renderQuotes() {
+    if (!quotesWrap) return;
+    quotesWrap.innerHTML = (current.quotes || []).map(q => {
+      if (q.type === "image") {
+        return `<div class="quote-item" data-id="${q.id}"><img class="quote-image" src="${q.dataUrl}" alt="Quote image"><div class="quote-actions"><span class="quote-action" data-act="del">Delete</span></div></div>`;
+      } else {
+        return `<div class="quote-item" data-id="${q.id}"><div class="quote-text">${escapeHTML(q.text || "")}</div><div class="quote-actions"><span class="quote-action" data-act="del">Delete</span></div></div>`;
+      }
+    }).join("");
+    $$(".quote-item .quote-action", quotesWrap).forEach(btn => {
+      on(btn, "click", () => {
+        const wrap = btn.closest(".quote-item");
+        const id = wrap.getAttribute("data-id");
+        current.quotes = (current.quotes || []).filter(q => q.id !== id);
+        renderQuotes();
       });
     });
   }
 
-  render();
-}
-
-/* ===========================
-   ADD BOOK (add-book.html)
-=========================== */
-async function initAdd(){
-  const coverBox  = byId("cover");
-  const pickCover = byId("pickCover");
-  const coverInput= byId("coverInput");
-
-  const titleEl = byId("title");
-  const authorEl= byId("author");
-  const statusEl= byId("status");
-
-  const starsWrap = byId("stars");
-  const ratingVal = byId("ratingVal");
-  const starCtl   = makeStars(starsWrap, 0, v=>{
-    ratingVal.textContent = `Selected: ${v.toFixed(1)}`;
-    ratingVal.dataset.value = v;
-  });
-
-  enableChipGroup(byId("genres"));
-  enableChipGroup(byId("moods"));
-  enableChipGroup(byId("tropes"));
-
-  const quotesUI = wireQuoteUI();
-
-  const fileBtn   = byId("upload-file-btn");
-  const fileInput = byId("bookFile");
-  const fileName  = byId("fileName");
-
-  let coverDataURL = "";
-  let pendingFile  = null;
-
-  function showCover(url){
-    coverBox.innerHTML = `<img src="${url}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:12px">`;
-  }
-
-  on(pickCover, "click", ()=> coverInput.click());
-  on(coverInput, "change", async ()=>{
-    const f = coverInput.files?.[0];
-    if (!f) return;
-    coverDataURL = await fileToDataURL(f);
-    showCover(coverDataURL);
-  });
-
-  on(fileBtn, "click", ()=> fileInput.click());
-  on(fileInput, "change", async ()=>{
-    const f = fileInput.files?.[0];
-    if (!f) return;
-    pendingFile = f;
-    fileName.textContent = f.name;
-
-    // Extract cover if possible
-    let extracted = null;
-    if (f.type==="application/pdf" || /\.pdf$/i.test(f.name)) extracted = await extractCoverFromPDF(f);
-    else if (f.type==="application/epub+zip" || /\.epub$/i.test(f.name)) extracted = await extractCoverFromEPUB(f);
-
-    if (extracted){ coverDataURL = extracted; showCover(extracted); }
-  });
-
-  on(byId("save-book-btn"), "click", async ()=>{
-    const book = {
-      id: uid(),
-      title:  titleEl.value?.trim() || "Untitled",
-      author: authorEl.value?.trim() || "",
-      status: statusEl.value || "reading",
-      rating: Number(ratingVal.dataset.value||0),
-      genres: getSelectedChips(byId("genres")),
-      moods:  getSelectedChips(byId("moods")),
-      tropes: getSelectedChips(byId("tropes")),
-      review: byId("review").value || "",
-      notes:  byId("notes").value || "",
-      quotes: getQuotesFromUI().map(q=>q), // via wireQuoteUI
-      coverDataURL: coverDataURL || "",
-      hasFile: !!pendingFile
-    };
-
-    const books = loadBooks(); books.push(book); saveBooks(books);
-    if (pendingFile) await idbPutFile(book.id, pendingFile.type || guessMimeFromName(pendingFile.name), pendingFile);
-    location.href = "index.html";
-  });
-
-  // wireQuoteUI impl (returns accessors used above)
-  function wireQuoteUI(){
-    const addBtn   = byId("addQuote");
-    const textArea = byId("quoteText");
-    const grid     = byId("quotes");
-
-    on(addBtn, "click", ()=>{
-      const txt = (textArea.value||"").trim();
+  on(addQuoteBtn, "click", () => {
+    if (quoteMode === "text") {
+      const txt = (quoteTextEl.value || "").trim();
       if (!txt) return;
-      grid.appendChild(renderQuote(txt));
-      textArea.value = "";
-    });
-
-    on(grid, "click", (e)=>{
-      const act = e.target.closest(".quote-action");
-      if (!act) return;
-      e.target.closest(".quote-item")?.remove();
-    });
-
-    function renderQuote(txt){
-      const item = document.createElement("div");
-      item.className = "quote-item";
-      item.innerHTML = `
-        <div class="quote-text">${escapeHTML(txt)}</div>
-        <div class="quote-actions"><span class="quote-action" data-act="del">Delete</span></div>
-      `;
-      return item;
+      current.quotes.push({ id: uid(), type: "text", text: txt });
+      quoteTextEl.value = "";
+      renderQuotes();
+    } else {
+      const input = document.createElement("input");
+      input.type = "file"; input.accept = "image/*";
+      on(input, "change", () => {
+        const file = input.files && input.files[0];
+        if (!file) return;
+        const fr = new FileReader();
+        fr.onload = () => {
+          current.quotes.push({ id: uid(), type: "image", dataUrl: fr.result });
+          renderQuotes();
+        };
+        fr.readAsDataURL(file);
+      });
+      input.click();
     }
-    function getQuotes(){ return $$(".quote-text", grid).map(n=>n.textContent.trim()).filter(Boolean); }
-
-    window.getQuotesFromUI = getQuotes; // small bridge
-    return { getQuotes };
-  }
-}
-
-/* ===========================
-   EDIT BOOK (edit-page.html)
-=========================== */
-async function initEdit(){
-  const id = qParam("id");
-  if (!id) { location.href="index.html"; return; }
-
-  const books = loadBooks();
-  const idx = books.findIndex(b=>b.id===id);
-  if (idx===-1){ location.href="index.html"; return; }
-  const book = books[idx];
-
-  const coverBox  = byId("cover");
-  const pickCover = byId("pickCover");
-  const coverInput= byId("coverInput");
-
-  const titleEl = byId("title");
-  const authorEl= byId("author");
-  const statusEl= byId("status");
-
-  const starsWrap = byId("stars");
-  const ratingVal = byId("ratingVal");
-  const starCtl   = makeStars(starsWrap, book.rating||0, v=>{
-    ratingVal.textContent = `Selected: ${v.toFixed(1)}`;
-  });
-  ratingVal.textContent = `Selected: ${(book.rating||0).toFixed(1)}`;
-
-  enableChipGroup(byId("genres"));
-  enableChipGroup(byId("moods"));
-  enableChipGroup(byId("tropes"));
-  setSelectedChips(byId("genres"), book.genres||[]);
-  setSelectedChips(byId("moods"),  book.moods||[]);
-  setSelectedChips(byId("tropes"), book.tropes||[]);
-
-  byId("review").value = book.review||"";
-  byId("notes").value  = book.notes||"";
-
-  // quotes
-  (function setQuotes(){
-    const grid = byId("quotes");
-    grid.innerHTML = "";
-    (book.quotes||[]).forEach(txt=>{
-      const item = document.createElement("div");
-      item.className = "quote-item";
-      item.innerHTML = `
-        <div class="quote-text">${escapeHTML(txt)}</div>
-        <div class="quote-actions"><span class="quote-action" data-act="del">Delete</span></div>
-      `;
-      grid.appendChild(item);
-    });
-    on(byId("addQuote"), "click", ()=>{
-      const txt = (byId("quoteText").value||"").trim();
-      if (!txt) return;
-      const item = document.createElement("div");
-      item.className = "quote-item";
-      item.innerHTML = `
-        <div class="quote-text">${escapeHTML(txt)}</div>
-        <div class="quote-actions"><span class="quote-action" data-act="del">Delete</span></div>
-      `;
-      grid.appendChild(item);
-      byId("quoteText").value = "";
-    });
-    on(grid, "click", (e)=>{
-      const act = e.target.closest(".quote-action");
-      if (act) e.target.closest(".quote-item")?.remove();
-    });
-  })();
-
-  // populate fields
-  titleEl.value = book.title||"";
-  authorEl.value= book.author||"";
-  statusEl.value= book.status||"reading";
-
-  if (book.coverDataURL){
-    coverBox.innerHTML = `<img src="${book.coverDataURL}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:12px">`;
-  }
-  on(pickCover,"click",()=> coverInput.click());
-  on(coverInput,"change", async ()=>{
-    const f = coverInput.files?.[0];
-    if (!f) return;
-    const dataURL = await fileToDataURL(f);
-    book.coverDataURL = dataURL;
-    coverBox.innerHTML = `<img src="${dataURL}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:12px">`;
   });
 
-  // file handling
-  const fileBtn   = byId("upload-file-btn");
-  const fileInput = byId("bookFile");
-  const fileName  = byId("fileName");
-  on(fileBtn, "click", ()=> fileInput.click());
-  on(fileInput, "change", async ()=>{
-    const f = fileInput.files?.[0];
-    if (!f) return;
-    fileName.textContent = f.name;
-    await idbPutFile(book.id, f.type || guessMimeFromName(f.name), f);
-    book.hasFile = true;
+  on(uploadFileBtn, "click", () => fileInput.click());
 
-    if (!book.coverDataURL){
-      let extracted = null;
-      if (f.type==="application/pdf" || /\.pdf$/i.test(f.name)) extracted = await extractCoverFromPDF(f);
-      else if (f.type==="application/epub+zip" || /\.epub$/i.test(f.name)) extracted = await extractCoverFromEPUB(f);
-      if (extracted){
-        book.coverDataURL = extracted;
-        coverBox.innerHTML = `<img src="${extracted}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:12px">`;
+  let current = DEFAULT_BOOK();
+  const currentId = qParam("id");
+  if (currentId) {
+    const found = loadBooks().find(b => b.id === currentId);
+    if (found) current = Object.assign(DEFAULT_BOOK(), found);
+  }
+
+  titleEl.value = current.title || "";
+  authorEl.value = current.author || "";
+  statusEl.value = current.status || "reading";
+  STAR.value = current.rating || 0;
+  ratingValEl.textContent = `Selected: ${current.rating || 0}`;
+  reviewEl.value = current.review || "";
+  notesEl.value = current.notes || "";
+  if (current.coverDataUrl) setCoverDataUrl(current.coverDataUrl);
+  setSelected(genresBox, current.genres);
+  setSelected(moodsBox, current.moods);
+  setSelected(tropesBox, current.tropes);
+  renderQuotes();
+
+  if (current.fileId) fileNameEl.textContent = `${current.fileId} (${current.fileType || "file"})`;
+
+  on(fileInput, "change", async () => {
+    const file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+    const type = ext(file.name) === "pdf" ? "pdf" : (ext(file.name) === "epub" ? "epub" : "");
+    const id = `file:${current.id}`;
+    await idbPutFile(id, type, file);
+    current.fileId = id;
+    current.fileType = type;
+    fileNameEl.textContent = file.name;
+    try {
+      if (type === "pdf") {
+        const dataUrl = await extractPdfCover(file);
+        if (dataUrl) setCoverDataUrl(dataUrl);
+      } else if (type === "epub") {
+        const dataUrl = await extractEpubCover(file);
+        if (dataUrl) setCoverDataUrl(dataUrl);
       }
-    }
+    } catch { }
   });
 
-  // actions
-  on(byId("delete-book-btn"), "click", async ()=>{
-    if (!confirm("Delete this book?")) return;
-    books.splice(idx,1); saveBooks(books);
-    await idbDeleteFile(book.id);
+  function collectFromForm() {
+    current.title = titleEl.value.trim();
+    current.author = authorEl.value.trim();
+    current.status = statusEl.value;
+    current.review = reviewEl.value.trim();
+    current.notes = notesEl.value.trim();
+    current.genres = parseSelected(genresBox);
+    current.moods = parseSelected(moodsBox);
+    current.tropes = parseSelected(tropesBox);
+    return current;
+  }
+
+  on(btnUpdate, "click", () => {
+    const b = collectFromForm();
+    let books = loadBooks();
+    const idx = books.findIndex(x => x.id === b.id);
+    if (idx >= 0) books[idx] = b; else books.push(b);
+    saveBooks(books);
+    alert("Saved ✓");
     location.href = "index.html";
   });
 
-  on(byId("update-book-btn"), "click", ()=>{
-    book.title  = titleEl.value?.trim()||"Untitled";
-    book.author = authorEl.value?.trim()||"";
-    book.status = statusEl.value||"reading";
-    book.rating = starCtl.value;
-
-    book.genres = getSelectedChips(byId("genres"));
-    book.moods  = getSelectedChips(byId("moods"));
-    book.tropes = getSelectedChips(byId("tropes"));
-
-    book.review = byId("review").value||"";
-    book.notes  = byId("notes").value||"";
-    book.quotes = $$(".quote-text", byId("quotes")).map(n=>n.textContent.trim());
-
-    books[idx] = book; saveBooks(books);
-    alert("Updated.");
+  on(btnDelete, "click", async () => {
+    if (!confirm("Delete this book?")) return;
+    let books = loadBooks();
+    books = books.filter(x => x.id !== current.id);
+    saveBooks(books);
+    if (current.fileId) { try { await idbDeleteFile(current.fileId); } catch { } }
+    location.href = "index.html";
   });
 
-  on(byId("read-book-btn"), "click", ()=> openReader(book.id, book.title));
+  on(btnRead, "click", async () => {
+    if (!current.fileId) { alert("No book file attached."); return; }
+    const rec = await idbGetFile(current.fileId);
+    if (!rec) { alert("Stored file not found."); return; }
+    openReaderOverlay({ title: current.title || "book", type: rec.type, blob: rec.blob });
+  });
 }
 
 /* ===========================
-   Reader overlay
+Cover-ekstraksjon
 =========================== */
-async function openReader(bookId, title){
-  const overlay = byId("reader");
-  const rTitle  = byId("rTitle");
-  const rClose  = byId("rClose");
-  const rAminus = byId("rAminus");
-  const rAplus  = byId("rAplus");
-  const rSlider = byId("rSlider");
-  const rCount  = byId("rCount");
-  const pdfWrap = byId("pdfWrap");
-  const epubWrap= byId("epubWrap");
-  const pdfCanvas = byId("pdfCanvas");
-  const tapLeft = byId("tapLeft");
-  const tapRight= byId("tapRight");
-
-  rTitle.textContent = title || "Book";
-  overlay.classList.add("show");
-  overlay.setAttribute("aria-hidden","false");
-
-  const rec = await idbGetFile(bookId);
-  if (!rec){ alert("No file attached to this book yet."); return; }
-
-  if ((rec.type||"").includes("pdf")){
-    epubWrap.style.display="none"; pdfWrap.style.display="block";
-    const pdf = await pdfjsLib.getDocument(await rec.blob.arrayBuffer()).promise;
-    let pageNum = 1;
-    const total = pdf.numPages;
-    rSlider.max = total; rSlider.value = 1; rCount.textContent = `1 / ${total}`;
-
-    async function render(){
-      const page = await pdf.getPage(pageNum);
-      const vw = pdfCanvas.parentElement.clientWidth;
-      const scale = vw / page.getViewport({scale:1}).width;
-      const viewport = page.getViewport({scale});
-      pdfCanvas.width = viewport.width; pdfCanvas.height = viewport.height;
-      await page.render({canvasContext: pdfCanvas.getContext("2d"), viewport}).promise;
-      rSlider.value = pageNum; rCount.textContent = `${pageNum} / ${total}`;
+async function extractPdfCover(file) {
+  if (window.pdfjsLib) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  }
+  const arr = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arr }).promise;
+  const page = await pdf.getPage(1);
+  const viewport = page.getViewport({ scale: 1.5 });
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  await page.render({ canvasContext: ctx, viewport }).promise;
+  const url = canvas.toDataURL("image/jpeg", 0.85);
+  try { await pdf.destroy(); } catch { }
+  return url;
+}
+async function extractEpubCover(file) {
+  try {
+    const book = ePub(file);
+    const url = await book.coverUrl();
+    if (url) {
+      const blob = await (await fetch(url)).blob();
+      return await new Promise(res => {
+        const fr = new FileReader();
+        fr.onload = () => res(fr.result);
+        fr.readAsDataURL(blob);
+      });
     }
-    await render();
+  } catch { }
+  return "";
+}
 
-    on(rSlider,"input", ()=>{ pageNum = Number(rSlider.value); render(); });
-    on(tapLeft,"click", ()=>{ if (pageNum>1){ pageNum--; render(); }});
-    on(tapRight,"click",()=>{ if (pageNum<total){ pageNum++; render(); }});
-    on(rClose,"click", closeReader);
+/* ===========================
+Reader overlay (PDF/EPUB)
+=========================== */
+let READER = null;
+function openReaderOverlay({ title, type, blob }) {
+  const overlay = byId("reader");
+  const rTitle = byId("rTitle");
+  const pdfWrap = byId("pdfWrap");
+  const epubWrap = byId("epubWrap");
+  const rClose = byId("rClose");
+  const rAminus = byId("rAminus");
+  const rAplus = byId("rAplus");
+  const rSlider = byId("rSlider");
+  const rCount = byId("rCount");
+  const tapLeft = byId("tapLeft");
+  const tapRight = byId("tapRight");
+  const pdfCanvas = byId("pdfCanvas");
+  if (!overlay) return;
 
+  rTitle.textContent = title || "book";
+  overlay.classList.add("show");
+  updateReadingStreak();
+
+  [pdfWrap, epubWrap].forEach(el => el.style.display = "none");
+  rSlider.value = 1; rSlider.min = 1; rSlider.max = 1; rCount.textContent = "1 / 1";
+  if (READER && READER.cleanup) READER.cleanup();
+
+  if (type === "pdf") {
+    pdfWrap.style.display = "";
+    pdfReader(blob, { pdfCanvas, rSlider, rCount, tapLeft, tapRight }).then(api => { READER = api; });
+  } else if (type === "epub") {
+    epubWrap.style.display = "";
+    epubReader(blob, { epubWrap, rSlider, rCount, tapLeft, tapRight }).then(api => { READER = api; });
   } else {
-    pdfWrap.style.display="none"; epubWrap.style.display="block";
-    const book = ePub(rec.blob);
-    const rendition = book.renderTo(epubWrap, { width:"100%", height:"100%" });
-    await rendition.display();
-
-    const count = book.spine?.length || 1;
-    rSlider.max = count; rSlider.value = 1; rCount.textContent = `1 / ${count}`;
-
-    rendition.on("relocated", (loc)=>{
-      const idx = (loc?.start?.index ?? 0) + 1;
-      rSlider.value = idx; rCount.textContent = `${idx} / ${count}`;
-    });
-
-    on(rSlider, "input", async ()=>{
-      const idx = Number(rSlider.value)-1;
-      const item = book.spine.get(idx);
-      if (item) await rendition.display(item.cfiBase);
-    });
-
-    let fontScale = 100;
-    on(rAplus,  "click", ()=>{ fontScale = clamp(fontScale+10, 60, 200); rendition.themes.fontSize(fontScale+"%"); });
-    on(rAminus, "click", ()=>{ fontScale = clamp(fontScale-10, 60, 200); rendition.themes.fontSize(fontScale+"%"); });
-
-    on(tapLeft, "click", ()=> rendition.prev());
-    on(tapRight,"click", ()=> rendition.next());
-    on(rClose,  "click", closeReader);
-  }
-
-  function closeReader(){
+    alert("Unsupported file type.");
     overlay.classList.remove("show");
-    overlay.setAttribute("aria-hidden","true");
+    return;
   }
+
+  on(rAplus, "click", () => READER && READER.zoom && READER.zoom(1));
+  on(rAminus, "click", () => READER && READER.zoom && READER.zoom(-1));
+  on(rClose, "click", () => {
+    if (READER && READER.cleanup) READER.cleanup();
+    overlay.classList.remove("show");
+  });
+  on(rSlider, "input", () => {
+    const v = Number(rSlider.value);
+    if (READER && READER.goto) READER.goto(v);
+  });
+}
+
+/* ---- PDF-visning ---- */
+async function pdfReader(blob, { pdfCanvas, rSlider, rCount, tapLeft, tapRight }) {
+  if (window.pdfjsLib) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  }
+  const data = await blob.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data }).promise;
+  let pageNo = 1;
+  let scale = 1.2;
+
+  rSlider.min = 1;
+  rSlider.max = pdf.numPages;
+  rSlider.value = pageNo;
+  rCount.textContent = `${pageNo} / ${pdf.numPages}`;
+
+  async function render() {
+    const page = await pdf.getPage(pageNo);
+    const view = page.getViewport({ scale });
+    const canvas = pdfCanvas;
+    const ctx = canvas.getContext("2d");
+    const maxW = canvas.parentElement.clientWidth;
+    const s = Math.min(scale, maxW / view.width);
+    const vp = page.getViewport({ scale: s });
+    canvas.width = Math.floor(vp.width);
+    canvas.height = Math.floor(vp.height);
+    await page.render({ canvasContext: ctx, viewport: vp }).promise;
+    rSlider.value = pageNo;
+    rCount.textContent = `${pageNo} / ${pdf.numPages}`;
+  }
+  function goto(n) { pageNo = clamp(n, 1, pdf.numPages); render(); }
+  function zoom(delta) { scale = clamp(scale + (delta > 0 ? 0.1 : -0.1), 0.6, 2); render(); }
+
+  on(tapLeft, "click", () => goto(pageNo - 1));
+  on(tapRight, "click", () => goto(pageNo + 1));
+
+  await render();
+  return { goto, zoom, cleanup() { try { pdf.destroy(); } catch { } } };
+}
+
+/* ---- EPUB-visning ---- */
+async function epubReader(blob, { epubWrap, rSlider, rCount, tapLeft, tapRight }) {
+  const book = ePub(blob);
+  const rendition = book.renderTo(epubWrap, { width: "100%", height: "100%" });
+  await rendition.display();
+
+  let fontPct = 100;
+  rSlider.min = 1; rSlider.max = 100; rSlider.value = 1;
+  rCount.textContent = `1%`;
+
+  function goto(step) {
+    const pct = clamp(step, 1, 100) / 100;
+    try {
+      if (book.locations && book.locations.cfiFromPercentage) {
+        const cfi = book.locations.cfiFromPercentage(pct);
+        rendition.display(cfi);
+      } else {
+        rendition.display(pct);
+      }
+    } catch {
+      rendition.next();
+    }
+  }
+  function zoom(delta) {
+    fontPct = clamp(fontPct + (delta > 0 ? 10 : -10), 70, 180);
+    rendition.themes.fontSize(fontPct + "%");
+  }
+
+  rendition.on("relocated", (loc) => {
+    let pct = 0;
+    try {
+      if (book.locations && book.locations.percentageFromCfi) {
+        pct = Math.round(book.locations.percentageFromCfi(loc.start.cfi) * 100);
+      } else if (loc && loc.start && loc.start.percentage != null) {
+        pct = Math.round(loc.start.percentage * 100);
+      }
+    } catch { }
+    pct = clamp(pct, 1, 100);
+    rSlider.value = pct;
+    rCount.textContent = `${pct}%`;
+  });
+
+  on(tapLeft, "click", () => rendition.prev());
+  on(tapRight, "click", () => rendition.next());
+
+  return { goto, zoom, cleanup() { try { book.destroy(); } catch { } } };
 }
 
 /* ===========================
-   Stats (stats.html)
+Stats (oversikt + minidiagram)
 =========================== */
-function initStats(){
+function initStatsPage() {
+  const wrap = $(".content-wrapper");
+  if (!wrap || location.pathname.toLowerCase().indexOf("stats.html") === -1) return;
+
   const books = loadBooks();
+  const finished = books.filter(b => b.status === "finished");
+  const reading = books.filter(b => b.status === "reading");
+  const avgRating = finished.length ? (finished.reduce((a, b) => a + (Number(b.rating) || 0), 0) / finished.length).toFixed(2) : "0.00";
 
-  // Ratings (all-time)
-  const ratings = books.map(b=>Number(b.rating||0)).filter(n=>n>0);
-  const avg = ratings.length ? (ratings.reduce((a,b)=>a+b,0)/ratings.length) : 0;
-  byId("avg-rating").textContent = avg.toFixed(2);
-  byId("total-ratings").textContent = String(ratings.length);
-  byId("favorite-books").textContent = String(books.filter(b=> (b.rating||0) >= 6).length);
+  wrap.innerHTML = `
+    <div class="stats-section">
+      <div class="section-header">
+        <div class="section-title"><i class="fas fa-chart-pie"></i><span>Overview</span></div>
+      </div>
+      <div class="overview-grid">
+        <div class="stat-card"><div class="stat-number">${fmt(books.length)}</div><div class="stat-label">Total Books</div></div>
+        <div class="stat-card rating-stat"><div class="stat-number">${avgRating}</div><div class="stat-label">Avg Rating</div></div>
+        <div class="stat-card"><div class="stat-number">${fmt(finished.length)}</div><div class="stat-label">Finished</div></div>
+        <div class="stat-card"><div class="stat-number">${fmt(reading.length)}</div><div class="stat-label">Reading</div></div>
+      </div>
+      <div class="reading-timeline">
+        <div class="section-header"><div class="section-title"><i class="fas fa-calendar"></i><span>Last 12 Months</span></div></div>
+        <div id="timelineChart" class="chart-container"></div>
+        <div class="timeline-stats" id="timelineStats"></div>
+      </div>
+    </div>
+    <div class="stats-section">
+      <div class="section-header"><div class="section-title"><i class="fas fa-user-edit"></i><span>Top Authors</span></div></div>
+      <div class="authors-list" id="authorsList"></div>
+    </div>
+    <div class="stats-section">
+      <div class="section-header"><div class="section-title"><i class="fas fa-fire"></i><span>Reading Streak</span></div></div>
+      <div class="streak-container">
+        <div class="streak-number" id="streakNum">0</div>
+        <div class="streak-label">Day streak</div>
+        <div class="streak-calendar" id="streakCal"></div>
+      </div>
+    </div>
+  `;
 
-  // Goals (Minutes)
+  const months = [];
+  const now = new Date();
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push({ key: d.toLocaleString(undefined, { month: "short" }), count: 0 });
+  }
+  finished.forEach((_, idx) => {
+    const bucket = Math.floor(idx / Math.max(1, Math.ceil(finished.length / 12)));
+    const m = months[Math.min(bucket, months.length - 1)];
+    if (m) m.count++;
+  });
+
+  drawMiniBars($("#timelineChart"), months.map(m => m.count));
+  $("#timelineStats").innerHTML = months.map(m => `<div class="timeline-item"><div class="timeline-number">${fmt(m.count)}</div><div class="timeline-label">${m.key}</div></div>`).join("");
+
+  const authorCount = {};
+  books.forEach(b => {
+    const a = (b.author || "").trim() || "Unknown";
+    authorCount[a] = (authorCount[a] || 0) + 1;
+  });
+  const top = Object.entries(authorCount).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const maxA = Math.max(1, ...top.map(x => x[1]));
+  byId("authorsList").innerHTML = top.map(([name, count]) => `<div class="author-item"><div class="author-name">${escapeHTML(name)}</div><div class="author-bar"><div class="author-fill" style="width:${(count / maxA) * 100}%"></div></div><div class="author-count">${count}</div></div>`).join("");
+
+  const st = getStreakData();
+  byId("streakNum").textContent = fmt(st.current || 0);
+  const cal = byId("streakCal");
+  for (let i = 27; i >= 0; i--) {
+    const cell = document.createElement("div");
+    cell.className = "streak-day " + (i < st.current ? "active" : "inactive");
+    cal.appendChild(cell);
+  }
+}
+function drawMiniBars(container, arr) {
+  if (!container) return;
+  const max = Math.max(1, ...arr);
+  const width = container.clientWidth || 320;
+  const height = 200;
+  const barW = Math.max(4, Math.floor(width / (arr.length * 1.5)));
+  const gap = Math.max(2, Math.floor(barW / 3));
+  const svgW = arr.length * (barW + gap) + gap;
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("width", "100%");
+  svg.setAttribute("height", height);
+  svg.setAttribute("viewBox", `0 0 ${svgW} ${height}`);
+  arr.forEach((v, i) => {
+    const h = Math.round((v / max) * (height - 20));
+    const x = gap + i * (barW + gap);
+    const y = height - h - 10;
+    const rect = document.createElementNS(svg.namespaceURI, "rect");
+    rect.setAttribute("x", x); rect.setAttribute("y", y);
+    rect.setAttribute("width", barW); rect.setAttribute("height", h);
+    rect.setAttribute("rx", 4);
+    rect.setAttribute("fill", "currentColor");
+    svg.appendChild(rect);
+  });
+  container.innerHTML = "";
+  container.style.color = "var(--primary)";
+  container.appendChild(svg);
+}
+
+/* ===========================
+Innstillinger
+=========================== */
+function initSettingsPage() {
+  if (location.pathname.toLowerCase().indexOf("settings.html") === -1) return;
+  const themeSelect = byId("theme-select");
+  const previews = $$(".theme-preview");
+  const exportBtn = byId("exportDataBtn");
+  const importBtn = byId("importDataBtn");
+  const backupBtn = byId("backupDataBtn");
+  const resetBtn = byId("resetDataBtn");
+  const saveGoals = byId("saveGoalsBtn");
+  const yGoal = byId("yearly-goal");
+  const dGoal = byId("daily-goal");
+
   const goals = getGoals();
-  const minutesGoal = Number(goals.minutes?.year || 0);
-  const minsNow = 0; // hook timer senere
-  byId("goalInput").value = minutesGoal || "";
-  byId("progress-goal").textContent = String(minutesGoal);
-  byId("progress-mins").textContent = String(minsNow);
-  const pct = minutesGoal>0 ? Math.round(minsNow*100/minutesGoal) : 0;
-  byId("progress-percent").textContent = `${pct}% Complete`;
-  byId("progress-fill").style.width = clamp(pct,0,100)+"%";
-  byId("rt-sessions").textContent = "0";
-  on(byId("goalSave"), "click", ()=>{
-    const g = getGoals(); g.minutes = g.minutes || {};
-    g.minutes.year = Number(byId("goalInput").value||0);
-    setGoals(g); alert("Saved.");
+  if (yGoal) yGoal.value = goals.yearly || "";
+  if (dGoal) dGoal.value = goals.daily || "";
+  on(saveGoals, "click", () => {
+    const g = { yearly: Number(yGoal.value || 0) || 0, daily: Number(dGoal.value || 0) || 0 };
+    setGoals(g);
+    alert("Goals saved ✓");
   });
 
-  // Goals (Books)
-  const booksGoal = Number(goals.books?.year || 0);
-  const finished = books.filter(b=> (b.status||"") === "finished").length;
-  byId("bookGoalInput").value = booksGoal || "";
-  byId("book-progress-goal").textContent = String(booksGoal);
-  byId("book-progress-now").textContent = String(finished);
-  const bpct = booksGoal>0 ? Math.round(finished*100/booksGoal) : 0;
-  byId("book-progress-percent").textContent = `${bpct}% Complete`;
-  byId("book-progress-fill").style.width = clamp(bpct,0,100)+"%";
-  on(byId("bookGoalSave"), "click", ()=>{
-    const g = getGoals(); g.books = g.books || {};
-    g.books.year = Number(byId("bookGoalInput").value||0);
-    setGoals(g); alert("Saved.");
-  });
-
-  // Range buttons og pickers
-  const btns = { day:byId("btnDay"), week:byId("btnWeek"), month:byId("btnMonth"), year:byId("btnYear") };
-  const picks= { day:byId("dayPick"), week:byId("weekPick"), month:byId("monthPick"), year:byId("yearPick") };
-
-  // Populate pickers
-  const now = new Date(), yNow = now.getFullYear();
-  picks.year.innerHTML = ""; for (let y=yNow; y>=yNow-10; y--){ const o=document.createElement("option"); o.value=o.textContent=y; picks.year.appendChild(o); }
-  picks.month.innerHTML= ""; for (let m=1;m<=12;m++){ const o=document.createElement("option"); o.value=m; o.textContent=new Date(yNow,m-1,1).toLocaleString(undefined,{month:"long"}); picks.month.appendChild(o); }
-  picks.week.innerHTML = ""; for (let w=1; w<=53; w++){ const o=document.createElement("option"); o.value=w; o.textContent=`Week ${w}`; picks.week.appendChild(o); }
-
-  function activate(which){
-    Object.values(btns).forEach(b=>b.classList.remove("active"));
-    btns[which].classList.add("active");
-    picks.day.style.display   = which==="day"   ? "inline-block":"none";
-    picks.week.style.display  = which==="week"  ? "inline-block":"none";
-    picks.month.style.display = which==="month" ? "inline-block":"none";
-    picks.year.style.display  = which==="year"  ? "inline-block":"none";
-  }
-  on(btns.day,  "click", ()=>activate("day"));
-  on(btns.week, "click", ()=>activate("week"));
-  on(btns.month,"click", ()=>activate("month"));
-  on(btns.year, "click", ()=>activate("year"));
-  activate("year");
-
-  // Charts (lazy render når details åpnes)
-  const chartOnce = (id, maker)=>{
-    const details = byId(id).closest("details");
-    if (!details) return;
-    let rendered = false;
-    details.addEventListener("toggle", ()=>{
-      if (details.open && !rendered){ rendered = true; maker(); }
-    });
-  };
-
-  chartOnce("chartGenres", ()=>{
-    const ctx = byId("chartGenres");
-    const counts = {};
-    books.forEach(b=> (b.genres||[]).forEach(g=> counts[g]=(counts[g]||0)+1 ));
-    new Chart(ctx, {
-      type:"doughnut",
-      data:{ labels:Object.keys(counts), datasets:[{ data:Object.values(counts) }] },
-      options:{ plugins:{legend:{position:"bottom"}} }
+  function highlight(theme) { previews.forEach(p => p.classList.toggle("active", p.getAttribute("data-theme") === theme)); }
+  const curTheme = getTheme(); highlight(curTheme);
+  on(themeSelect, "change", () => { setTheme(themeSelect.value === "default" ? "default" : themeSelect.value); highlight(getTheme()); });
+  previews.forEach(p => {
+    on(p, "click", () => {
+      const t = p.getAttribute("data-theme");
+      setTheme(t === "default" ? "default" : t);
+      if (themeSelect) themeSelect.value = t === "default" ? "default" : t;
+      highlight(t);
     });
   });
 
-  chartOnce("chartStatus", ()=>{
-    const ctx = byId("chartStatus");
-    const groups = {};
-    books.forEach(b=>{ const s=(b.status||"unknown"); groups[s]=(groups[s]||0)+1; });
-    new Chart(ctx, {
-      type:"bar",
-      data:{ labels:Object.keys(groups), datasets:[{ label:"Books", data:Object.values(groups) }] },
-      options:{ responsive:true, scales:{ y:{ beginAtZero:true } } }
-    });
+  on(exportBtn, "click", () => {
+    const data = { books: loadBooks(), groups: getGroups(), goals: getGoals(), theme: getTheme(), streak: getStreakData() };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `pagebud-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
   });
 
-  chartOnce("chartAuthors", ()=>{
-    const ctx = byId("chartAuthors");
-    const counts = {};
-    books.forEach(b=>{ const a=(b.author||"Unknown"); counts[a]=(counts[a]||0)+1; });
-    const top = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,10);
-    new Chart(ctx, {
-      type:"bar",
-      data:{ labels: top.map(e=>e[0]), datasets:[{ label:"Books", data: top.map(e=>e[1]) }] },
-      options:{ indexAxis:"y", scales:{ x:{ beginAtZero:true } } }
+  on(importBtn, "click", () => {
+    const input = document.createElement("input");
+    input.type = "file"; input.accept = "application/json";
+    on(input, "change", async () => {
+      const f = input.files && input.files[0];
+      if (!f) return;
+      try {
+        const text = await f.text();
+        const data = JSON.parse(text);
+        if (Array.isArray(data.books)) saveBooks(data.books);
+        if (Array.isArray(data.groups)) setGroups(data.groups);
+        if (data.goals && typeof data.goals === "object") setGoals(data.goals);
+        if (data.theme) setTheme(data.theme);
+        if (data.streak) setStreakData(data.streak);
+        alert("Imported ✓");
+        location.reload();
+      } catch {
+        alert("Import failed (invalid file).");
+      }
     });
+    input.click();
+  });
+
+  on(backupBtn, "click", () => exportBtn.click());
+
+  on(resetBtn, "click", async () => {
+    if (!confirm("Reset ALL data? This cannot be undone.")) return;
+    localStorage.removeItem(LS_BOOKS_KEY);
+    localStorage.removeItem(LS_GROUPS_KEY);
+    localStorage.removeItem(LS_GOALS_KEY);
+    localStorage.removeItem(LS_STREAK_KEY);
+    try {
+      const db = await idbOpen();
+      const tx = db.transaction(DB_STORE, "readwrite");
+      tx.objectStore(DB_STORE).clear();
+      await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = rej; });
+    } catch { }
+    alert("Data reset ✓");
+    location.reload();
   });
 }
 
 /* ===========================
-   Buddy Read (local demo)
+Buddy Read
 =========================== */
-function initBuddy(){
-  const books = loadBooks();
-  const sel = byId("group-book");
-  if (sel){
-    sel.innerHTML = `<option value="">Choose a book from your library</option>` +
-      books.map(b=>`<option value="${b.id}">${escapeHTML(b.title)} — ${escapeHTML(b.author||"")}</option>`).join("");
-  }
+function initBuddyReadPage() {
+  if (location.pathname.toLowerCase().indexOf("buddy-read.html") === -1) return;
+
+  const groupName = byId("group-name");
+  const groupBook = byId("group-book");
+  const groupSched = byId("group-schedule");
+  const createBtn = byId("create-btn");
+  const refreshBtn = byId("refresh-btn");
 
   const listWrap = byId("groups-list");
-  const empty = byId("empty-groups");
+  const emptyGroups = byId("empty-groups");
+
   const detail = byId("group-detail");
+  const backToList = byId("back-to-list");
+  const delGroupBtn = byId("delete-group");
 
-  const refresh = ()=>{
+  const dName = byId("detail-name");
+  const dMembers = byId("detail-members");
+  const dBookTitle = byId("detail-book-title");
+  const dBookAuthor = byId("detail-book-author");
+  const dProgress = byId("detail-progress");
+  const dProgText = byId("detail-progress-text");
+
+  const btnTogether = byId("btnTogether");
+  const btnSync = byId("btnSync");
+  const startSession = byId("start-session");
+  const onlineCount = byId("online-count");
+
+  const chatMessages = byId("chat-messages");
+  const chatInput = byId("chat-input");
+  const sendBtn = byId("send-btn");
+
+  const books = loadBooks();
+  if (groupBook) {
+    groupBook.innerHTML = `<option value="">Choose a book from your library</option>` + books.map(b => `<option value="${b.id}">${escapeHTML(b.title || "Untitled")} — ${escapeHTML(b.author || "")}</option>`).join("");
+  }
+
+  function renderList() {
     const groups = getGroups();
-    if (!groups.length){
-      empty.style.display="block"; listWrap.innerHTML="";
-    } else {
-      empty.style.display="none";
-      listWrap.innerHTML = groups.map(g=>{
-        const bk = books.find(b=>b.id===g.bookId);
-        const title = bk ? `${escapeHTML(bk.title)} — ${escapeHTML(bk.author||"")}` : "Unknown book";
-        return `
-          <div class="card" data-id="${g.id}">
-            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-              <div>
-                <div style="font-weight:800">${escapeHTML(g.name)}</div>
-                <div class="muted" style="font-size:.9rem">${title}</div>
-              </div>
-              <button class="btn btn-secondary" data-act="open" style="width:auto;padding:8px 12px">Open</button>
-            </div>
-          </div>
-        `;
-      }).join("");
+    if (!groups.length) {
+      listWrap.innerHTML = "";
+      emptyGroups.style.display = "";
+      detail.style.display = "none";
+      return;
     }
-  };
-  refresh();
-  on(byId("refresh-btn"), "click", refresh);
+    emptyGroups.style.display = "none";
+    listWrap.innerHTML = groups.map(g => {
+      const book = books.find(b => b.id === g.bookId);
+      const title = book ? escapeHTML(book.title) : "Unknown book";
+      return `<div class="card" data-id="${g.id}"><div style="display:flex;align-items:center;justify-content:space-between"><div><div style="font-weight:800">${escapeHTML(g.name)}</div><div style="color:#6b6b6b;font-size:.9rem">${title}</div></div><div style="width:120px"><div class="progress-bar"><div class="progress-fill" style="width:${g.progress || 0}%"></div></div><div style="color:#6b6b6b;font-size:.8rem;text-align:right">${g.progress || 0}%</div></div></div></div>`;
+    }).join("");
+    $$(".card[data-id]", listWrap).forEach(card => {
+      on(card, "click", () => {
+        const id = card.getAttribute("data-id");
+        openDetail(id);
+      });
+    });
+  }
 
-  on(byId("create-btn"), "click", ()=>{
-    const name = byId("group-name").value.trim();
-    const bookId = byId("group-book").value;
-    const schedule = byId("group-schedule").value.trim();
-    if (!name || !bookId){ alert("Give it a name and choose a book."); return; }
+  function openDetail(id) {
     const groups = getGroups();
-    groups.push({ id:uid(), name, bookId, schedule, members:["You"], progress:0 });
-    setGroups(groups);
-    byId("group-name").value=""; byId("group-schedule").value=""; sel.value="";
-    refresh();
-  });
-
-  on(listWrap, "click", (e)=>{
-    const btn = e.target.closest("[data-act='open']");
-    if (!btn) return;
-    openGroup(btn.closest(".card")?.dataset.id);
-  });
-
-  function openGroup(groupId){
-    const groups = getGroups();
-    const g = groups.find(x=>x.id===groupId);
+    const g = groups.find(x => x.id === id);
     if (!g) return;
 
-    const book = loadBooks().find(b=>b.id===g.bookId);
-    $("#detail-name").textContent = g.name;
-    $("#detail-members").textContent = `Members: ${g.members.join(", ")}`;
-    $("#detail-book-title").textContent = book ? book.title : "Unknown";
-    $("#detail-book-author").textContent = book ? (book.author||"") : "";
-    $("#detail-progress").style.width = `${clamp(g.progress||0,0,100)}%`;
-    $("#detail-progress-text").textContent = `Group progress: ${clamp(g.progress||0,0,100)}%`;
+    dName.textContent = g.name;
+    const book = loadBooks().find(b => b.id === g.bookId);
+    dBookTitle.textContent = book ? (book.title || "Untitled") : "Unknown";
+    dBookAuthor.textContent = book ? (book.author || "") : "";
+    dProgress.style.width = `${g.progress || 0}%`;
+    dProgText.textContent = `Group progress: ${g.progress || 0}%`;
 
-    const chatList = byId("chat-messages");
-    chatList.innerHTML = getChat(groupId).map(m=>`
-      <div style="padding:6px 8px;margin-bottom:6px;background:#f7f7f7;border-radius:8px"><b>${escapeHTML(m.from)}:</b> ${escapeHTML(m.text)}</div>
-    `).join("");
+    dMembers.innerHTML = `<div style="font-size:.9rem;color:#6b6b6b">Members: You</div>`;
+    onlineCount.textContent = `1 online`;
 
-    detail.style.display="block";
-    document.documentElement.scrollTop = 0;
-
-    on(byId("send-btn"), "click", ()=>{
-      const input = byId("chat-input");
-      const text = input.value.trim();
-      if (!text) return;
-      const arr = getChat(groupId);
-      arr.push({from:"You", text, ts:Date.now()});
-      setChat(groupId, arr);
-      input.value = "";
-      chatList.innerHTML += `<div style="padding:6px 8px;margin-bottom:6px;background:#eaf4ff;border-radius:8px"><b>You:</b> ${escapeHTML(text)}</div>`;
-      chatList.scrollTop = chatList.scrollHeight;
-    });
-
-    on(byId("start-session"), "click", ()=>{
-      alert("Local demo: reading session started. (Real-time sync requires a backend later.)");
-    });
-
-    on(byId("back-to-list"), "click", ()=>{
-      detail.style.display="none";
-    }, { once:true });
-
-    on(byId("delete-group"), "click", ()=>{
-      if (!confirm("Delete this group?")) return;
-      const gs = getGroups().filter(x=>x.id!==groupId);
-      setGroups(gs);
-      detail.style.display="none";
-      refresh();
-    }, { once:true });
+    detail.dataset.id = g.id;
+    detail.style.display = "";
+    renderChat(g.id);
   }
+
+  function renderChat(groupId) {
+    const msgs = getChat(groupId);
+    chatMessages.innerHTML = msgs.map(m => `<div style="padding:6px 8px;margin:6px 0;background:var(--background);border-radius:8px"><div style="font-size:.75rem;color:#999">${new Date(m.t).toLocaleString()}</div><div>${escapeHTML(m.text)}</div></div>`).join("");
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  on(sendBtn, "click", () => {
+    const gid = detail.dataset.id;
+    if (!gid) return;
+    const txt = (chatInput.value || "").trim();
+    if (!txt) return;
+    const msgs = getChat(gid);
+    msgs.push({ t: Date.now(), text: txt });
+    setChat(gid, msgs);
+    chatInput.value = "";
+    renderChat(gid);
+  });
+
+  on(createBtn, "click", () => {
+    const name = (groupName.value || "").trim();
+    const bookId = groupBook.value;
+    const schedule = (groupSched.value || "").trim();
+    if (!name || !bookId) { alert("Add a group name and choose a book."); return; }
+    const groups = getGroups();
+    groups.push({ id: uid(), name, bookId, schedule, progress: 0 });
+    setGroups(groups);
+    groupName.value = ""; groupBook.value = ""; groupSched.value = "";
+    renderList();
+  });
+
+  on(refreshBtn, "click", renderList);
+  on(backToList, "click", () => { detail.style.display = "none"; });
+  on(delGroupBtn, "click", () => {
+    const id = detail.dataset.id;
+    if (!id) return;
+    if (!confirm("Delete this group?")) return;
+    const groups = getGroups().filter(g => g.id !== id);
+    setGroups(groups);
+    detail.style.display = "none";
+    renderList();
+  });
+
+  on(btnTogether, "click", () => { btnTogether.classList.add("active"); btnSync.classList.remove("active"); });
+  on(btnSync, "click", () => { btnSync.classList.add("active"); btnTogether.classList.remove("active"); });
+
+  on(startSession, "click", async () => {
+    const id = detail.dataset.id;
+    if (!id) { alert("Open a group first."); return; }
+    const groups = getGroups();
+    const g = groups.find(x => x.id === id);
+    if (!g) { alert("Group not found."); return; }
+    const book = loadBooks().find(b => b.id === g.bookId);
+    if (!book || !book.fileId) { alert("This group’s book has no file attached."); return; }
+    const rec = await idbGetFile(book.fileId);
+    if (!rec) { alert("Stored file not found."); return; }
+    openReaderOverlay({ title: book.title, type: rec.type, blob: rec.blob });
+  });
+
+  renderList();
 }
 
 /* ===========================
-   Router
+Bootstrap
 =========================== */
-document.addEventListener("DOMContentLoaded", ()=>{
-  const ttl = (document.title||"").toLowerCase();
-  if (ttl.includes("stats"))      initStats();
-  else if (ttl.includes("buddy")) initBuddy();
-  else if (ttl.includes("add"))   initAdd();
-  else if (ttl.includes("edit"))  initEdit();
-  else                            initLibrary();
-
-  // touch shim
-  document.body.addEventListener("touchstart", ()=>{}, {passive:true});
+document.addEventListener("DOMContentLoaded", () => {
+  initLibraryPage();
+  initAddEditPage();
+  initStatsPage();
+  initSettingsPage();
+  initBuddyReadPage();
 });

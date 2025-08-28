@@ -1,125 +1,192 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-  <title>PageBud • Stats</title>
-
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet"/>
-  <link href="style.css?v=2025-08-26-19" rel="stylesheet"/>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Stats - PageBud</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link rel="stylesheet" href="style.css?v=2025-08-26-18" />
   <link rel="manifest" href="manifest.json">
-
-  <!-- iOS PWA polish -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <meta name="theme-color" content="#111111">
-
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
 </head>
+
 <body>
   <div class="app-container">
-    <div class="stats-page">
-      <div class="stats-header header">
-        <h1>Statistics</h1>
-        <a class="back-button" href="index.html" aria-label="Back"><i class="fas fa-arrow-left"></i></a>
+    <!-- Header -->
+    <div class="stats-header">
+      <div class="back-button" onclick="location.href='index.html'">
+        <i class="fas fa-arrow-left"></i>
       </div>
-
-      <!-- Range controls -->
-      <div class="range-bar">
-        <div class="seg">
-          <button id="btnDay"   type="button">Daily</button>
-          <button id="btnWeek"  type="button">Weekly</button>
-          <button id="btnMonth" type="button">Monthly</button>
-          <button id="btnYear"  type="button" class="active">Yearly</button>
-        </div>
-        <div class="pickers">
-          <input  id="dayPick"   type="date" style="display:none">
-          <select id="weekPick"  style="display:none" title="Week"></select>
-          <select id="monthPick" style="display:none" title="Month"></select>
-          <select id="yearPick"  title="Year"></select>
-        </div>
+      <h1>Stats (DENNE ER IKKE FERDIG!)</h1>
+      <div class="time-filter">
+        <button class="time-btn" data-period="daily">Daily</button>
+        <button class="time-btn" data-period="weekly">Weekly</button>
+        <button class="time-btn" data-period="monthly">Monthly</button>
+        <button class="time-btn active" data-period="yearly">Yearly</button>
       </div>
-
-      <section class="stats-grid">
-        <!-- Minutes Goal -->
-        <div class="stats-card" id="minutesCard">
-          <h3 style="margin-bottom:6px">Reading Goal (Minutes)</h3>
-          <div class="goal-row">
-            <input id="goalInput" class="input" type="number" min="0" step="5" placeholder="Minutes">
-            <button id="goalSave" type="button" class="btn btn-primary">Save</button>
-          </div>
-          <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
-          <div class="progress-text">
-            <span id="progress-percent">0% Complete</span>
-            <span><span id="progress-mins">0</span>/<span id="progress-goal">0</span> mins</span>
-          </div>
-          <div class="stat-row" style="margin-top:6px"><span>Sessions in range</span><span id="rt-sessions">0</span></div>
-        </div>
-
-        <!-- Books Goal -->
-        <div class="stats-card" id="booksCard">
-          <h3 style="margin-bottom:6px">Reading Goal (Books)</h3>
-          <div class="goal-row">
-            <input id="bookGoalInput" class="input" type="number" min="0" step="1" placeholder="Books">
-            <button id="bookGoalSave" type="button" class="btn btn-primary">Save</button>
-          </div>
-          <div class="progress-bar"><div id="book-progress-fill" class="progress-fill"></div></div>
-          <div class="progress-text">
-            <span id="book-progress-percent">0% Complete</span>
-            <span><span id="book-progress-now">0</span>/<span id="book-progress-goal">0</span> books</span>
-          </div>
-        </div>
-
-        <!-- Ratings (all-time) -->
-        <div class="stats-card">
-          <h3 style="margin-bottom:6px">Ratings Overview (All)</h3>
-          <div class="stat-row"><span>Average Rating</span><span id="avg-rating">0.0</span></div>
-          <div class="stat-row"><span>Total Ratings</span><span id="total-ratings">0</span></div>
-          <div class="stat-row"><span>Favorites (≥6★)</span><span id="favorite-books">0</span></div>
-        </div>
-
-        <!-- Charts (lazy-init on open) -->
-        <details class="stats-card">
-          <summary>Genres</summary>
-          <div class="card-body"><canvas id="chartGenres"></canvas></div>
-        </details>
-        <details class="stats-card">
-          <summary>Status</summary>
-          <div class="card-body"><canvas id="chartStatus"></canvas></div>
-        </details>
-        <details class="stats-card">
-          <summary>Most Read Authors (Top 10)</summary>
-          <div class="card-body"><canvas id="chartAuthors"></canvas></div>
-        </details>
-
-        <!-- Export -->
-        <div class="stats-card">
-          <h3 style="margin-bottom:6px">Export</h3>
-          <div class="btn-group">
-            <button class="btn btn-secondary" type="button" onclick="exportBooksCSV()">Export CSV</button>
-            <button class="btn btn-primary"   type="button" onclick="exportBooksJSON()">Export JSON</button>
-          </div>
-        </div>
-
-        <!-- Maintenance -->
-        <div class="stats-card">
-          <h3>Maintenance</h3>
-          <button class="btn btn-secondary" type="button" onclick="window.forceUpdateNow()">
-            Force update (reload app)
-          </button>
-          <div class="muted">Fetches new service worker and reloads.</div>
-        </div>
-      </section>
     </div>
 
+    <div class="content-wrapper">
+      <!-- Reading Timeline -->
+      <div class="reading-timeline">
+        <div class="section-header">
+          <div class="section-title">
+            <i class="fas fa-calendar-alt"></i>
+            <span>Reading Activity</span>
+          </div>
+        </div>
+        <div class="timeline-stats">
+          <div class="timeline-item">
+            <div class="timeline-number" id="dailyCount">0</div>
+            <div class="timeline-label">Today</div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-number" id="weeklyCount">2</div>
+            <div class="timeline-label">This Week</div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-number" id="monthlyCount">8</div>
+            <div class="timeline-label">This Month</div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-number" id="yearlyCount">42</div>
+            <div class="timeline-label">This Year</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Overview Cards -->
+      <div class="overview-grid">
+        <div class="stat-card">
+          <div class="stat-number" id="booksRead">42</div>
+          <div class="stat-label">Books Read</div>
+        </div>
+        <div class="stat-card rating-stat">
+          <div class="stat-number" id="avgRating">4.2</div>
+          <div class="stat-label">Average Rating</div>
+        </div>
+      </div>
+
+      <!-- Reading Streak -->
+      <div class="stats-section">
+        <div class="section-header">
+          <div class="section-title">
+            <i class="fas fa-fire"></i>
+            <span>Reading Streak</span>
+          </div>
+        </div>
+        <div class="streak-container">
+          <div class="streak-number" id="streakCount">7</div>
+          <div class="streak-label">Days in a row</div>
+          <div class="streak-calendar" id="streakCalendar">
+            <!-- Calendar will be populated by JavaScript -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Genres Chart -->
+      <div class="stats-section">
+        <div class="section-header">
+          <div class="section-title">
+            <i class="fas fa-tags"></i>
+            <span>Genres</span>
+          </div>
+        </div>
+        <div class="chart-container">
+          <canvas id="genresChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Book Formats -->
+      <div class="stats-section">
+        <div class="section-header">
+          <div class="section-title">
+            <i class="fas fa-book"></i>
+            <span>Book Formats</span>
+          </div>
+        </div>
+        <div class="chart-container chart-small">
+          <canvas id="formatsChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Most Read Authors -->
+      <div class="stats-section">
+        <div class="section-header">
+          <div class="section-title">
+            <i class="fas fa-user-edit"></i>
+            <span>Most Read Authors</span>
+          </div>
+        </div>
+        <div class="authors-list" id="topAuthors">
+          <!-- Generated by JavaScript -->
+        </div>
+      </div>
+
+      <!-- Language Distribution -->
+      <div class="stats-section">
+        <div class="section-header">
+          <div class="section-title">
+            <i class="fas fa-globe"></i>
+            <span>Language</span>
+          </div>
+        </div>
+        <div class="chart-container language-chart">
+          <canvas id="languageChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Tip Section -->
+      <div class="tip-section">
+        <div class="tip-text">
+          <i class="fas fa-lightbulb"></i>
+          Tip: Mark today active to track reading trends. This data is generated locally from your library data.
+        </div>
+        <div class="export-section">
+          <button class="btn btn-light" id="markActiveBtn">Mark Active Today</button>
+          <button class="btn btn-light" id="backupLibraryBtn">Backup Library Data</button>
+        </div>
+      </div>
+
+      <!-- Export Options -->
+      <div class="stats-section">
+        <div class="section-header">
+          <div class="section-title">
+            <i class="fas fa-download"></i>
+            <span>Export</span>
+          </div>
+        </div>
+        <div class="export-section">
+          <button class="btn btn-primary" id="exportLibraryCSV">Export Library CSV</button>
+          <button class="btn btn-primary" id="exportStatsJSON">Export Stats JSON</button>
+          <button class="btn btn-primary" id="exportJSON">Export All JSON</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Navigation -->
     <nav class="bottom-nav">
-      <div class="nav-item" onclick="location.href='index.html'"><i class="fas fa-book"></i> Library</div>
-      <div class="nav-item active" onclick="location.href='stats.html'"><i class="fas fa-chart-line"></i> Stats</div>
-      <div class="nav-item" onclick="location.href='buddy-read.html'"><i class="fas fa-users"></i> Buddy Read</div>
+      <div class="nav-item" onclick="location.href='index.html'">
+        <i class="fas fa-book"></i> Library
+      </div>
+      <div class="nav-item active" onclick="location.href='stats.html'">
+        <i class="fas fa-chart-line"></i> Stats
+      </div>
+      <div class="nav-item" onclick="location.href='buddy-read.html'">
+        <i class="fas fa-users"></i> Buddy Read
+      </div>
+      <div class="nav-item" onclick="location.href='settings.html'">
+        <i class="fas fa-cog"></i> Settings
+      </div>
     </nav>
   </div>
 
-  <script src="script.js?v=2025-08-26-19"></script>
+  <script src="script.js?v=2025-08-26-18"></script>
 </body>
+
 </html>

@@ -1,12 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Edit Book - PageBud</title>
 
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
-  <link rel="stylesheet" href="style.css?v=2025-08-26-19"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link rel="stylesheet" href="style.css?v=2025-08-26-20" />
   <link rel="manifest" href="manifest.json">
 
   <!-- Reader libs -->
@@ -14,6 +15,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
 </head>
+
 <body>
   <div class="app-container edit-page">
     <!-- Header -->
@@ -34,12 +36,12 @@
     <!-- Fields -->
     <div class="form-group">
       <label for="title">Title</label>
-      <input id="title" type="text" placeholder="Book title…"/>
+      <input id="title" type="text" placeholder="Book title…" />
     </div>
 
     <div class="form-group">
       <label for="author">Author</label>
-      <input id="author" type="text" placeholder="Author name…"/>
+      <input id="author" type="text" placeholder="Author name…" />
     </div>
 
     <div class="form-group">
@@ -62,125 +64,125 @@
 
     <!-- Chips -->
     <details class="chip-toggle" id="genresBox">
-  <summary>Genres</summary>
-  <div class="chip-scroll" id="genres">
-    <div class="toggle-option">Apocalypse</div>
-    <div class="toggle-option">Adventure</div>
-    <div class="toggle-option">Biography</div>
-    <div class="toggle-option">Business</div>
-    <div class="toggle-option">Children</div>
-    <div class="toggle-option">Christian</div>
-    <div class="toggle-option">Classics</div>
-    <div class="toggle-option">Comic</div>
-    <div class="toggle-option">Contemporary</div>
-    <div class="toggle-option">Crime</div>
-    <div class="toggle-option">Dark Romance</div>
-    <div class="toggle-option">Drama</div>
-    <div class="toggle-option">Dystopian</div>
-    <div class="toggle-option">Erotic</div>
-    <div class="toggle-option">Fairytale Retellings</div>
-    <div class="toggle-option">Fantasy</div>
-    <div class="toggle-option">Folklore</div>
-    <div class="toggle-option">Gothic</div>
-    <div class="toggle-option">History</div>
-    <div class="toggle-option">Holiday / Seasonal</div>
-    <div class="toggle-option">Horror</div>
-    <div class="toggle-option">Humor</div>
-    <div class="toggle-option">LGBTQ+</div>
-    <div class="toggle-option">Lost World</div>
-    <div class="toggle-option">Memoir</div>
-    <div class="toggle-option">Mystery</div>
-    <div class="toggle-option">Mythology</div>
-    <div class="toggle-option">New Adult</div>
-    <div class="toggle-option">Non-fiction</div>
-    <div class="toggle-option">Novel</div>
-    <div class="toggle-option">Novella</div>
-    <div class="toggle-option">Paranormal</div>
-    <div class="toggle-option">Philosophy</div>
-    <div class="toggle-option">Poetry</div>
-    <div class="toggle-option">Political</div>
-    <div class="toggle-option">Psychological</div>
-    <div class="toggle-option">Religious</div>
-    <div class="toggle-option">Romance</div>
-    <div class="toggle-option">Satire</div>
-    <div class="toggle-option">Sci-Fi</div>
-    <div class="toggle-option">Self-Help</div>
-    <div class="toggle-option">Short Stories</div>
-    <div class="toggle-option">Space</div>
-    <div class="toggle-option">Spiritual</div>
-    <div class="toggle-option">Splatterpunk</div>
-    <div class="toggle-option">Sports Fiction</div>
-    <div class="toggle-option">Steampunk</div>
-    <div class="toggle-option">Superhero</div>
-    <div class="toggle-option">Suspense</div>
-    <div class="toggle-option">Thriller</div>
-    <div class="toggle-option">Urban Legend</div>
-    <div class="toggle-option">Western</div>
-    <div class="toggle-option">Witchy</div>
-    <div class="toggle-option">YA</div>
-  </div>
-</details>
+      <summary>Genres</summary>
+      <div class="chip-scroll" id="genres">
+        <div class="toggle-option">Apocalypse</div>
+        <div class="toggle-option">Adventure</div>
+        <div class="toggle-option">Biography</div>
+        <div class="toggle-option">Business</div>
+        <div class="toggle-option">Children</div>
+        <div class="toggle-option">Christian</div>
+        <div class="toggle-option">Classics</div>
+        <div class="toggle-option">Comic</div>
+        <div class="toggle-option">Contemporary</div>
+        <div class="toggle-option">Crime</div>
+        <div class="toggle-option">Dark Romance</div>
+        <div class="toggle-option">Drama</div>
+        <div class="toggle-option">Dystopian</div>
+        <div class="toggle-option">Erotic</div>
+        <div class="toggle-option">Fairytale Retellings</div>
+        <div class="toggle-option">Fantasy</div>
+        <div class="toggle-option">Folklore</div>
+        <div class="toggle-option">Gothic</div>
+        <div class="toggle-option">History</div>
+        <div class="toggle-option">Holiday / Seasonal</div>
+        <div class="toggle-option">Horror</div>
+        <div class="toggle-option">Humor</div>
+        <div class="toggle-option">LGBTQ+</div>
+        <div class="toggle-option">Lost World</div>
+        <div class="toggle-option">Memoir</div>
+        <div class="toggle-option">Mystery</div>
+        <div class="toggle-option">Mythology</div>
+        <div class="toggle-option">New Adult</div>
+        <div class="toggle-option">Non-fiction</div>
+        <div class="toggle-option">Novel</div>
+        <div class="toggle-option">Novella</div>
+        <div class="toggle-option">Paranormal</div>
+        <div class="toggle-option">Philosophy</div>
+        <div class="toggle-option">Poetry</div>
+        <div class="toggle-option">Political</div>
+        <div class="toggle-option">Psychological</div>
+        <div class="toggle-option">Religious</div>
+        <div class="toggle-option">Romance</div>
+        <div class="toggle-option">Satire</div>
+        <div class="toggle-option">Sci-Fi</div>
+        <div class="toggle-option">Self-Help</div>
+        <div class="toggle-option">Short Stories</div>
+        <div class="toggle-option">Space</div>
+        <div class="toggle-option">Spiritual</div>
+        <div class="toggle-option">Splatterpunk</div>
+        <div class="toggle-option">Sports Fiction</div>
+        <div class="toggle-option">Steampunk</div>
+        <div class="toggle-option">Superhero</div>
+        <div class="toggle-option">Suspense</div>
+        <div class="toggle-option">Thriller</div>
+        <div class="toggle-option">Urban Legend</div>
+        <div class="toggle-option">Western</div>
+        <div class="toggle-option">Witchy</div>
+        <div class="toggle-option">YA</div>
+      </div>
+    </details>
 
 
     <details class="chip-toggle" id="moodsBox">
-  <summary>Moods</summary>
-  <div class="chip-scroll" id="moods">
-    <div class="toggle-option">💔 Angsty</div>
-    <div class="toggle-option">🌅 Bittersweet</div>
-    <div class="toggle-option">🧡 Cozy</div>
-    <div class="toggle-option">😱 Creepy</div>
-    <div class="toggle-option">🧟‍♀️ Dark</div>
-    <div class="toggle-option">😭 Emotional</div>
-    <div class="toggle-option">⚡ Fast-paced</div>
-    <div class="toggle-option">🥰 Feel-good</div>
-    <div class="toggle-option">🤣 Funny</div>
-    <div class="toggle-option">🌸 Heartwarming</div>
-    <div class="toggle-option">🤯 Mind-bending</div>
-    <div class="toggle-option">🌙 Moody</div>
-    <div class="toggle-option">✨ Magical</div>
-    <div class="toggle-option">😌 Relaxing</div>
-    <div class="toggle-option">😭 Sad/Crying</div>
-    <div class="toggle-option">🐢 Slow-burn</div>
-    <div class="toggle-option">🌶️ Spicy</div>
-    <div class="toggle-option">🌀 Twisty</div>
-    <div class="toggle-option">🧠 Thought-provoking</div>
-    <div class="toggle-option">🔥 Tense</div>
-    <div class="toggle-option">💖 Wholesome</div>
-  </div>
-</details>
+      <summary>Moods</summary>
+      <div class="chip-scroll" id="moods">
+        <div class="toggle-option">💔 Angsty</div>
+        <div class="toggle-option">🌅 Bittersweet</div>
+        <div class="toggle-option">🧡 Cozy</div>
+        <div class="toggle-option">😱 Creepy</div>
+        <div class="toggle-option">🧟‍♀️ Dark</div>
+        <div class="toggle-option">😭 Emotional</div>
+        <div class="toggle-option">⚡ Fast-paced</div>
+        <div class="toggle-option">🥰 Feel-good</div>
+        <div class="toggle-option">🤣 Funny</div>
+        <div class="toggle-option">🌸 Heartwarming</div>
+        <div class="toggle-option">🤯 Mind-bending</div>
+        <div class="toggle-option">🌙 Moody</div>
+        <div class="toggle-option">✨ Magical</div>
+        <div class="toggle-option">😌 Relaxing</div>
+        <div class="toggle-option">😭 Sad/Crying</div>
+        <div class="toggle-option">🐢 Slow-burn</div>
+        <div class="toggle-option">🌶️ Spicy</div>
+        <div class="toggle-option">🌀 Twisty</div>
+        <div class="toggle-option">🧠 Thought-provoking</div>
+        <div class="toggle-option">🔥 Tense</div>
+        <div class="toggle-option">💖 Wholesome</div>
+      </div>
+    </details>
 
     <!-- Tropes -->
-<details class="chip-toggle" id="tropesBox">
-  <summary>Tropes</summary>
-  <div class="chip-scroll" id="tropes">
-    <div class="toggle-option" data-val="age-gap">Age Gap</div>
-    <div class="toggle-option" data-val="arranged-marriage">Arranged Marriage</div>
-    <div class="toggle-option" data-val="billionaire">Billionaire</div>
-    <div class="toggle-option" data-val="celebrity">Celebrity</div>
-    <div class="toggle-option" data-val="childhood-friends">Childhood Friends</div>
-    <div class="toggle-option" data-val="close-proximity">Close Proximity</div>
-    <div class="toggle-option" data-val="coworkers">Coworkers</div>
-    <div class="toggle-option" data-val="dark-secrets">Dark Secrets</div>
-    <div class="toggle-option" data-val="destined-mates">Destined Mates</div>
-    <div class="toggle-option" data-val="enemies-to-lovers">Enemies to Lovers</div>
-    <div class="toggle-option" data-val="fake-dating">Fake Dating</div>
-    <div class="toggle-option" data-val="forbidden-love">Forbidden Love</div>
-    <div class="toggle-option" data-val="friends-to-lovers">Friends to Lovers</div>
-    <div class="toggle-option" data-val="grumpy-sunshine">Grumpy x Sunshine</div>
-    <div class="toggle-option" data-val="love-triangle">Love Triangle</div>
-    <div class="toggle-option" data-val="marriage-of-convenience">Marriage of Convenience</div>
-    <div class="toggle-option" data-val="one-bed">Only One Bed</div>
-    <div class="toggle-option" data-val="opposites-attract">Opposites Attract</div>
-    <div class="toggle-option" data-val="pen-pals">Pen Pals</div>
-    <div class="toggle-option" data-val="rivals-to-lovers">Rivals to Lovers</div>
-    <div class="toggle-option" data-val="royalty">Royalty</div>
-    <div class="toggle-option" data-val="second-chance">Second Chance</div>
-    <div class="toggle-option" data-val="slow-burn">Slow Burn</div>
-    <div class="toggle-option" data-val="soulmates">Soulmates</div>
-    <div class="toggle-option" data-val="time-travel">Time Travel</div>
-    <div class="toggle-option" data-val="unrequited-love">Unrequited Love</div>
-  </div>
-</details>
+    <details class="chip-toggle" id="tropesBox">
+      <summary>Tropes</summary>
+      <div class="chip-scroll" id="tropes">
+        <div class="toggle-option" data-val="age-gap">Age Gap</div>
+        <div class="toggle-option" data-val="arranged-marriage">Arranged Marriage</div>
+        <div class="toggle-option" data-val="billionaire">Billionaire</div>
+        <div class="toggle-option" data-val="celebrity">Celebrity</div>
+        <div class="toggle-option" data-val="childhood-friends">Childhood Friends</div>
+        <div class="toggle-option" data-val="close-proximity">Close Proximity</div>
+        <div class="toggle-option" data-val="coworkers">Coworkers</div>
+        <div class="toggle-option" data-val="dark-secrets">Dark Secrets</div>
+        <div class="toggle-option" data-val="destined-mates">Destined Mates</div>
+        <div class="toggle-option" data-val="enemies-to-lovers">Enemies to Lovers</div>
+        <div class="toggle-option" data-val="fake-dating">Fake Dating</div>
+        <div class="toggle-option" data-val="forbidden-love">Forbidden Love</div>
+        <div class="toggle-option" data-val="friends-to-lovers">Friends to Lovers</div>
+        <div class="toggle-option" data-val="grumpy-sunshine">Grumpy x Sunshine</div>
+        <div class="toggle-option" data-val="love-triangle">Love Triangle</div>
+        <div class="toggle-option" data-val="marriage-of-convenience">Marriage of Convenience</div>
+        <div class="toggle-option" data-val="one-bed">Only One Bed</div>
+        <div class="toggle-option" data-val="opposites-attract">Opposites Attract</div>
+        <div class="toggle-option" data-val="pen-pals">Pen Pals</div>
+        <div class="toggle-option" data-val="rivals-to-lovers">Rivals to Lovers</div>
+        <div class="toggle-option" data-val="royalty">Royalty</div>
+        <div class="toggle-option" data-val="second-chance">Second Chance</div>
+        <div class="toggle-option" data-val="slow-burn">Slow Burn</div>
+        <div class="toggle-option" data-val="soulmates">Soulmates</div>
+        <div class="toggle-option" data-val="time-travel">Time Travel</div>
+        <div class="toggle-option" data-val="unrequited-love">Unrequited Love</div>
+      </div>
+    </details>
 
 
     <div class="form-group">
@@ -198,10 +200,12 @@
       <textarea id="quoteText" placeholder="Add a quote…"></textarea>
       <div class="quote-options" style="margin-top:10px">
         <div id="qText" class="quote-option selected">
-          <i class="fas fa-font"></i><div>Text</div>
+          <i class="fas fa-font"></i>
+          <div>Text</div>
         </div>
         <div id="qGallery" class="quote-option">
-          <i class="fas fa-image"></i><div>Gallery</div>
+          <i class="fas fa-image"></i>
+          <div>Gallery</div>
         </div>
       </div>
       <button id="addQuote" class="btn btn-secondary" style="margin-top:12px">+ Add Quote</button>
@@ -262,6 +266,31 @@
     </div>
   </div>
 
-  <script src="script.js?v=2025-08-26-19"></script>
+  <!-- EPUB READER -->
+  <section id="epubReader" class="reader-shell" aria-label="EPUB Reader" hidden>
+    <div id="reader-toolbar" class="reader-toolbar">
+      <button id="btnCloseReader" type="button" title="Close">✕</button>
+      <div class="spacer"></div>
+      <button id="fontMinus" type="button" title="Smaller text">A-</button>
+      <button id="fontPlus" type="button" title="Larger text">A+</button>
+      <!-- Aa-knappen fra reader-theme.js blir lagt her automatisk -->
+    </div>
+
+    <div id="viewer" class="viewer" role="document" tabindex="0"></div>
+  </section>
+
+  <!-- ePub.js-biblioteket -->
+  <script src="https://cdn.jsdelivr.net/npm/epubjs@0.3/dist/epub.min.js"></script>
+
+  <!-- Tema-modulen du fikk av meg (IKKE HTML her) -->
+  <script src="reader-theme.js"></script>
+
+  <!-- Init som oppretter book+rendition og kaller PBReaderTheme.attach(...) -->
+  <script src="reader-init.js"></script>
+
+
+
+  <script src="script.js?v=2025-08-26-20"></script>
 </body>
+
 </html>

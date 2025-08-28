@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Settings - PageBud</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <link rel="stylesheet" href="style.css?v=2025-08-26-20" />
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <meta name="theme-color" content="#111111">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <div class="stats-header">
+            <div class="back-button" onclick="location.href='index.html'">
+                <i class="fas fa-arrow-left"></i>
+            </div>
+            <h1>Settings</h1>
+            <div style="width: 32px;"></div> <!-- Spacer for alignment -->
+        </div>
+
+        <div class="content-wrapper">
+            <!-- Theme Selection -->
+            <div class="stats-section">
+                <div class="section-header">
+                    <div class="section-title">
+                        <i class="fas fa-palette"></i>
+                        <span>Appearance</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="theme-select">Color Theme</label>
+
+                    <div class="theme-previews">
+                        <div class="theme-preview" data-theme="default">
+                            <div class="theme-colors">
+                                <div class="color-swatch" style="background-color: #7BDFF2;"></div>
+                                <div class="color-swatch" style="background-color: #B4F8C8;"></div>
+                                <div class="color-swatch" style="background-color: #F7D6E0;"></div>
+                            </div>
+                            <div class="theme-name">Pink & Blue</div>
+                        </div>
+
+                        <div class="theme-preview" data-theme="dark-academia">
+                            <div class="theme-colors">
+                                <div class="color-swatch" style="background-color: #1c1c1c;"></div>
+                                <div class="color-swatch" style="background-color: #daddd8;"></div>
+                                <div class="color-swatch" style="background-color: #ecebe4;"></div>
+                            </div>
+                            <div class="theme-name">Dark Academia</div>
+                        </div>
+
+                        <div class="theme-preview" data-theme="pink-beige">
+                            <div class="theme-colors">
+                                <div class="color-swatch" style="background-color: #F3B3CD;"></div>
+                                <div class="color-swatch" style="background-color: #F1C4A5;"></div>
+                                <div class="color-swatch" style="background-color: #F7DDCE;"></div>
+                            </div>
+                            <div class="theme-name">Pink & Beige</div>
+                        </div>
+
+                        <div class="theme-preview" data-theme="black-white">
+                            <div class="theme-colors">
+                                <div class="color-swatch" style="background-color: #000000;"></div>
+                                <div class="color-swatch" style="background-color: #EFF0EE;"></div>
+                                <div class="color-swatch" style="background-color: #F6D3DD;"></div>
+                            </div>
+                            <div class="theme-name">Black & White</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Data Management -->
+                <div class="stats-section">
+                    <div class="section-header">
+                        <div class="section-title">
+                            <i class="fas fa-database"></i>
+                            <span>Data Management</span>
+                        </div>
+                    </div>
+
+                    <div class="settings-actions">
+                        <button class="btn btn-secondary full-width" id="exportDataBtn">
+                            <i class="fas fa-download"></i> Export All Data
+                        </button>
+
+                        <button class="btn btn-secondary full-width" id="importDataBtn">
+                            <i class="fas fa-upload"></i> Import Data
+                        </button>
+
+                        <button class="btn btn-secondary full-width" id="backupDataBtn">
+                            <i class="fas fa-cloud"></i> Backup to Cloud
+                        </button>
+
+                        <button class="btn btn-danger full-width" id="resetDataBtn">
+                            <i class="fas fa-trash"></i> Reset All Data
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Reading Goals -->
+                <div class="stats-section">
+                    <div class="section-header">
+                        <div class="section-title">
+                            <i class="fas fa-bullseye"></i>
+                            <span>Reading Goals</span>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="yearly-goal">Yearly Reading Goal</label>
+                        <input type="number" id="yearly-goal" class="form-control" placeholder="Number of books" min="1"
+                            max="1000">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="daily-goal">Daily Reading Goal (minutes)</label>
+                        <input type="number" id="daily-goal" class="form-control" placeholder="Minutes per day" min="5"
+                            max="1000">
+                    </div>
+
+                    <button class="btn btn-primary full-width" id="saveGoalsBtn">Save Goals</button>
+                </div>
+
+                <!-- Notifications -->
+                <div class="stats-section">
+                    <div class="section-header">
+                        <div class="section-title">
+                            <i class="fas fa-bell"></i>
+                            <span>Notifications</span>
+                        </div>
+                    </div>
+
+                    <div class="toggle-setting">
+                        <div class="toggle-label">
+                            <span>Daily Reading Reminders</span>
+                            <span class="toggle-desc">Get reminded to read every day</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="daily-reminders">
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+
+                    <div class="toggle-setting">
+                        <div class="toggle-label">
+                            <span>Goal Progress Updates</span>
+                            <span class="toggle-desc">Receive notifications about your reading progress</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="goal-updates" checked>
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+
+                    <div class="toggle-setting">
+                        <div class="toggle-label">
+                            <span>New Features</span>
+                            <span class="toggle-desc">Get notified about new app features</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="new-features" checked>
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- About -->
+                <div class="stats-section">
+                    <div class="section-header">
+                        <div class="section-title">
+                            <i class="fas fa-info-circle"></i>
+                            <span>About PageBud</span>
+                        </div>
+                    </div>
+
+                    <div class="about-content">
+                        <p>PageBud v1.0.0</p>
+                        <p>Your personal reading companion to track, organize, and enjoy your books.</p>
+
+                        <div class="about-links">
+                            <a href="#" class="about-link">
+                                <i class="fas fa-question-circle"></i> Help & Support
+                            </a>
+                            <a href="#" class="about-link">
+                                <i class="fas fa-star"></i> Rate PageBud
+                            </a>
+                            <a href="#" class="about-link">
+                                <i class="fas fa-share-alt"></i> Share with Friends
+                            </a>
+                            <a href="#" class="about-link">
+                                <i class="fas fa-lock"></i> Privacy Policy
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- PageBud – Engagement Settings -->
+            <section id="engagementSettings" class="card">
+                <h3>Engagement</h3>
+
+                <label style="display:flex;align-items:center;gap:8px;margin:8px 0;">
+                    <input type="checkbox" id="reminderToggle" />
+                    Daily Reading Reminder
+                    <span style="margin-left:auto;">at</span>
+                    <input type="time" id="reminderTime" value="20:00" />
+                </label>
+
+                <label style="display:flex;align-items:center;gap:8px;margin:8px 0;">
+                    <input type="checkbox" id="goalToggle" checked />
+                    Goal Progress Updates (25/50/75/100 %)
+                </label>
+
+                <label style="display:flex;align-items:center;gap:8px;margin:8px 0;">
+                    <input type="checkbox" id="newFeaturesToggle" checked />
+                    New features announcements
+                </label>
+            </section>
+
+
+            <!-- Bottom Navigation -->
+            <nav class="bottom-nav">
+                <div class="nav-item" onclick="location.href='index.html'">
+                    <i class="fas fa-book"></i> Library
+                </div>
+                <div class="nav-item" onclick="location.href='stats.html'">
+                    <i class="fas fa-chart-line"></i> Stats
+                </div>
+                <div class="nav-item" onclick="location.href='buddy-read.html'">
+                    <i class="fas fa-users"></i> Buddy Read
+                </div>
+                <div class="nav-item active" onclick="location.href='settings.html'">
+                    <i class="fas fa-cog"></i> Settings
+                </div>
+            </nav>
+        </div>
+
+        <script src="script.js?v=2025-08-26-20"></script>
+        <script src="engagement.js"></script>
+</body>
+
+</html>

@@ -1,7 +1,7 @@
 // sw.js — PageBud (precache + sane strategies)
 
 // 1) Bump denne ved hvert deploy
-const CACHE_NAME = "pagebud-cache-v19";
+const CACHE_NAME = "pagebud-cache-v20";
 
 // 2) Legg inn ALLE filer du vil være 100% sikre på lastes riktig.
 //    Viktig: bruk samme query som i HTML!
@@ -22,7 +22,7 @@ const ASSETS = [
 // --- Install: pre-cache alt viktig ---
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)).catch(()=>{})
+    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)).catch(() => { })
   );
   self.skipWaiting(); // aktiver ny SW med en gang
 });

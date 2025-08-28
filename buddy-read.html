@@ -1,12 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Buddy Read - PageBud</title>
 
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-  <link rel="stylesheet" href="style.css?v=2025-08-26-19"/>
+  <link rel="stylesheet" href="style.css?v=2025-08-26-20" />
   <link rel="manifest" href="manifest.json">
 
   <!-- iOS PWA polish -->
@@ -15,6 +16,7 @@
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <meta name="theme-color" content="#111111">
 </head>
+
 <body>
   <div class="app-container">
     <!-- Header -->
@@ -63,7 +65,8 @@
           <div style="display:flex;align-items:center;justify-content:space-between">
             <h2 id="detail-name">Group</h2>
             <div class="row" style="width:auto">
-              <button id="delete-group" class="btn danger" style="width:auto;padding:8px 12px"><i class="fa fa-trash"></i></button>
+              <button id="delete-group" class="btn danger" style="width:auto;padding:8px 12px"><i
+                  class="fa fa-trash"></i></button>
               <button id="back-to-list" class="btn btn-secondary" style="width:auto;padding:8px 12px">Back</button>
             </div>
           </div>
@@ -79,8 +82,11 @@
           </div>
 
           <div style="margin-top:10px">
-            <div class="progress-bar"><div class="progress-fill" id="detail-progress"></div></div>
-            <div style="font-size:.85rem;color:#6b6b6b;margin-top:4px" id="detail-progress-text">Group progress: 0%</div>
+            <div class="progress-bar">
+              <div class="progress-fill" id="detail-progress"></div>
+            </div>
+            <div style="font-size:.85rem;color:#6b6b6b;margin-top:4px" id="detail-progress-text">Group progress: 0%
+            </div>
           </div>
         </div>
 
@@ -91,7 +97,7 @@
             <div id="btnSync" class="session-btn"><i class="fas fa-user-friends"></i> Sync Reading</div>
           </div>
           <div style="font-size:.85rem;color:#6b6b6b;margin-bottom:8px">
-            <b>Read Together</b> = everyone reads at own pace (chat-enabled).  
+            <b>Read Together</b> = everyone reads at own pace (chat-enabled).
             <b>Sync Reading</b> = leader flips pages for everyone.
           </div>
           <button class="btn btn-primary" id="start-session"><i class="fas fa-play"></i> Start Reading Session</button>
@@ -115,9 +121,11 @@
       <div class="nav-item" onclick="location.href='index.html'"><i class="fas fa-book"></i>Library</div>
       <div class="nav-item" onclick="location.href='stats.html'"><i class="fas fa-chart-line"></i>Stats</div>
       <div class="nav-item active"><i class="fas fa-users"></i>Buddy Read</div>
+      <div class="nav-item" onclick="location.href='settings.html'"><i class="fas fa-cog"></i>Settings</div>
     </nav>
   </div>
 
-  <script src="script.js?v=2025-08-26-19"></script>
+  <script src="script.js?v=2025-08-26-20"></script>
 </body>
+
 </html>
