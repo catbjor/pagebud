@@ -22,7 +22,7 @@ try {
 // sw.js — PageBud (precache + sane strategies)
 
 // 1) Bump denne ved hvert deploy
-const CACHE_NAME = "pagebud-cache-v24";
+const CACHE_NAME = "pagebud-cache-v28";
 
 // --- FCM i samme SW ---
 try {

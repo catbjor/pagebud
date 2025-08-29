@@ -1,11 +1,11 @@
 /* =========================================================
-   PageBud – app-logic (library, editor, buddy, stats)
-   --------------------------------------------------------- */
+   PageBud – app logic (library, editor, buddy, stats)
+   ========================================================= */
+"use strict";
 
 /* -------------------- Utils -------------------- */
 const LS_BOOKS = "pb:books";
 const LS_READING_DAYS = "pb:readingDays"; // Map { "YYYY-MM-DD": true }
-const LS_LAST_SEARCH = "pb:lastSearch";
 const nowIso = () => new Date().toISOString();
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
@@ -73,7 +73,7 @@ function starsHTML(rating = 0) {
 
 /* -------------------- Library (index.html) -------------------- */
 function matchesFactory(q, filter) {
-  // eksakt logikk du ba om
+  // exact logic you requested
   return function matches(b) {
     if (q) {
       const s = (b.title || "") + " " + (b.author || "");
@@ -84,12 +84,14 @@ function matchesFactory(q, filter) {
     if (filter === "owned") return (b.tags || []).includes("owned");
     if (filter === "wishlist") return (b.tags || []).includes("wishlist");
     return (b.status || "") === filter;
-  }
+  };
 }
 
 function renderLibrary() {
   const grid = $("#book-grid");
   const empty = $("#empty-state");
+  if (!grid || !empty) return;
+
   const q = ($("#search-input")?.value || "").trim();
   const activeChip = $("#filter-chips .category.active");
   const filter = activeChip ? activeChip.dataset.filter : "all";
@@ -113,7 +115,7 @@ function renderLibrary() {
     </div>
   `).join("");
 
-  // Alltid til edit (lesing kun i Edit/Add)
+  // Always go to Edit; reading only from Add/Edit pages
   grid.querySelectorAll(".book-card").forEach(card => {
     card.addEventListener("click", (ev) => {
       ev.preventDefault();
@@ -128,17 +130,7 @@ function initLibraryPage() {
   const grid = $("#book-grid");
   if (!grid) return;
 
-  // Hent og prefill siste søk
-  const searchEl = $("#search-input");
-  const savedQ = localStorage.getItem(LS_LAST_SEARCH) || "";
-  if (searchEl) {
-    searchEl.value = savedQ;
-    searchEl.addEventListener("input", () => {
-      localStorage.setItem(LS_LAST_SEARCH, (searchEl.value || "").trim());
-      renderLibrary();
-    });
-  }
-
+  $("#search-input")?.addEventListener("input", renderLibrary);
   $$("#filter-chips .category").forEach(chip => {
     chip.addEventListener("click", () => {
       $$("#filter-chips .category").forEach(c => c.classList.remove("active"));
@@ -206,24 +198,6 @@ function openPDF(dataUrl) {
   }, { once: true });
 }
 
-/* Når EPUB åpnes, merk "read today" ved første interaksjon (klikk/piltaster) */
-function wireEpubReadMarkers() {
-  const viewer = document.getElementById("viewer");
-  if (!viewer) return;
-  let fired = false;
-  const fire = () => {
-    if (fired) return;
-    fired = true;
-    markReadToday();
-  };
-  viewer.addEventListener("click", fire, { once: true });
-  const keyHandler = (e) => {
-    const k = e.key || "";
-    if (k === "ArrowRight" || k === "ArrowLeft") { fire(); }
-  };
-  document.addEventListener("keydown", keyHandler, { once: true });
-}
-
 /* -------------------- Editor (add/edit) -------------------- */
 function wireStarRating(starsEl, valueEl, book) {
   const makeStar = (i) => `<span class="star-container" data-i="${i}" title="${i}">★</span>`;
@@ -281,7 +255,7 @@ function initEditorCommon() {
   wireChipBox("#genres", "genres", book);
   wireChipBox("#moods", "moods", book);
   wireChipBox("#tropes", "tropes", book);
-  wireChipBox("#tags", "tags", book); // NEW: favorite/owned/wishlist
+  wireChipBox("#tags", "tags", book); // favorite/owned/wishlist
 
   // Fields
   $("#title")?.addEventListener("input", (e) => book.title = e.target.value);
@@ -292,7 +266,7 @@ function initEditorCommon() {
   $("#review")?.addEventListener("input", (e) => book.review = e.target.value);
   $("#notes")?.addEventListener("input", (e) => book.notes = e.target.value);
 
-  // Quotes (tekst)
+  // Quotes (text)
   $("#addQuote")?.addEventListener("click", () => {
     const q = ($("#quoteText")?.value || "").trim();
     if (!q) return;
@@ -344,7 +318,7 @@ function initEditorCommon() {
   $("#read-book-btn")?.addEventListener("click", () => {
     if (!book.fileUrl) { alert("No book file attached."); return; }
 
-    // Logg lesing i dag – før vi åpner leseren
+    // Log reading today before opening reader
     markReadToday();
 
     if (book.fileType === "pdf") {
@@ -355,8 +329,6 @@ function initEditorCommon() {
         return;
       }
       window.initEpubReader(book.fileUrl);
-      // Marker "read today" ved første EPUB-interaksjon (sidevending)
-      wireEpubReadMarkers();
     } else {
       alert("Unknown file type.");
     }
@@ -371,7 +343,7 @@ function initAddPage() {
     id: null, title: "", author: "",
     status: "reading", rating: 0,
     genres: [], moods: [], tropes: [],
-    tags: [], // NEW
+    tags: [], // favorite / owned / wishlist
     review: "", notes: "", quotes: [],
     cover: "", fileUrl: "", fileName: "", fileType: ""
   };
@@ -401,7 +373,7 @@ function initEditPage() {
     $("#coverIcon").style.display = "none";
   }
 
-  // paint chips basert på eksisterende data
+  // paint chips
   ["genres", "moods", "tropes", "tags"].forEach(field => {
     const root = document.getElementById(field); if (!root) return;
     const set = new Set(book[field] || []);
@@ -415,7 +387,7 @@ function initEditPage() {
   initEditorCommon();
 }
 
-/* -------------------- Buddy Read (dropdown fylles fra dine bøker) -------------------- */
+/* -------------------- Buddy Read (dropdown from your books) -------------------- */
 function initBuddyPage() {
   if (!$("#group-book")) return;
   const select = $("#group-book");
@@ -431,7 +403,7 @@ function initBuddyPage() {
     const name = ($("#group-name")?.value || "").trim();
     const bookId = select.value;
     if (!name || !bookId) { alert("Give the group a name and select a book."); return; }
-    alert("Group created ✓ (UI demo). For ekte synk, bruk Firestore + buddy-chat.js.");
+    alert("Group created ✓ (UI demo). For real sync, wire Firestore + buddy-chat.js.");
     $("#group-name").value = ""; select.value = "";
   });
 }
@@ -445,7 +417,7 @@ function initStatsPage() {
       <div class="section-header">
         <div class="section-title"><i class="fas fa-chart-line"></i><span>Overview</span></div>
         <div class="header-actions">
-          <button class="btn btn-secondary" id="btnLogToday" title="Mark read today">Read today</button>
+          <button class="btn btn-secondary" id="btnLogToday" title="Mark read today" type="button">Read today</button>
         </div>
       </div>
       <div class="overview-grid">
@@ -466,10 +438,10 @@ function initStatsPage() {
       <div class="section-header">
         <div class="section-title"><i class="fas fa-calendar"></i><span>Reading Calendar</span></div>
         <div class="time-filter">
-          <button class="time-btn active" data-range="daily">Daily</button>
-          <button class="time-btn" data-range="weekly">Weekly</button>
-          <button class="time-btn" data-range="monthly">Monthly</button>
-          <button class="time-btn" data-range="yearly">Yearly</button>
+          <button class="time-btn active" data-range="daily" type="button">Daily</button>
+          <button class="time-btn" data-range="weekly" type="button">Weekly</button>
+          <button class="time-btn" data-range="monthly" type="button">Monthly</button>
+          <button class="time-btn" data-range="yearly" type="button">Yearly</button>
         </div>
       </div>
       <div id="calWrap"></div>
@@ -487,7 +459,6 @@ function initStatsPage() {
   }
 
   // calendar builder
-  let currentRange = "daily";
   function buildCalendar() {
     const days = loadReadingDays();
     const today = new Date();
@@ -497,7 +468,6 @@ function initStatsPage() {
     const wrap = document.createElement("div");
     wrap.className = "cal-shell";
 
-    // header row
     wrap.innerHTML = `
       <div class="cal-head">
         <div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div>
@@ -506,12 +476,10 @@ function initStatsPage() {
     `;
     const grid = wrap.querySelector("#calGrid");
 
-    // Start på første i måneden (mandag=0 i vår visning)
     const first = new Date(year, month, 1);
     const firstWeekday = (first.getDay() + 6) % 7; // 0=Mon
     const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-    // Fyll “forrige” måned tomme celler
     for (let i = 0; i < firstWeekday; i++) {
       const cell = document.createElement("div");
       cell.className = "cal-day out";
@@ -530,13 +498,11 @@ function initStatsPage() {
         <div class="cal-list"></div>
         <div class="cal-badges"></div>
       `;
-      // Mark read
       if (days[ymd]) {
         const badge = cell.querySelector(".cal-badges");
         badge.innerHTML = `<span class="cal-dot start"></span>`;
       }
 
-      // Toggle lesing ved klikk
       cell.addEventListener("click", () => {
         const map = loadReadingDays();
         map[ymd] = !map[ymd];
@@ -555,26 +521,19 @@ function initStatsPage() {
     $("#calWrap").appendChild(buildCalendar());
   }
 
-  // range-switch (for nå påvirker det bare styling/heading – grunnlaget er der om du vil utvide)
   $$(".time-btn", host).forEach(btn => {
     btn.addEventListener("click", () => {
       $$(".time-btn", host).forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
-      currentRange = btn.dataset.range;
       renderCal();
     });
   });
 
-  $("#btnLogToday").addEventListener("click", () => {
+  $("#btnLogToday")?.addEventListener("click", () => {
     const map = loadReadingDays();
     const k = fmtDateYMD(new Date());
     map[k] = true; saveReadingDays(map); renderCal();
   });
-
-  // Live-oppdatering når lesing markeres, eller bøker endres
-  document.addEventListener("pb:readMarked", () => { refreshOverview(); renderCal(); });
-  document.addEventListener("pb:booksSyncedLocal", refreshOverview);
-  document.addEventListener("pb:booksSynced", refreshOverview);
 
   refreshOverview();
   renderCal();

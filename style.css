@@ -740,6 +740,12 @@ body {
   overflow: hidden;
 }
 
+/* Respecter hidden-attribute – Tving bort leseren til den åpnes eksplisitt */
+.reader-shell[hidden] {
+  display: none !important;
+  visibility: hidden !important;
+}
+
 #pdfWrap,
 #epubWrap {
   position: absolute;
@@ -1881,4 +1887,30 @@ input:checked+.slider:before {
   bottom: 84px;
   /* over tab-baren */
   z-index: 1100;
+}
+
+/* ---------- HARD CLOSE by default ---------- */
+.reader-shell {
+  display: none !important;
+}
+
+.reader-shell.open {
+  display: grid !important;
+}
+
+/* vi åpner ved å legge på .open */
+
+/* PDF-overlay også hard-closed som default */
+.reader-overlay {
+  display: none !important;
+}
+
+.reader-overlay.show {
+  display: flex !important;
+}
+
+/* Respekter hidden-attribute uansett */
+[hidden] {
+  display: none !important;
+  visibility: hidden !important;
 }

@@ -6,15 +6,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Edit Book - PageBud</title>
 
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
   <link rel="stylesheet" href="style.css" />
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#111111" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+
   <script>
     document.documentElement.setAttribute('data-theme', localStorage.getItem('pb:theme') || 'default');
   </script>
 
-  <!-- Reader libs (kun her hvor vi faktisk kan lese) -->
+  <!-- Reader libs -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/epubjs@0.3/dist/epub.min.js"></script>
 </head>
@@ -32,7 +34,7 @@
       <div id="cover" class="cover-image">
         <i id="coverIcon" class="fas fa-book"></i>
       </div>
-      <button id="pickCover" class="upload-btn">Upload Cover</button>
+      <button id="pickCover" class="upload-btn" type="button">Upload Cover</button>
       <input id="coverInput" type="file" accept="image/*" hidden />
     </div>
 
@@ -156,22 +158,24 @@
           <div>Gallery</div>
         </div>
       </div>
-      <button id="addQuote" class="btn btn-secondary" style="margin-top:12px">+ Add Quote</button>
+      <button id="addQuote" class="btn btn-secondary" style="margin-top:12px" type="button">+ Add Quote</button>
       <div id="quotes" class="quotes-grid" style="margin-top:12px"></div>
     </div>
 
     <div class="form-group">
       <label>Book File (PDF/EPUB)</label>
-      <button id="upload-file-btn" class="btn btn-secondary"><i class="fas fa-upload"></i>&nbsp; Upload/Replace</button>
+      <button id="upload-file-btn" class="btn btn-secondary" type="button">
+        <i class="fas fa-upload"></i>&nbsp; Upload/Replace
+      </button>
       <input id="bookFile" type="file" accept=".pdf,.epub" hidden />
       <div id="fileName" class="muted" style="margin-top:8px">No file attached</div>
     </div>
 
     <div class="btn-group">
-      <button id="delete-book-btn" class="btn btn-secondary">Delete Book</button>
-      <button class="btn btn-secondary" onclick="location.href='index.html'">Cancel</button>
-      <button id="update-book-btn" class="btn btn-primary">Update Book</button>
-      <button id="read-book-btn" class="btn btn-primary">Read Book</button>
+      <button id="delete-book-btn" class="btn btn-secondary" type="button">Delete Book</button>
+      <button class="btn btn-secondary" type="button" onclick="location.href='index.html'">Cancel</button>
+      <button id="update-book-btn" class="btn btn-primary" type="button">Update Book</button>
+      <button id="read-book-btn" class="btn btn-primary" type="button">Read Book</button>
     </div>
 
     <!-- Bottom nav -->
@@ -183,23 +187,21 @@
     </nav>
   </div>
 
-  <!-- PDF/Generic Reader Overlay -->
+  <!-- Generic Reader Overlay (PDF) -->
   <div id="reader" class="reader-overlay" aria-hidden="true">
     <div class="reader-top">
       <div class="group">
-        <button id="rClose" title="Close">×</button>
+        <button id="rClose" title="Close" type="button">×</button>
         <span class="reader-title" id="rTitle">book</span>
       </div>
       <div class="group">
-        <button id="rAminus">A-</button>
-        <button id="rAplus">A+</button>
+        <button id="rAminus" type="button">A-</button>
+        <button id="rAplus" type="button">A+</button>
       </div>
     </div>
     <div id="rBody" class="reader-body">
       <div id="pdfWrap" style="display:none"><canvas id="pdfCanvas"></canvas></div>
       <div id="epubWrap" style="display:none"></div>
-      <div id="tapLeft"></div>
-      <div id="tapRight"></div>
     </div>
     <div class="reader-bottom">
       <input id="rSlider" type="range" min="1" max="1" value="1">
@@ -214,16 +216,15 @@
       <div class="spacer"></div>
       <button id="fontMinus" type="button" title="Smaller text">A-</button>
       <button id="fontPlus" type="button" title="Larger text">A+</button>
-      <!-- Aa-knappen fra PBReaderTheme monteres her -->
     </div>
     <div id="viewer" class="viewer" role="document" tabindex="0"></div>
   </section>
 
-  <!-- Theme + init for EPUB -->
+  <!-- Reader theme + init -->
   <script src="reader-theme.js"></script>
   <script src="reader-init.js"></script>
 
-  <!-- Firebase (compat) + init + sync + app logic -->
+  <!-- Firebase + app scripts (each exactly once) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>

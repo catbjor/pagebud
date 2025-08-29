@@ -1,68 +1,136 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PageBud – Settings</title>
-    <link rel="stylesheet" href="styles.css" />
-    <script defer src="script.js"></script>
-    <script defer src="push.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <link rel="stylesheet" href="style.css?v=2025-08-29-29" />
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#111111">
 </head>
 
-<body data-page="settings">
-    <header class="topbar">
-        <div class="brand">Settings</div>
-    </header>
+<body>
+    <div class="app-container">
+        <div class="stats-header">
+            <div class="back-button" onclick="location.href='index.html'"><i class="fas fa-arrow-left"></i></div>
+            <h1>Settings</h1>
+            <div style="width:32px;"></div>
+        </div>
 
-
-    <main class="container">
-        <section class="card" style="margin-bottom:12px">
-            <h2 style="margin:0 0 12px">Appearance</h2>
-            <div class="theme-grid">
-                <div class="theme-card" data-theme="theme-pink-blue">
-                    <div class="theme-swatch"></div>
-                    <div>Pink & Blue</div>
+        <div class="content-wrapper">
+            <!-- Appearance -->
+            <div class="stats-section">
+                <div class="section-header">
+                    <div class="section-title"><i class="fas fa-palette"></i><span>Appearance</span></div>
                 </div>
-                <div class="theme-card" data-theme="theme-pink-beige">
-                    <div class="theme-swatch"></div>
-                    <div>Pink & Beige</div>
-                </div>
-                <div class="theme-card" data-theme="theme-barbie">
-                    <div class="theme-swatch"></div>
-                    <div>Barbie</div>
-                </div>
-                <div class="theme-card" data-theme="theme-goth">
-                    <div class="theme-swatch"></div>
-                    <div>Goth</div>
+                <div class="theme-previews">
+                    <div class="theme-preview" data-theme="default">
+                        <div class="theme-colors">
+                            <div class="color-swatch" style="background:#7BDFF2"></div>
+                            <div class="color-swatch" style="background:#B4F8C8"></div>
+                            <div class="color-swatch" style="background:#F7D6E0"></div>
+                        </div>
+                        <div class="theme-name">Pink & Blue</div>
+                    </div>
+                    <div class="theme-preview" data-theme="pink-beige">
+                        <div class="theme-colors">
+                            <div class="color-swatch" style="background:#F3B3CD"></div>
+                            <div class="color-swatch" style="background:#F1C4A5"></div>
+                            <div class="color-swatch" style="background:#F7DDCE"></div>
+                        </div>
+                        <div class="theme-name">Pink & Beige</div>
+                    </div>
+                    <div class="theme-preview" data-theme="barbie">
+                        <div class="theme-colors">
+                            <div class="color-swatch" style="background:#FE9DD0"></div>
+                            <div class="color-swatch" style="background:#8BD2F1"></div>
+                            <div class="color-swatch" style="background:#F8C9EB"></div>
+                        </div>
+                        <div class="theme-name">Barbie</div>
+                    </div>
+                    <div class="theme-preview" data-theme="goth">
+                        <div class="theme-colors">
+                            <div class="color-swatch" style="background:#1E1E22"></div>
+                            <div class="color-swatch" style="background:#3E2D36"></div>
+                            <div class="color-swatch" style="background:#5C3F49"></div>
+                        </div>
+                        <div class="theme-name">Goth</div>
+                    </div>
                 </div>
             </div>
-        </section>
 
+            <!-- Notifications -->
+            <div class="stats-section">
+                <div class="section-header">
+                    <div class="section-title"><i class="fas fa-bell"></i><span>Notifications (FCM)</span></div>
+                </div>
+                <button id="enablePushBtn" class="btn btn-secondary full-width">Enable Push (FCM)</button>
+                <div class="muted" style="margin-top:8px">Requires browser permission + your VAPID public key.</div>
+            </div>
 
-        <section class="card" style="margin-bottom:12px">
-            <h2 style="margin:0 0 12px">Notifications (FCM)</h2>
-            <p style="color:var(--muted)">Requires browser permission + your VAPID public key.</p>
-            <button id="enablePushBtn" class="btn">Enable Push</button>
-        </section>
+            <!-- Account -->
+            <div class="stats-section">
+                <div class="section-header">
+                    <div class="section-title"><i class="fas fa-user"></i><span>Account</span></div>
+                </div>
+                <button class="btn btn-secondary full-width"
+                    onclick="fb.auth.signOut().then(()=>location.href='auth.html')">
+                    <i class="fas fa-sign-out-alt"></i> Log out
+                </button>
+            </div>
+        </div>
 
+        <nav class="bottom-nav">
+            <div class="nav-item" onclick="location.href='index.html'"><i class="fas fa-book"></i> Library</div>
+            <div class="nav-item" onclick="location.href='stats.html'"><i class="fas fa-chart-line"></i> Stats</div>
+            <div class="nav-item" onclick="location.href='buddy-read.html'"><i class="fas fa-users"></i> Buddy Read
+            </div>
+            <div class="nav-item active"><i class="fas fa-cog"></i> Settings</div>
+        </nav>
+    </div>
 
-        <section class="card">
-            <h2 style="margin:0 0 12px">Account</h2>
-            <button class="btn btn-sm" style="background:#eee;color:#222">Log out</button>
-        </section>
-    </main>
+    <!-- App -->
+    <script src="script.js?v=2025-08-29-02"></script>
 
+    <!-- Firebase (compat) -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
+    <script src="firebase-init.js"></script>
+    <script src="sync.js"></script>
 
-    <a class="fab" href="edit.html" aria-label="Add book">+</a>
+    <script>
+        const VAPID_PUBLIC_KEY = "BJuvG6f4DO9_FG-tk1h9gQ5Ry1yeU9CYcrnZ-qRcIAbn4BgNnG73dHur62WbtBu_t9-XqeTHuGmR7UsASZPe0_g";
+        async function enablePush() {
+            try {
+                const reg = await navigator.serviceWorker.getRegistration();
+                if (!reg) { alert("Service Worker not registered yet."); return; }
+                const messaging = firebase.messaging();
+                const perm = await Notification.requestPermission();
+                if (perm !== "granted") return;
+                const token = await messaging.getToken({ vapidKey: VAPID_PUBLIC_KEY, serviceWorkerRegistration: reg });
+                if (!token) throw new Error("No token");
+                const u = fb.auth.currentUser;
+                if (u) {
+                    await fb.db.collection("users").doc(u.uid).collection("webPushTokens")
+                        .doc(token).set({
+                            token, ua: navigator.userAgent,
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                }
+                alert("Push enabled ✓");
+            } catch (e) { console.error(e); alert("Push feilet – se console"); }
+        }
+        document.getElementById("enablePushBtn").addEventListener("click", enablePush);
 
-
-    <nav class="tabbar">
-        <a data-tab="library" href="index.html">📚<span>Library</span></a>
-        <a data-tab="stats" href="stats.html">📈<span>Stats</span></a>
-        <a data-tab="friends" href="friends.html">👥<span>Buddy Read</span></a>
-        <a data-tab="settings" class="active" href="settings.html">⚙️<span>Settings</span></a>
-    </nav>
+        // Sync
+        requireAuth(async () => { PBSync.subscribe(); await PBSync.pushAll(); });
+    </script>
+    <script src="script.js?v=2025-08-29-30"></script>
+    <script src="reader-init.js?v=2025-08-29-30"></script>
 </body>
 
 </html>

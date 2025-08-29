@@ -5,13 +5,17 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>PageBud</title>
+
+  <!-- Styles -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-  <link rel="stylesheet" href="style.css?v=2025-08-28-25" />
-  <link rel="manifest" href="manifest.json">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <meta name="theme-color" content="#111111">
+  <link rel="stylesheet" href="style.css?v=2025-08-29-31" />
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <meta name="theme-color" content="#111111" />
 </head>
 
 <body>
@@ -21,10 +25,12 @@
     <header class="header">
       <h1>PageBud</h1>
       <div style="display:flex;gap:8px">
-        <button class="back-button" onclick="location.href='discover.html'" title="Discover"><i
-            class="fa-solid fa-compass"></i></button>
-        <button class="back-button" onclick="location.href='friends.html'" title="Friends"><i
-            class="fa-solid fa-user-group"></i></button>
+        <button class="back-button" onclick="location.href='discover.html'" title="Discover">
+          <i class="fa-solid fa-compass"></i>
+        </button>
+        <button class="back-button" onclick="location.href='friends.html'" title="Friends">
+          <i class="fa-solid fa-user-group"></i>
+        </button>
       </div>
     </header>
 
@@ -88,30 +94,31 @@
     </nav>
   </div>
 
-  <!-- App JS -->
-  <script src="script.js?v=2025-08-28-25"></script>
+  <!-- App logic (må lastes FØR Firebase for å kunne koble hendelser etc.) -->
+  <script src="script.js?v=2025-08-29-32"></script>
 
-  <!-- Firebase (compat) + init + sync + feed -->
+  <!-- Firebase (compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-  <script src="firebase-init.js"></script>
-  <script src="sync.js"></script>
-  <script src="social-feed.js"></script>
-  <script src="firebase-init.js"></script>
-  <script src="sync.js"></script>
-  <script>
-    requireAuth(async (user) => {
-      PBSync.subscribe();
-      await PBSync.pushAll();
-    });
-  </script>
 
+  <!-- Init + Sync (definerer window.fb, requireAuth, PBSync) -->
+  <script src="firebase-init.js"></script>
+  <script src="sync.js"></script>
+
+  <!-- Friends feed (leser fra Firestore etter at fb/PBSync finnes) -->
+  <script src="social-feed.js"></script>
+
+  <!-- Kjør først når alt over er lastet -->
   <script>
-    requireAuth(async (user) => {
-      PBSync.subscribe();
-      await PBSync.pushAll();
-      startSocialFeed(); // venne-aktivitet
+    requireAuth(async () => {
+      if (window.PBSync) {
+        PBSync.subscribe();
+        await PBSync.pushAll();
+      }
+      if (typeof startSocialFeed === "function") {
+        startSocialFeed();
+      }
     });
   </script>
 </body>
