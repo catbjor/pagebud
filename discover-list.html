@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <script src="theme-init.js"></script>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Discover – See all</title>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="discover-rails.css" />
+</head>
+
+<body>
+    <header class="header">
+        <a href="discover.html" class="back-fab" aria-label="Back"><i class="fa-solid fa-arrow-left"></i></a>
+        <h1>See all</h1>
+        <div></div>
+    </header>
+
+    <div class="container">
+        <div class="card" id="filters" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <input id="q" class="form-control" placeholder="Filter in this list…" />
+            <div class="seg" role="tablist" aria-label="Sort">
+                <button class="seg-btn active" data-sort="popular" role="tab" aria-selected="true">Popular</button>
+                <button class="seg-btn" data-sort="new" role="tab" aria-selected="false">New</button>
+            </div>
+        </div>
+
+        <section class="card">
+            <div id="grid" class="book-grid"></div>
+        </section>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js" defer></script>
+    <script src="discover-list.js" defer></script>
+</body>
+
+</html>

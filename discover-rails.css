@@ -1,22 +1,43 @@
-/* discover-rails.css — rails, skeletons, trygge kort, chips, drawer */
+/* discover-rails.css — rails, skeletons, chips, drawer, preview, responsive */
+
+/* Hold siden i ro, rails scroller lokalt */
+html,
+body {
+    overflow-x: hidden;
+}
+
+/* --- Skjul legacy sidepanel + tving 1-kol layout når vi bruker drawer --- */
+.disc-shell.disc-shell--drawer {
+    grid-template-columns: 1fr !important;
+}
+
+.disc-shell.disc-shell--drawer .disc-side {
+    display: none !important;
+}
 
 /* --- Horisontale rails --- */
 .rail-list {
     display: grid;
     grid-auto-flow: column;
-    grid-auto-columns: clamp(148px, 24vw, 186px);
+    grid-auto-columns: clamp(140px, 44vw, 186px);
     gap: 10px;
     overflow-x: auto;
     padding-bottom: 6px;
     scroll-snap-type: x mandatory;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior-inline: contain;
 }
 
 .rail-list>.tile {
     scroll-snap-align: start;
 }
 
-/* --- Seksjonsheader (tittel + filter + "See all") --- */
+/* Seksjonsboks */
+section.card[data-rail] {
+    overflow: hidden;
+}
+
+/* --- Seksjonsheader --- */
 .rail-head {
     display: flex;
     align-items: center;
@@ -52,6 +73,28 @@
     font-weight: 700;
 }
 
+/* --- Chips --- */
+.chips {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.chip {
+    font-size: .75rem;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 2px 8px;
+    white-space: nowrap;
+}
+
+.chip.active {
+    background: var(--surface);
+    font-weight: 700;
+}
+
 /* --- Tile som kort --- */
 .tile.card {
     display: grid;
@@ -78,7 +121,6 @@
     font-weight: 800;
     line-height: 1.25;
     max-height: 2.5em;
-    /* 2 linjer */
     overflow: hidden;
 }
 
@@ -95,24 +137,6 @@
     font-size: .85rem;
 }
 
-/* --- Chips (brukes både i header og på tiles) --- */
-.chips {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-wrap: wrap;
-}
-
-.chip {
-    font-size: .75rem;
-    color: var(--muted);
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    padding: 2px 8px;
-    white-space: nowrap;
-}
-
-/* --- Tile actions / badges --- */
 .tile .actions {
     display: flex;
     align-items: center;
@@ -131,7 +155,7 @@
     white-space: nowrap;
 }
 
-/* --- Skeleton loader --- */
+/* --- Skeleton --- */
 .skel {
     border: 1px solid var(--border);
     border-radius: 12px;
@@ -172,7 +196,7 @@
     }
 }
 
-/* --- Liten dot-loader på “See all” --- */
+/* --- “See all” loader --- */
 .btn.small.loading {
     pointer-events: none;
     opacity: .75;
@@ -188,23 +212,23 @@
 
 @keyframes dots {
     0% {
-        content: "⋯";
+        content: "⋯"
     }
 
     33% {
-        content: "•⋯";
+        content: "•⋯"
     }
 
     66% {
-        content: "••⋯";
+        content: "••⋯"
     }
 
     100% {
-        content: "⋯";
+        content: "⋯"
     }
 }
 
-/* --- Drawer (hamburger → venstremeny) --- */
+/* --- Drawer --- */
 .drawer-backdrop {
     position: fixed;
     inset: 0;
@@ -243,6 +267,17 @@
     margin-bottom: 8px;
 }
 
+.drawer-search {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.drawer-list {
+    max-height: calc(100% - 92px);
+    overflow: auto;
+}
+
 .drawer-list .side-link {
     padding: 8px 10px;
     border: 1px solid var(--border);
@@ -255,6 +290,32 @@
     background: var(--surface);
 }
 
+/* --- Preview popover --- */
+.preview-pop {
+    position: absolute;
+    z-index: 99999;
+    max-width: min(360px, 90vw);
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, .25);
+    display: none;
+}
+
+.preview-pop.show {
+    display: block;
+}
+
+.preview-pop .ttl {
+    font-weight: 900;
+}
+
+.preview-pop .muted {
+    color: var(--muted);
+    font-size: .9rem;
+}
+
 /* Smal scrollbar kun på rails */
 .rail-list::-webkit-scrollbar {
     height: 8px;
@@ -263,4 +324,41 @@
 .rail-list::-webkit-scrollbar-thumb {
     background: var(--border);
     border-radius: 999px;
+}
+
+/* --- Keep page fixed, rails scroll independently --- */
+html,
+body {
+    overflow-x: hidden;
+    max-width: 100%;
+    touch-action: pan-y;
+}
+
+.app-container,
+.disc-main,
+.card {
+    overflow-x: clip;
+}
+
+/* Seksjonsboks “eier” scrollen og hindrer lekkasje */
+section.card[data-rail] {
+    overflow: hidden;
+}
+
+/* Railene: ekte horisontal scroll, smooth på touch */
+.rail-list {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x;
+    /* horisontale sveip går til railen */
+    scroll-snap-type: x mandatory;
+    /* snap til tile-kort */
+    scrollbar-gutter: stable;
+}
+
+/* Litt defensivt for å forhindre at noe presser bredden */
+.rail-list .tile,
+.rail-list img,
+.rail-list .cover {
+    max-width: 100%;
 }

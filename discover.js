@@ -1,34 +1,86 @@
-// discover.js — rails + søk + detaljer + chips + drawer + sort pills + daily rotation
+// discover.js — rails + søk + chips + drawer + sort + daily rotation + filter-chips + preview + see-all page
 (() => {
     "use strict";
     const $ = (s, r = document) => r.querySelector(s);
     const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+    const esc = (s) => String(s || "").replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' }[m]));
+    const short = (s, max = 18) => (s || "").length > max ? (s.slice(0, max - 1) + "…") : (s || "");
+    const nk = (t, a) => `${(t || "").toLowerCase().trim()}::${(a || "").toLowerCase().trim()}`;
 
-    /* ---------------- Populære sjangre for drawer ---------------- */
-    const POPULAR_GENRES = {
-        "Romance": "romance",
-        "Fantasy": "fantasy",
-        "Dark Romance": "dark_romance",
-        "Mystery": "mystery",
-        "Thriller": "thriller",
-        "Horror": "horror",
-        "Young Adult": "young_adult_fiction",
-        "New Adult": "new_adult",
+    /* --- Skjul legacy sidepanel + 1-kol grid --- */
+    (function removeLegacySidebar() {
+        const shell = document.querySelector(".disc-shell");
+        const oldAside = document.querySelector("aside.disc-side");
+        if (shell) shell.classList.add("disc-shell--drawer");
+        if (oldAside) oldAside.remove();
+    })();
+
+    /* --- Stor sjangerliste (alfabetisk) --- */
+    const ALL_GENRES = {
+        "Action & Adventure": "action_and_adventure",
+        "Apocalyptic & Dystopian": "dystopian",
+        "Art & Photography": "art",
+        "Biography": "biography",
+        "Booker & Prize Winners": "booker_prize",
+        "Business & Finance": "business",
+        "Christian Fiction": "christian_fiction",
         "Classics": "classics",
-        "Historical": "historical_fiction",
-        "Non-fiction": "nonfiction",
-        "Sci-Fi": "science_fiction",
+        "Comedy & Humor": "humor",
+        "Comics & Graphic Novels": "graphic_novels",
+        "Contemporary Romance": "contemporary_romance",
+        "Cookbooks": "cookbooks",
+        "Cozy Mystery": "cozy_mystery",
+        "Crime": "crime",
         "Dark Academia": "dark_academia",
-        "Cozy Mystery": "cozy_mystery"
+        "Dark Romance": "dark_romance",
+        "Detective": "detective_and_mystery_stories",
+        "Drama": "drama",
+        "Essays": "essays",
+        "Epic / High Fantasy": "high_fantasy",
+        "Fairy Tales & Retellings": "retellings",
+        "Fantasy": "fantasy",
+        "Feel-Good": "feel_good",
+        "Gothic": "gothic_fiction",
+        "Health & Fitness": "health",
+        "Historical Fiction": "historical_fiction",
+        "History": "history",
+        "Horror": "horror",
+        "LGBTQ+": "lgbtq",
+        "Literary Fiction": "literary_fiction",
+        "Manga": "manga",
+        "Mathematics": "mathematics",
+        "Memoir": "memoir",
+        "Middle Grade": "juvenile_fiction",
+        "Mythology": "mythology",
+        "New Adult": "new_adult",
+        "Non-fiction": "nonfiction",
+        "Paranormal Romance": "paranormal_romance",
+        "Philosophy": "philosophy",
+        "Poetry": "poetry",
+        "Productivity & Self-help": "self-help",
+        "Psychology": "psychology",
+        "Religion & Spirituality": "religion",
+        "Retellings": "retellings",
+        "Romance": "romance",
+        "Science": "science",
+        "Science Fiction": "science_fiction",
+        "Short Stories": "short_stories",
+        "Space Opera": "space_opera",
+        "Sports": "sports",
+        "Thriller": "thriller",
+        "True Crime": "true_crime",
+        "Urban Fantasy": "urban_fantasy",
+        "War & Military": "war_stories",
+        "Women’s Fiction": "women_fiction",
+        "Young Adult": "young_adult_fiction"
     };
 
-    /* ---------------- Rails/kolleksjoner ---------------- */
+    /* --- Kolleksjoner/rails --- */
     const RAILS = [
         { id: "because", title: "Because you read …", kind: "because", size: 20, sortable: false },
 
-        { id: "new_week", title: "New this week", kind: "trending", period: "weekly", filterNew: true, size: 20, sortable: true },
-        { id: "booktok", title: "Popular on BookTok", kind: "trending", period: "weekly", size: 20, sortable: true },
-        { id: "month_hot", title: "Most gifted (proxy)", kind: "trending", period: "monthly", size: 20, sortable: true },
+        { id: "new_week", title: "New this week", kind: "trending", period: "weekly", filterNew: true, size: 20, sortable: true, fallback: "new" },
+        { id: "booktok", title: "Popular on BookTok", kind: "trending", period: "weekly", size: 20, sortable: true, fallback: "booktok" },
 
         { id: "romance", title: "Romance Reads", kind: "subject", subject: "romance", sortable: true },
         { id: "new_adult", title: "New Adult Romance", kind: "subjectLike", q: 'subject:"new adult" OR subject:"college romance"', sortable: true },
@@ -36,17 +88,7 @@
         { id: "dark_romance", title: "Dark Romance", kind: "subjectLike", q: 'subject:"dark romance" OR subject:"erotic romance"', sortable: true },
         { id: "retellings", title: "Retellings & Mythology", kind: "subjectLike", q: 'subject:retellings OR subject:mythology', sortable: true },
         { id: "dark_acad", title: "Dark Academia", kind: "subjectLike", q: 'subject:"dark academia" OR subject:"campus fiction"', sortable: true },
-        { id: "cozy_autumn", title: "Cozy Autumn Reads", kind: "subjectLike", q: 'subject:"cozy mystery" OR subject:autumn', sortable: true },
-        { id: "beach_vibes", title: "Beach & Summer Vibes", kind: "subjectLike", q: 'subject:"beach reads" OR subject:summer', sortable: true },
-        { id: "cottagecore", title: "Cottagecore Reads", kind: "subjectLike", q: 'subject:cottagecore OR subject:"pastoral fiction"', sortable: true },
-        { id: "feel_good", title: "Feel-Good Comfort Reads", kind: "subjectLike", q: 'subject:"feel good" OR subject:"uplifting"', sortable: true },
-        { id: "spooky", title: "Spooky Season", kind: "subjectLike", q: 'subject:halloween OR subject:"ghost stories" OR subject:horror', sortable: true },
-        { id: "holiday_rom", title: "Holiday Romance", kind: "subjectLike", q: 'subject:christmas AND subject:romance', sortable: true },
         { id: "thrillers", title: "Twisty Mysteries & Thrillers", kind: "subjectLike", q: 'subject:thriller OR subject:"mystery fiction"', sortable: true },
-
-        { id: "enemies_to_lovers", title: "Enemies to Lovers Picks", kind: "subjectLike", q: 'subject:"enemies to lovers"', sortable: true },
-        { id: "slow_burn", title: "Slow Burn Specialists", kind: "subjectLike", q: 'subject:"slow burn"', sortable: true },
-        { id: "found_family", title: "Found Family", kind: "subjectLike", q: 'subject:"found family"', sortable: true },
 
         { id: "classics_modern", title: "Modern Classics (1980–)", kind: "subjectLike", q: 'subject:classics', modernOnly: true, sortable: true },
         { id: "banned", title: "Banned & Forbidden Books", kind: "subject", subject: "banned_books", sortable: true },
@@ -54,20 +96,12 @@
         { id: "short_sweet", title: "Books under 300 pages", kind: "pages", op: "<", pages: 300, sortable: false },
         { id: "chonkers", title: "Chunky But Worth It", kind: "pages", op: ">=", pages: 500, sortable: false },
 
-        { id: "debut", title: "Debut Authors to Watch", kind: "subjectLike", q: 'subject:"debut fiction" OR subject:debut', sortable: true },
-        { id: "cry", title: "Books That Made Me Cry", kind: "subjectLike", q: 'subject:"tearjerkers" OR subject:"emotional"', sortable: true },
-        { id: "weird", title: "Weird but Brilliant", kind: "subjectLike", q: 'subject:"weird fiction" OR subject:"absurdist fiction"', sortable: true },
-
-        { id: "adapt", title: "Books Becoming Movies/Series", kind: "subjectLike", q: 'subject:"books to movies" OR subject:"television adaptations"', sortable: true },
         { id: "nonfic", title: "Non-fiction highlights", kind: "subject", subject: "nonfiction", sortable: true },
         { id: "nor", title: "Norwegian picks", kind: "subjectLike", q: 'language:nor OR subject:norway', sortable: true }
     ];
 
-    /* ---------------- Library snapshot (for Open/✓/badges) ---------------- */
-    const nk = (t, a) => `${(t || "").toLowerCase().trim()}::${(a || "").toLowerCase().trim()}`;
-    let libByKey = new Map();   // normKey -> {id,rating,spice,workKey}
-    let libByWork = new Map();  // workKey -> {id,rating,spice}
-
+    /* --- Library snapshot --- */
+    let libByKey = new Map(), libByWork = new Map();
     async function loadLibrarySnapshot() {
         libByKey = new Map(); libByWork = new Map();
         try {
@@ -93,7 +127,7 @@
         } catch { }
     }
 
-    /* ---------------- Open Library helpers ---------------- */
+    /* --- Open Library helpers --- */
     const coverURLFrom = (doc) => {
         if (!doc) return "";
         const id = doc.cover_i || doc.cover_id || (doc.cover_edition_key ? doc.cover_edition_key : null);
@@ -154,8 +188,12 @@
         const docs = Array.isArray(data.docs) ? data.docs : [];
         return { items: docs.map(normFromSearch), total: data.numFound || 0 };
     }
+
+    /* --- Detaljer (cache) --- */
+    const detailCache = new Map();
     async function fetchWorkDetail(workKey) {
         if (!workKey) return { description: "", average: 0, count: 0, subjects: [] };
+        if (detailCache.has(workKey)) return detailCache.get(workKey);
         const base = `https://openlibrary.org${workKey}.json`;
         const rate = `https://openlibrary.org${workKey}/ratings.json`;
         const [meta, ratings] = await Promise.allSettled([olJSON(base), olJSON(rate)]);
@@ -164,10 +202,12 @@
         const subj = meta.status === "fulfilled" ? (Array.isArray(meta.value?.subjects) ? meta.value.subjects.slice(0, 10) : []) : [];
         const avg = ratings.status === "fulfilled" ? (ratings.value?.summary?.average || 0) : 0;
         const cnt = ratings.status === "fulfilled" ? (ratings.value?.summary?.count || 0) : 0;
-        return { description: desc, subjects: subj, average: avg, count: cnt };
+        const out = { description: desc, subjects: subj, average: avg, count: cnt };
+        detailCache.set(workKey, out);
+        return out;
     }
 
-    /* ---------------- Because you read (subjects) ---------------- */
+    /* --- Because you read (subjects) --- */
     let becauseSubjectsToday = [];
     async function loadLibraryBooks() {
         try {
@@ -205,7 +245,6 @@
         const subjects = pickDailySubset(subjectsAll, Math.min(4, subjectsAll.length || 0));
         becauseSubjectsToday = subjects;
         if (!subjects.length) {
-            // fallback: forfatter-basert
             const authors = []; for (const b of lib.slice(-30).reverse()) {
                 const a = (b.author || "").trim(); if (a && !authors.includes(a)) authors.push(a);
                 if (authors.length >= 4) break;
@@ -231,8 +270,7 @@
             .slice(0, limit);
     }
 
-    /* ---------------- UI helpers ---------------- */
-    const esc = (s) => String(s || "").replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' }[m]));
+    /* --- UI utilities --- */
     function skeletonTiles(n = 6) {
         return Array.from({ length: n }).map(() => `
     <div class="tile skel">
@@ -241,8 +279,6 @@
       <div class="ph a"></div>
     </div>`).join("");
     }
-    const short = (s, max = 18) => (s || "").length > max ? (s.slice(0, max - 1) + "…") : (s || "");
-
     function tileHTML(b) {
         const byWork = b.workKey ? libByWork.get(b.workKey) : null;
         const byKey = libByKey.get(nk(b.title, b.author)) || null;
@@ -265,8 +301,7 @@
 
         return `
       <div class="tile card" data-work="${b.workKey || ""}">
-        ${b.cover ? `<img class="cover" src="${b.cover}" alt="" onerror="this.style.background='#eee';this.src='';">`
-                : `<div class="cover"></div>`}
+        ${b.cover ? `<img class="cover" src="${b.cover}" alt="" onerror="this.style.background='#eee';this.src='';">` : `<div class="cover"></div>`}
         <div>
           <div class="t">${esc(b.title)}</div>
           <div class="a">${esc(b.author || "")}</div>
@@ -276,7 +311,6 @@
         </div>
       </div>`;
     }
-
     function headerHTML(r) {
         const pills = r.sortable ? `
       <div class="seg" role="tablist" aria-label="Sort">
@@ -284,11 +318,13 @@
         <button class="seg-btn" data-sort="new" role="tab" aria-selected="false">New</button>
       </div>` : ``;
         const becauseChips = r.id === "because" ? `<div class="chips" data-because-chips style="margin-top:4px"></div>` : ``;
+        const railChips = `<div class="chips" data-rail-chips="${r.id}" style="margin-top:${r.id === "because" ? "6px" : "0"}"></div>`;
         return `
       <div class="rail-head">
         <div>
           <h2 style="margin:0;font-size:1.1rem">${esc(r.title)}</h2>
           ${becauseChips}
+          ${railChips}
         </div>
         <div class="rail-actions">
           ${pills}
@@ -296,87 +332,74 @@
         </div>
       </div>`;
     }
-
     function sectionHTML(r) {
-        return `
-      <section class="card" data-rail="${r.id}" style="margin-bottom:12px">
-        ${headerHTML(r)}
-        <div class="rail-list">${skeletonTiles(6)}</div>
-      </section>`;
+        return `<section class="card" data-rail="${r.id}" style="margin-bottom:12px">${headerHTML(r)}<div class="rail-list">${skeletonTiles(6)}</div></section>`;
     }
 
-    function ensureSheet() {
-        let sh = $("#disc-sheet");
-        if (!sh) {
-            sh = document.createElement("div");
-            sh.id = "disc-sheet"; sh.style.position = "fixed"; sh.style.inset = "0";
-            sh.style.background = "rgba(0,0,0,.35)"; sh.style.display = "none"; sh.style.zIndex = "999";
-            sh.innerHTML = `
-        <div class="card" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);max-width:720px;width:calc(100% - 32px);padding:16px">
-          <div id="disc-close" class="btn" style="position:absolute;right:8px;top:8px">Close</div>
-          <div id="disc-body"></div>
-        </div>`;
-            document.body.appendChild(sh);
-            $("#disc-close", sh)?.addEventListener("click", () => sh.style.display = "none");
-            sh.addEventListener("click", (e) => { if (e.target === sh) sh.style.display = "none"; });
-        }
-        return sh;
-    }
-
-    async function openDetail(basic) {
-        const sh = ensureSheet(); const body = $("#disc-body");
-        body.innerHTML = `<div class="muted">Loading…</div>`; sh.style.display = "";
-        let desc = "", avg = 0, cnt = 0, subjects = basic.subjects || [];
-        try {
-            if (basic.workKey) {
-                const det = await fetchWorkDetail(basic.workKey);
-                desc = det.description || desc; avg = det.average || 0; cnt = det.count || 0;
-                if (det.subjects?.length) subjects = det.subjects;
-            }
-        } catch { }
-        const hit = (basic.workKey && libByWork.get(basic.workKey)) || libByKey.get(nk(basic.title, basic.author));
-        const inlibRow = hit
-            ? `<div style="margin-top:6px"><span class="inlib">✓ In library</span> <a class="btn btn-primary small" href="reader.html?id=${encodeURIComponent(hit.id)}">Open</a></div>`
-            : `<div style="margin-top:6px"><button class="btn btn-primary" id="disc-add">Add to Library</button></div>`;
-
-        body.innerHTML = `
-      <div style="display:grid;grid-template-columns:120px 1fr;gap:14px;align-items:start">
-        <img src="${basic.cover || ""}" alt="" style="width:120px;height:160px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">
-        <div>
-          <div style="font-weight:900;font-size:1.2rem">${esc(basic.title)}</div>
-          <div class="muted" style="margin-top:2px">${esc(basic.author || "")}${basic.year ? " • " + esc(String(basic.year)) : ""}</div>
-          <div style="margin-top:8px">
-            <span class="chips">
-              ${(subjects || []).slice(0, 6).map(s => `<span class="chip">${esc(short(s, 18))}</span>`).join("")}
-            </span>
-          </div>
-          <div style="margin-top:8px">
-            ${avg ? `<span style="font-weight:800">${avg.toFixed(1)}★</span> <span class="muted small">(${cnt})</span>` : `<span class="muted small">No rating</span>`}
-          </div>
-          ${inlibRow}
+    /* --- Drawer (hamburger) med søk --- */
+    function ensureDrawer() {
+        let dd = $("#disc-drawer");
+        if (dd) return dd;
+        dd = document.createElement("div");
+        dd.id = "disc-drawer";
+        dd.className = "drawer-backdrop";
+        dd.innerHTML = `
+      <div class="drawer-panel">
+        <div class="drawer-head">
+          <b>Browse genres</b>
+          <button class="btn" id="disc-drawer-close">Close</button>
         </div>
-      </div>
-      ${desc ? `<div style="margin-top:12px;line-height:1.4">${esc(desc)}</div>`
-                : `<div style="margin-top:12px" class="muted">No description available.</div>`}
-    `;
-        $("#disc-add")?.addEventListener("click", async (e) => {
-            const btn = e.currentTarget;
-            try {
-                btn.disabled = true; btn.textContent = "Adding…";
-                await addToLibrary({ title: basic.title, author: basic.author, cover: basic.cover, subjects, year: basic.year, workKey: basic.workKey });
-                btn.textContent = "Added ✓";
-                setTimeout(async () => {
-                    await loadLibrarySnapshot();
-                    const hitNow = (basic.workKey && libByWork.get(basic.workKey)) || libByKey.get(nk(basic.title, basic.author));
-                    const row = btn.parentElement;
-                    if (hitNow && row) row.innerHTML = `<span class="inlib">✓ In library</span> <a class="btn btn-primary small" href="reader.html?id=${encodeURIComponent(hitNow.id)}">Open</a>`;
-                }, 500);
-            } catch {
-                btn.disabled = false; btn.textContent = "Add to Library";
-            }
+        <div class="drawer-search">
+          <input class="form-control" id="drawerFilter" placeholder="Filter genres…" />
+        </div>
+        <div class="drawer-list" id="drawerGenreList"></div>
+      </div>`;
+        document.body.appendChild(dd);
+        dd.addEventListener("click", (e) => { if (e.target === dd) dd.classList.remove("show"); });
+        $("#disc-drawer-close", dd)?.addEventListener("click", () => dd.classList.remove("show"));
+
+        const list = $("#drawerGenreList", dd);
+        const entries = Object.entries(ALL_GENRES).sort((a, b) => a[0].localeCompare(b[0]));
+        function render(filter = "") {
+            const f = filter.trim().toLowerCase();
+            const rows = f ? entries.filter(([label]) => label.toLowerCase().includes(f)) : entries;
+            list.innerHTML = rows.map(([label, slug]) => `<div class="side-link" data-subj="${slug}">${label}</div>`).join("");
+        }
+        render();
+        $("#drawerFilter", dd)?.addEventListener("input", (e) => render(e.target.value || ""));
+
+        list.addEventListener("click", (e) => {
+            const node = e.target.closest(".side-link"); if (!node) return;
+            const subj = node.getAttribute("data-subj"); if (!subj) return;
+            dd.classList.remove("show");
+            (async () => {
+                await loadLibrarySnapshot();
+                const h = $("#results"); if (!h) return;
+                h.innerHTML = `<div class="muted">Loading…</div>`;
+                try {
+                    const items = await fetchSubject(subj, 60);
+                    h.innerHTML = items.map(tileHTML).join("");
+                    h.querySelectorAll(".tile").forEach((n, i) => n.__bookBasic = items[i]);
+                    bindTiles(h);
+                } catch { h.innerHTML = `<div class="muted">Could not load this category.</div>`; }
+            })();
         });
+        return dd;
+    }
+    function insertHamburger() {
+        if ($("#discMenuBtn")) return;
+        const bar = document.createElement("div");
+        bar.className = "card";
+        bar.style.display = "flex";
+        bar.style.justifyContent = "flex-end";
+        bar.style.marginBottom = "8px";
+        bar.innerHTML = `<button class="btn btn-secondary small" id="discMenuBtn">☰ Genres</button>`;
+        const results = $("#results");
+        if (results) results.parentNode.insertBefore(bar, results);
+        $("#discMenuBtn")?.addEventListener("click", () => ensureDrawer().classList.add("show"));
     }
 
+    /* --- Toast & addToLibrary --- */
     function toast(msg = "Done") {
         let el = $("#pb-toast");
         if (!el) {
@@ -387,7 +410,6 @@
         }
         el.textContent = msg; el.classList.add("show"); setTimeout(() => el.classList.remove("show"), 1600);
     }
-
     async function addToLibrary(basic, originBtn) {
         try {
             if (originBtn) { originBtn.disabled = true; originBtn.textContent = "Adding…"; }
@@ -396,8 +418,7 @@
                 author: basic.author || "",
                 coverUrl: basic.cover || "",
                 status: "want",
-                rating: 0,
-                spice: 0,
+                rating: 0, spice: 0,
                 year: basic.year || "",
                 workKey: basic.workKey || "",
                 subjects: Array.isArray(basic.subjects) ? basic.subjects.slice(0, 8) : [],
@@ -435,123 +456,129 @@
         }
     }
 
-    /* ---------------- Sortering ---------------- */
+    /* --- Sort/filtrering per rail --- */
     function sortItems(items, mode) {
-        if (mode === "new") {
-            return [...items].sort((a, b) => (Number(b.year) || 0) - (Number(a.year) || 0));
+        if (mode === "new") return [...items].sort((a, b) => (Number(b.year) || 0) - (Number(a.year) || 0));
+        return items;
+    }
+    function topSubjectsFromItems(items, max = 6) {
+        const counts = new Map();
+        for (const it of items) {
+            for (const s of (it.subjects || []).slice(0, 6)) {
+                const k = String(s).toLowerCase(); if (!k) continue;
+                counts.set(k, (counts.get(k) || 0) + 1);
+            }
         }
-        return items; // "popular"
+        const ban = new Set(["fiction", "nonfiction", "novels", "literature", "history", "biography"]);
+        return [...counts.entries()].filter(([s]) => !ban.has(s))
+            .sort((a, b) => b[1] - a[1]).slice(0, max).map(([s]) => s);
     }
 
-    /* ---------------- Drawer (hamburger) ---------------- */
-    function ensureDrawer() {
-        let dd = $("#disc-drawer");
-        if (dd) return dd;
-        dd = document.createElement("div");
-        dd.id = "disc-drawer";
-        dd.className = "drawer-backdrop";
-        dd.innerHTML = `
-      <div class="drawer-panel">
-        <div class="drawer-head">
-          <b>Browse genres</b>
-          <button class="btn" id="disc-drawer-close">Close</button>
-        </div>
-        <div class="drawer-list" id="drawerGenreList"></div>
-      </div>`;
-        document.body.appendChild(dd);
-        dd.addEventListener("click", (e) => { if (e.target === dd) dd.classList.remove("show"); });
-        $("#disc-drawer-close", dd)?.addEventListener("click", () => dd.classList.remove("show"));
-
-        // bygg liste
-        const list = $("#drawerGenreList", dd);
-        list.innerHTML = Object.entries(POPULAR_GENRES)
-            .map(([label, slug]) => `<div class="side-link" data-subj="${slug}">${label}</div>`).join("");
-
-        // click handler
-        const onGenreClick = (e) => {
-            const node = e.target.closest(".side-link"); if (!node) return;
-            const subj = node.getAttribute("data-subj"); if (!subj) return;
-            dd.classList.remove("show");
-            (async () => {
-                await loadLibrarySnapshot();
-                const h = host(); if (!h) return;
-                clearHost(); h.insertAdjacentHTML("beforeend", `<div class="muted">Loading…</div>`);
-                try {
-                    const items = await fetchSubject(subj, 60);
-                    h.innerHTML = items.map(tileHTML).join("");
-                    h.querySelectorAll(".tile").forEach((n, i) => n.__bookBasic = items[i]);
-                    bindTiles(h);
-                } catch { empty("Could not load this category."); }
-            })();
-        };
-        list.addEventListener("click", onGenreClick);
-        return dd;
+    /* --- Render --- */
+    function skeletonTiles(n = 6) {
+        return Array.from({ length: n }).map(() => `
+    <div class="tile skel">
+      <div class="ph cover"></div>
+      <div class="ph t"></div>
+      <div class="ph a"></div>
+    </div>`).join("");
     }
-    function insertHamburger() {
-        if ($("#discMenuBtn")) return;
-        const bar = document.createElement("div");
-        bar.className = "card";
-        bar.style.display = "flex";
-        bar.style.justifyContent = "flex-end";
-        bar.style.marginBottom = "8px";
-        bar.innerHTML = `<button class="btn btn-secondary small" id="discMenuBtn">☰ Genres</button>`;
-        const results = $("#results");
-        if (results) results.parentNode.insertBefore(bar, results);
-        $("#discMenuBtn")?.addEventListener("click", () => ensureDrawer().classList.add("show"));
+    function renderRail(section, items) {
+        const list = section.querySelector(".rail-list");
+        if (!list) return;
+        list.innerHTML = items.map(tileHTML).join("");
+        list.querySelectorAll(".tile").forEach((node, i) => node.__bookBasic = items[i]);
+        bindTiles(list);
     }
-
-    /* ---------------- Render/Load ---------------- */
-    function host() { return $("#results"); }
-    function clearHost() { const h = host(); if (h) h.innerHTML = ""; }
-    function empty(msg = "No results") { const h = host(); if (h) h.innerHTML = `<div class="muted" style="text-align:center;padding:16px">${esc(msg)}</div>`; }
 
     function bindTiles(scope = document) {
-        scope.addEventListener?.("click", async (e) => {
+        scope.addEventListener("click", async (e) => {
             const addBtn = e.target.closest("[data-add]");
             if (addBtn) { const data = JSON.parse(decodeURIComponent(addBtn.getAttribute("data-add"))); await addToLibrary(data, addBtn); return; }
-            const tile = e.target.closest(".tile"); if (!tile) return;
-            const b = tile.__bookBasic || {
-                workKey: tile.getAttribute("data-work"),
-                title: tile.querySelector(".t")?.textContent || "",
-                author: tile.querySelector(".a")?.textContent || "",
-                year: tile.querySelector(".meta")?.textContent || "",
-                cover: tile.querySelector(".cover")?.getAttribute("src") || "",
-                subjects: []
-            };
-            openDetail(b);
         });
     }
 
-    async function renderRail(section, items) {
-        const list = section.querySelector(".rail-list");
-        if (!list) return;
-        list.innerHTML = skeletonTiles(6);
-        await Promise.resolve();
-        list.innerHTML = items.map(tileHTML).join("");
-        list.querySelectorAll(".tile").forEach((node, i) => node.__bookBasic = items[i]);
+    /* --- Preview (hover/long-press) --- */
+    function ensurePreview() {
+        let el = $("#disc-prev");
+        if (!el) { el = document.createElement("div"); el.id = "disc-prev"; el.className = "preview-pop"; document.body.appendChild(el); }
+        return el;
     }
+    function hidePreview() { const el = $("#disc-prev"); if (el) el.classList.remove("show"); }
+    function placePreview(el, nearRect) {
+        const pad = 8, w = el.offsetWidth || 320, vw = window.innerWidth, vh = window.innerHeight;
+        let x = nearRect.right + window.scrollX + pad;
+        let y = nearRect.top + window.scrollY;
+        if (x + w + 8 > window.scrollX + vw) x = nearRect.left + window.scrollX - w - pad;
+        if (x < window.scrollX + 8) x = window.scrollX + 8;
+        if (y + el.offsetHeight > window.scrollY + vh - 8) y = window.scrollY + vh - el.offsetHeight - 8;
+        el.style.left = `${x}px`; el.style.top = `${y}px`;
+    }
+    async function showPreview(tile, basic) {
+        const el = ensurePreview();
+        el.innerHTML = `<div class="muted">Loading…</div>`;
+        el.classList.add("show");
+        const rect = tile.getBoundingClientRect();
+        placePreview(el, rect);
+        try {
+            const det = await fetchWorkDetail(basic.workKey);
+            const chips = (det.subjects || []).slice(0, 6).map(s => `<span class="chip">${esc(short(s, 16))}</span>`).join("");
+            const txt = (det.description || "").toString();
+            const blurb = txt.length > 260 ? txt.slice(0, 257) + "…" : txt || "No description.";
+            el.innerHTML = `
+        <div class="ttl">${esc(basic.title)}</div>
+        <div class="muted" style="margin-bottom:4px">${esc(basic.author || "")}${basic.year ? " • " + esc(String(basic.year)) : ""}</div>
+        <div class="chips" style="margin-bottom:6px">${chips}</div>
+        <div style="line-height:1.35">${esc(blurb)}</div>
+        <div class="muted" style="margin-top:6px">${det.average ? `${det.average.toFixed(1)}★ (${det.count})` : "No rating"}</div>`;
+            placePreview(el, rect);
+        } catch {
+            el.innerHTML = `<div class="ttl">${esc(basic.title)}</div><div class="muted">Preview unavailable.</div>`;
+            placePreview(el, rect);
+        }
+    }
+    window.addEventListener("scroll", hidePreview, { passive: true, capture: true });
 
+    /* --- Bygg rails --- */
     async function buildHomeRails() {
         insertHamburger();
         await loadLibrarySnapshot();
-        const h = host(); if (!h) return;
-        clearHost();
-        h.innerHTML = RAILS.map(r => sectionHTML(r)).join("");
-        bindTiles(h);
+        const h = $("#results"); if (!h) return;
+        h.innerHTML = RAILS.map(r => `<section class="card" data-rail="${r.id}" style="margin-bottom:12px">${headerHTML(r)}<div class="rail-list">${skeletonTiles(6)}</div></section>`).join("");
 
         for (const rail of RAILS) {
             const sec = $(`[data-rail="${rail.id}"]`); if (!sec) continue;
-            const list = sec.querySelector(".rail-list"); list.innerHTML = skeletonTiles(6);
+            const list = sec.querySelector(".rail-list");
 
-            // local state pr. rail
             let sortMode = "popular";
             let items = [];
+            let activeChip = "";
+
+            const applyFilterAndSort = () => {
+                const pool = activeChip
+                    ? items.filter(it => (it.subjects || []).map(s => String(s).toLowerCase()).includes(activeChip))
+                    : items;
+                return sortItems(pool, sortMode);
+            };
+            const renderRailChips = () => {
+                const host = sec.querySelector(`[data-rail-chips="${rail.id}"]`);
+                if (!host) return;
+                const top = topSubjectsFromItems(items, 6);
+                if (!top.length) { host.innerHTML = ""; return; }
+                host.innerHTML = top.map(s => `<button class="chip ${activeChip === s ? 'active' : ''}" data-chip="${s}">${esc(short(s, 16))}</button>`).join("") +
+                    (activeChip ? ` <button class="chip" data-chip="">Clear</button>` : "");
+                host.addEventListener("click", (e) => {
+                    const c = e.target.closest("[data-chip]"); if (!c) return;
+                    activeChip = (c.getAttribute("data-chip") || "").toLowerCase();
+                    renderRailChips();
+                    renderRail(sec, applyFilterAndSort());
+                }, { once: true });
+            };
 
             async function loadAndRender() {
                 try {
                     if (rail.kind === "because") {
                         items = await fetchBecauseYouRead(rail.size || 20);
-                        // oppdater chips i header
                         const chipHost = sec.querySelector("[data-because-chips]");
                         if (chipHost && becauseSubjectsToday?.length) {
                             chipHost.innerHTML = becauseSubjectsToday.slice(0, 4).map(s => `<span class="chip">${esc(short(s, 18))}</span>`).join("");
@@ -560,7 +587,21 @@
                         items = await fetchTrending(rail.period || "daily", rail.size || 20);
                         if (rail.filterNew) {
                             const y = new Date().getFullYear();
-                            items = items.filter(b => Number(b.year) >= (y - 1));
+                            let filtered = items.filter(b => Number(b.year) >= (y - 1));
+                            if (!filtered.length) filtered = items.filter(b => Number(b.year) >= (y - 2));
+                            items = filtered.length ? filtered : items;
+                        }
+                        if (!items.length && rail.fallback === "new") {
+                            const { items: docs } = await fetchSearch("", 1, 200);
+                            items = docs.filter(d => {
+                                const y = Number(d.year || d.first_publish_year || 0);
+                                const now = new Date().getFullYear();
+                                return y >= now - 1;
+                            }).slice(0, rail.size || 20);
+                        }
+                        if (!items.length && rail.fallback === "booktok") {
+                            const { items: docs } = await fetchSearch('subject:"booktok" OR "tiktok made me buy it"', 1, 120);
+                            items = docs.slice(0, rail.size || 20);
                         }
                     } else if (rail.kind === "subject") {
                         items = await fetchSubject(rail.subject, rail.size || 20);
@@ -568,7 +609,7 @@
                         items = await fetchSubjectLike(rail.q, rail.size || 20);
                         if (rail.modernOnly) items = items.filter(b => Number(b.year) >= 1980);
                     } else if (rail.kind === "pages") {
-                        const { items: docs } = await fetchSearch("", 1, 160);
+                        const { items: docs } = await fetchSearch("", 1, 220);
                         items = docs.filter(d => {
                             const p = Number(d.pages || d.number_of_pages_median || 0);
                             return rail.op === "<" ? p > 0 && p < (rail.pages || 300) : p >= (rail.pages || 500);
@@ -576,81 +617,57 @@
                     }
                     const seen = new Set();
                     items = items.filter(b => { const k = nk(b.title, b.author); if (seen.has(k)) return false; seen.add(k); return true; });
-                    await renderRail(sec, sortItems(items, sortMode));
+
+                    renderRailChips();
+                    renderRail(sec, applyFilterAndSort());
                 } catch (e) {
                     console.warn("Rail failed:", rail.id, e);
                     list.insertAdjacentHTML("beforeend", `<div class="muted small">Could not load "${rail.title}"</div>`);
                 }
             }
 
-            // første last
             await loadAndRender();
 
-            // sort-pills
             if (rail.sortable) {
                 const pills = sec.querySelectorAll('.seg .seg-btn');
                 pills.forEach(btn => btn.addEventListener('click', async () => {
                     pills.forEach(p => p.classList.remove('active'));
                     btn.classList.add('active');
                     sortMode = btn.getAttribute('data-sort') || "popular";
-                    await renderRail(sec, sortItems(items, sortMode));
+                    renderRail(sec, applyFilterAndSort());
                 }));
             }
 
-            // “See all” med loader
+            // “See all” → egen side
             const btn = sec.querySelector('[data-more]');
-            btn?.addEventListener("click", async () => {
-                if (btn.classList.contains("loading")) return;
-                btn.classList.add("loading");
-                const prev = btn.textContent;
-                btn.textContent = "Loading";
-                try {
-                    let more = items;
-                    if (rail.kind === "trending") more = await fetchTrending(rail.period || "daily", 60);
-                    else if (rail.kind === "subject") more = await fetchSubject(rail.subject, 60);
-                    else if (rail.kind === "subjectLike") more = await fetchSubjectLike(rail.q, 60);
-                    else if (rail.kind === "because") more = await fetchBecauseYouRead(60);
-                    else if (rail.kind === "pages") {
-                        const { items: docs } = await fetchSearch("", 1, 200);
-                        more = docs.filter(d => {
-                            const p = Number(d.pages || d.number_of_pages_median || 0);
-                            return rail.op === "<" ? p > 0 && p < (rail.pages || 300) : p >= (rail.pages || 500);
-                        });
-                    }
-                    const seen = new Set();
-                    more = more.filter(b => { const k = nk(b.title, b.author); if (seen.has(k)) return false; seen.add(k); return true; });
-                    await renderRail(sec, sortItems(more.slice(0, 60), sortMode));
-                } finally {
-                    btn.classList.remove("loading");
-                    btn.textContent = prev || "See all";
-                }
+            btn?.addEventListener("click", () => {
+                location.href = `discover-list.html?rail=${encodeURIComponent(rail.id)}`;
             });
         }
     }
 
-    /* ---------------- Search mode ---------------- */
+    /* --- Search mode --- */
     async function runSearch(q) {
         await loadLibrarySnapshot();
         if (!q) { await buildHomeRails(); return; }
-        const h = host(); if (!h) return;
-        clearHost(); h.insertAdjacentHTML("beforeend", `<div class="muted">Searching…</div>`);
+        const h = $("#results"); if (!h) return;
+        h.innerHTML = `<div class="muted">Searching…</div>`;
         try {
             const { items } = await fetchSearch(q, 1, 60);
-            if (!items.length) { empty("No results"); return; }
+            if (!items.length) { h.innerHTML = `<div class="muted">No results</div>`; return; }
             h.innerHTML = items.map(tileHTML).join("");
             h.querySelectorAll(".tile").forEach((node, i) => node.__bookBasic = items[i]);
             bindTiles(h);
-        } catch { empty("Could not load results."); }
+        } catch { h.innerHTML = `<div class="muted">Could not load results.</div>`; }
     }
 
-    /* ---------------- Wire UI + boot ---------------- */
+    /* --- Wire UI + boot --- */
     function wireUI() {
         const qEl = $("#q");
         $("#qBtn")?.addEventListener("click", () => runSearch((qEl?.value || "").trim()));
         qEl?.addEventListener("keydown", (e) => { if (e.key === "Enter") runSearch((qEl.value || "").trim()); });
     }
-
-    function boot() { wireUI(); buildHomeRails(); }
+    function boot() { wireUI(); insertHamburger(); buildHomeRails(); }
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot, { once: true });
     else boot();
 
