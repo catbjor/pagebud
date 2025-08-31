@@ -1,30 +1,28 @@
-// discover.js
-// Lightweight Discover page: Open Library search + subjects with infinite scroll.
-// Optional: “Add to Library” (Firestore) when fb/auth is present.
-
+// discover.js — Open Library search + subjects with infinite scroll
+// Adds to library via PBSync.saveBook(...) for consistent offline/updatedAt flow
 (() => {
     "use strict";
     const $ = (s, r = document) => r.querySelector(s);
 
     // ---- Config ----
-    const PAGE_SIZE = 20; // Open Library supports 'limit' with pagination via 'page'
+    const PAGE_SIZE = 20;
     const SUBJECT_MAP = {
         Romance: "romance",
         Fantasy: "fantasy",
         Mystery: "mystery",
         Horror: "horror",
         "Sci-Fi": "science_fiction",
-        "YA": "young_adult",
+        YA: "young_adult",
         Thriller: "thriller",
         "Non-fiction": "nonfiction"
     };
 
     // ---- State ----
     const state = {
-        mode: "subject",       // 'subject' | 'search'
+        mode: "subject",   // 'subject' | 'search'
         subject: "romance",
         query: "",
-        sort: "popular",       // 'popular' | 'new'
+        sort: "popular",   // 'popular' | 'new'
         page: 1,
         loading: false,
         done: false
@@ -32,10 +30,8 @@
 
     // ---- Helpers ----
     const coverURL = (doc) => {
-        // Prefer cover_i; fall back to first edition cover if present
         const id = doc.cover_i || (doc.cover_edition_key ? doc.cover_edition_key : null);
-        if (!id) return ""; // no cover
-        // For cover_i use /b/id/; for edition keys it's /b/olid/.. (but we only have id usually)
+        if (!id) return "";
         if (doc.cover_i) return `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg`;
         return `https://covers.openlibrary.org/b/olid/${doc.cover_edition_key}-M.jpg`;
     };
@@ -62,8 +58,7 @@
             <div class="a" style="height:12px;background:#eee;border-radius:6px;width:40%"></div>
           </div>
           <div class="meta" style="height:12px;background:#eee;border-radius:6px;width:48px"></div>
-        </div>
-      `).join("");
+        </div>`).join("");
             results.appendChild(sk);
         } else {
             $("#disc-sk")?.remove();
@@ -86,11 +81,12 @@
         const host = $("#results");
         if (!host || !docs.length) return;
         const items = docs.map(normalizeDoc);
-        const canWrite = !!(window.fb && fb.auth?.currentUser && fb.db);
+        const canWrite = !!(window.PBSync && window.fb && fb.auth?.currentUser);
 
         const html = items.map(b => `
       <div class="tile">
-        <img class="cover" src="${b.cover || ""}" alt="" onerror="this.style.background='#eee';this.src='';" />
+        <img class="cover" src="${b.cover || ""}" alt=""
+             onerror="this.style.background='#eee';this.src='';" />
         <div>
           <div class="t">${escapeHtml(b.title)}</div>
           <div class="a">${escapeHtml(b.author)}</div>
@@ -99,8 +95,7 @@
           ${b.year ? b.year : ""}
           ${canWrite ? `<div><button class="btn btn-secondary" data-add='${encodeURIComponent(JSON.stringify(b))}' style="margin-top:6px;padding:6px 10px">Add</button></div>` : ""}
         </div>
-      </div>
-    `).join("");
+      </div>`).join("");
 
         host.insertAdjacentHTML("beforeend", html);
 
@@ -122,8 +117,6 @@
 
     // ---- API calls ----
     async function fetchSearch(q, page = 1, sort = "popular") {
-        // Open Library /search.json supports: q, page, sort? (sort=relevance or sort=editions?)
-        // We'll emulate 'new' by filtering client-side on year DESC
         const url = new URL("https://openlibrary.org/search.json");
         url.searchParams.set("q", q || "");
         url.searchParams.set("page", String(page));
@@ -139,8 +132,6 @@
     }
 
     async function fetchSubject(subject, page = 1, sort = "popular") {
-        // Using the search endpoint with subject query for consistency
-        // e.g., q=subject:fantasy
         const url = new URL("https://openlibrary.org/search.json");
         url.searchParams.set("q", `subject:${subject}`);
         url.searchParams.set("page", String(page));
@@ -157,7 +148,6 @@
 
     // ---- Boot + Events ----
     function bindUI() {
-        // Genre sidebar (already injected in HTML by discover.html fallback or your own code)
         const genreList = $("#genreList");
         if (genreList && !genreList.children.length) {
             const names = Object.keys(SUBJECT_MAP);
@@ -187,7 +177,7 @@
             loadMore(true);
         });
 
-        $("#sortPopular")?.addEventListener("click", (e) => {
+        $("#sortPopular")?.addEventListener("click", () => {
             state.sort = "popular";
             $("#sortPopular")?.classList.add("active");
             $("#sortNew")?.classList.remove("active");
@@ -196,7 +186,7 @@
             loadMore(true);
         });
 
-        $("#sortNew")?.addEventListener("click", (e) => {
+        $("#sortNew")?.addEventListener("click", () => {
             state.sort = "new";
             $("#sortNew")?.classList.add("active");
             $("#sortPopular")?.classList.remove("active");
@@ -235,7 +225,6 @@
             renderItems(docs);
             state.page += 1;
 
-            // If fewer than PAGE_SIZE came back, likely done
             if (docs.length < PAGE_SIZE || state.page * PAGE_SIZE >= (numFound || 999999)) {
                 state.done = true;
             }
@@ -256,50 +245,39 @@
         host.after(sentinel);
 
         const io = new IntersectionObserver((entries) => {
-            entries.forEach(e => {
-                if (e.isIntersecting) loadMore();
-            });
+            entries.forEach(e => { if (e.isIntersecting) loadMore(); });
         }, { root: null, rootMargin: "600px 0px 600px 0px", threshold: 0.01 });
 
         io.observe(sentinel);
     }
 
-    // ---- Add to Library (optional Firestore) ----
-    async function addToLibrary(book) {
-        // Requires firebase-init.js initialized and signed-in user.
-        const user = fb.auth.currentUser;
+    // ---- Add to Library via PBSync (offline-first & consistent updatedAt) ----
+    async function addToLibrary(b) {
+        // krever innlogget bruker (PBSync klarer local save uansett, men vi følger kravene dine)
+        const user = fb?.auth?.currentUser;
         if (!user) throw new Error("Not signed in");
-        const id = randomId();
-        const doc = {
-            id,
-            title: book.title || "Untitled",
-            author: book.author || "",
-            coverUrl: book.cover || "",
+
+        const bookObj = {
+            title: b.title || "Untitled",
+            author: b.author || "",
+            coverUrl: b.cover || "",
             status: "want",
             rating: 0,
-            createdAt: new Date().toISOString(),
             fileType: null,
             fileUrl: null
+            // NB: id + updatedAt settes av PBSync.saveBook()
         };
-        await fb.db.collection("users").doc(user.uid)
-            .collection("books").doc(id).set(doc, { merge: true });
-        return id;
+
+        const saved = await PBSync.saveBook(bookObj);
+        return saved?.id || saved?.book?.id || null;
     }
 
     // ---- Utilities ----
-    function randomId() {
-        return Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10);
-    }
-
     function toast(msg = "Done") {
+        if (window.toast) return window.toast(msg);
         let el = $("#pb-toast");
-        if (!el) {
-            el = document.createElement("div");
-            el.id = "pb-toast";
-            document.body.appendChild(el);
-        }
-        el.textContent = msg;
-        el.classList.add("show");
+        if (!el) { el = document.createElement("div"); el.id = "pb-toast"; document.body.appendChild(el); }
+        el.textContent = msg; el.classList.add("show");
         setTimeout(() => el.classList.remove("show"), 1600);
     }
 
@@ -309,15 +287,9 @@
         }[s]));
     }
 
-    // ---- Public boot (called by discover.html) ----
+    // ---- Public boot ----
     window.startDiscover = function startDiscover() {
-        // Init UI bindings only once
-        if (!window.__discBound) {
-            bindUI();
-            window.__discBound = true;
-        }
-
-        // Initial load (subject Romance default)
+        if (!window.__discBound) { bindUI(); window.__discBound = true; }
         state.mode = "subject";
         state.subject = state.subject || "romance";
         state.sort = state.sort || "popular";

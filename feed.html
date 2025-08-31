@@ -1,42 +1,27 @@
 <!DOCTYPE html>
+
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <script src="theme-init.js"></script>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport" />
     <title>Friends Feed – PageBud</title>
     <!-- Put this inline snippet in the <head> of EVERY page BEFORE style.css -->
-    <script>
-        (function () {
-            // Apply immediately to avoid FOUC
-            function resolve(raw) {
-                if (raw === "system") {
-                    return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-                }
-                return raw || "default";
-            }
-            var raw = localStorage.getItem("pb:theme") || "default";
-            document.documentElement.setAttribute("data-theme", resolve(raw));
-            document.documentElement.setAttribute("data-tone", "pastel");
-        }());
-    </script>
 
-    <link rel="stylesheet" href="style.css" />
-    <meta name="theme-color" content="#111111" />
-    <link rel="manifest" href="manifest.json" />
-    <link rel="apple-touch-icon" href="icons/icon-192.png" />
-    <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('pb:theme') || 'default');</script>
+    <link href="style.css" rel="stylesheet" />
+    <meta content="#111111" name="theme-color" />
+    <link href="manifest.json" rel="manifest" />
+    <link href="icons/icon-192.png" rel="apple-touch-icon" />
 
     <!-- 1) Firebase compat SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
-
     <script src="firebase-config.js"></script>
     <script src="firebase-init.js?v=dev-1"></script>
     <script src="profiles.js"></script>
-
     <!-- 2) 🔧 Inline config -->
     <script>
 
@@ -50,7 +35,6 @@
             measurementId: "G-TK4VCBT1V9"
         };
     </script>
-
 </head>
 
 <body>
@@ -59,16 +43,12 @@
             <h1>Friends Feed</h1>
             <div class="back-button" onclick="location.href='index.html'"><i class="fas fa-arrow-left"></i></div>
         </header>
-
         <section class="library" style="padding-top:0">
-            <div id="friends-feed" class="card" style="padding:12px"></div>
+            <div class="card" id="friends-feed" style="padding:12px"></div>
         </section>
-
     </div>
-
     <script src="activity.js"></script>
     <script src="social-feed.js"></script>
-
     <script>
 
         requireAuth(() => startSocialFeed && startSocialFeed());

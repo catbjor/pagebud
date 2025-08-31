@@ -15,6 +15,9 @@
     const BC_NAME = "pb-reset";
 
     function toast(msg) {
+        // inne i toast(msg)
+        if (window.toast) { try { window.toast(msg); return; } catch { } }
+
         let n = document.getElementById("pb-toast");
         if (!n) {
             n = document.createElement("div");

@@ -1,159 +1,103 @@
 <!DOCTYPE html>
+
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport" />
     <title>Settings – PageBud</title>
-    <!-- Put this inline snippet in the <head> of EVERY page BEFORE style.css -->
-    <script>
-        (function () {
-            // Apply immediately to avoid FOUC
-            function resolve(raw) {
-                if (raw === "system") {
-                    return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-                }
-                return raw || "default";
-            }
-            var raw = localStorage.getItem("pb:theme") || "default";
-            document.documentElement.setAttribute("data-theme", resolve(raw));
-            document.documentElement.setAttribute("data-tone", "pastel");
-        }());
-    </script>
-
-
-    <!-- Apply saved theme immediately (no FOUC) -->
-    <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("pb:theme") || "default");</script>
-
-    <!-- Icons + App styles -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-    <link rel="stylesheet" href="style.css" />
-
-    <!-- Firebase (load but do NOT block DOM: use defer) -->
-    <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-    <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-    <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-    <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
-    <script defer src="firebase-config.js"></script>
-    <script defer src="firebase-init.js?v=dev-1"></script>
-
-    <!-- Page scripts (also deferred) -->
-    <script defer src="reset-utils.js"></script>
-    <script defer src="settings.js"></script>
-    <script defer src="settings-timer.js"></script>
-    <script defer src="nav.js"></script>
-    <script defer src="timer.js"></script>
+    <!-- Apply current theme ASAP on every page -->
+    <script src="theme-init.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet" />
+    <link href="style.css" rel="stylesheet" />
 </head>
 
 <body>
     <div class="app-container">
         <header class="header">
             <h1>Settings</h1>
-            <!-- header actions via nav.js -->
+            <div class="header-actions">
+                <button class="back-fab" onclick="history.back()" title="Back">
+                    <i class="fa fa-chevron-left"></i>
+                </button>
+            </div>
         </header>
-
-        <div class="container">
-            <!-- THEME -->
+        <main class="container">
+            <!-- Appearance -->
             <section class="card">
-                <h2>Theme</h2>
-                <div class="muted" id="themeStatus" style="margin-bottom:10px">
-                    Current: <b id="themeName">default</b>
+                <div class="card-head">
+                    <h2>Appearance</h2>
+                    <div class="muted">Current: <span id="currentThemeVal">default</span></div>
                 </div>
-                <div id="themeGrid" class="theme-previews"></div>
-                <div class="settings-actions" style="margin-top:12px">
-                    <button class="btn" id="btnMatchSystem">Match system</button>
+                <div class="theme-previews" id="themeList"></div>
+                <div class="row">
+                    <button class="btn btn-secondary" id="btnMatchSystem">
+                        <i class="fa fa-desktop" style="margin-right:6px;"></i> Match system
+                    </button>
                 </div>
             </section>
-
-            <!-- TIMER -->
-            <section class="card" style="margin-top:16px;padding:16px">
-                <h2 style="margin-bottom:12px">Reading Timer</h2>
-
-                <section class="section" style="padding:0">
-                    <div class="section-header">
-                        <div class="section-title" style="font-weight:800">
-                            <i class="fa-solid fa-bullseye"></i> Daily reading goal
+            <!-- Reading Timer -->
+            <section class="card">
+                <div class="card-head">
+                    <h2>Reading Timer</h2>
+                </div>
+                <div class="row">
+                    <label class="row-label" for="goalInput">Daily reading goal</label>
+                    <div class="row-grow">
+                        <div class="row between">
+                            <input class="range" id="goalInput" max="180" min="5" step="5" type="range" value="20" />
+                            <div class="muted"><span id="goalVal">20</span> m</div>
                         </div>
+                        <button class="btn" id="goalSave" style="margin-top:6px;">Save</button>
                     </div>
-                    <p class="muted" style="margin-top:6px">Sett et daglig mål i minutter. Brukes i kalenderen og
-                        statistikken.</p>
-                    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:8px">
-                        <input id="goalMin" type="number" min="0" max="300" step="5" style="width:90px;padding:8px" />
-                        <input id="goalRange" type="range" min="0" max="300" step="5" style="flex:1;min-width:200px" />
-                        <button id="goalSave" class="btn" type="button"
-                            style="background:var(--primary);border-color:var(--primary);color:#000">Save</button>
-                        <span id="goalStatus" class="muted"></span>
-                    </div>
-                </section>
-
-                <div class="section" style="padding:0;margin-top:12px">
-                    <label style="font-weight:600">Dock side</label>
-                    <div style="display:flex;gap:12px;align-items:center;margin-top:6px">
-                        <label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="radio"
-                                name="pb-timer-side" value="left" /> Left</label>
-                        <label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="radio"
-                                name="pb-timer-side" value="right" /> Right</label>
-                    </div>
-                    <div class="muted" style="margin-top:6px">Flytt timer-docken til venstre eller høyre.</div>
                 </div>
-
-                <div class="section" style="padding:0;margin-top:12px">
-                    <label style="font-weight:600;display:flex;align-items:center;gap:8px;cursor:pointer">
-                        <input id="pb-timer-collapsed" type="checkbox" /> Start collapsed (kun klokke-ikon)
+                <div class="row">
+                    <div class="row-label">Dock side</div>
+                    <div class="chips">
+                        <label class="chip"><input id="dockLeft" name="dockSide" type="radio" value="left" />
+                            Left</label>
+                        <label class="chip"><input id="dockRight" name="dockSide" type="radio" value="right" />
+                            Right</label>
+                    </div>
+                </div>
+                <div class="row">
+                    <label class="chip">
+                        <input id="startCollapsed" type="checkbox" /> Start collapsed (clock icon only)
                     </label>
-                    <div class="muted" style="margin-top:6px">Når påslått: timeren starter skjult og vises først når du
-                        trykker på klokke-ikonet.</div>
+                    <div class="muted">Timer starts hidden and expands when you tap the clock.</div>
                 </div>
-
-                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
-                    <button id="pb-timer-apply" class="btn" type="button"
-                        style="background:var(--primary);border-color:var(--primary);color:#000">Apply now</button>
-                    <button id="pb-timer-toggle" class="btn" type="button">Show/Hide now</button>
-                    <button id="pb-timer-reset" class="btn" type="button"
-                        style="background:#ff6b6b;border-color:#ff6b6b;color:#000">Reset timer state</button>
+                <div class="row wrap">
+                    <button class="btn" id="btnApplyNow">Apply now</button>
+                    <button class="btn" id="btnShowDock">Show/Hide now</button>
+                    <button class="btn" id="btnResetTimer">Reset timer state</button>
                 </div>
             </section>
-
-            <!-- RESET -->
-            <section class="card" style="margin-top:16px">
-                <h2>Reset cache</h2>
-                <p class="muted">Bruk hvis appen ikke oppdateres pga. PWA cache. “Full reset” logger deg ut.</p>
-                <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <!-- Reset cache -->
+            <section class="card" style="margin-bottom: 90px;">
+                <div class="card-head">
+                    <h2>Reset cache</h2>
+                </div>
+                <p class="muted">Useful if styles don’t update. “Full reset” signs you out.</p>
+                <div class="row wrap">
                     <button class="btn" id="btnResetKeep">Reset caches (keep login)</button>
-                    <button class="btn" id="btnResetFull">Full reset (sign out)</button>
+                    <button class="btn" id="btnFullReset">Full reset (signs out)</button>
                 </div>
-                <div id="resetStatus" class="muted" style="margin-top:8px"></div>
             </section>
-
-            <!-- NOTIFICATIONS -->
-            <section class="card" style="margin-top:16px">
-                <h2>Notifications</h2>
-                <p class="muted">Varsler for venneforespørsler og meldinger.</p>
-                <button class="btn" id="btnEnablePush">Enable push</button>
-                <div class="muted" id="pushStatus" style="margin-top:8px"></div>
-            </section>
-
-            <!-- ACCOUNT -->
-            <section class="card" style="margin-top:16px">
-                <h2>Account</h2>
-                <button class="btn" id="btnLogout" style="background:#ff6b6b;border-color:#ff6b6b;color:#000">Log
-                    out</button>
-            </section>
-        </div>
+        </main>
+        <nav class="bottom-nav">
+            <div class="nav-item" onclick="location.href='index.html'"><i class="fas fa-book"></i> Library</div>
+            <div class="nav-item" onclick="location.href='stats.html'"><i class="fas fa-chart-line"></i> Stats</div>
+            <div class="nav-item" onclick="location.href='discover.html'"><i class="fas fa-compass"></i> Discover</div>
+            <div class="nav-item active"><i class="fas fa-cog"></i> Settings</div>
+        </nav>
     </div>
+    <script src="toast.js" defer></script>
+    <script src="push.js" defer></script>
+    <script src="timer.js" defer></script>
+    <script src="settings.js" defer></script>
+    <script src="settings-fix.js" defer></script>
 
-    <div id="pb-toast" role="status" aria-live="polite"></div>
 
-    <!-- Page-only helpers -->
-    <script>
-        // Safe logout button wiring
-        document.addEventListener("DOMContentLoaded", () => {
-            document.getElementById("btnLogout")?.addEventListener("click", async () => {
-                try { await fb.auth.signOut(); location.href = "auth.html"; }
-                catch (e) { alert(e?.message || "Failed to log out"); }
-            });
-        });
-    </script>
 </body>
 
 </html>

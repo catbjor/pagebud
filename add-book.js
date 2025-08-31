@@ -1,181 +1,69 @@
-// add-book.js — hardened save (never sends undefined into Firestore)
-(function () {
-    "use strict";
-    const $ = (s, r = document) => r.querySelector(s);
+/* ============================================================
+   PageBud – add-book.js (user/{uid}/books) with half-star widgets
+============================================================ */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const db = firebase.firestore();
 
-    // ----- catalogs -----
-    const GENRES = ["Adventure", "Biography", "Classics", "Contemporary", "Crime", "Dystopian", "Fantasy", "Historical", "Horror", "Humor", "LGBTQ+", "Literary", "Memoir", "Mystery", "Mythology", "Non-fiction", "Paranormal", "Philosophy", "Poetry", "Romance", "Sci-Fi", "Self-help", "Thriller", "Travel", "YA"];
-    const MOODS = ["📖 Page-turner", "🌀 Weird", "🌑 Dark", "🌧 Moody", "👨‍👩‍👧 Found Family", "💗 Heartwarming", "🔥 Slow burn", "🎀 Whimsical", "🧣 Cozy", "🐣 Cute"];
-    const TROPES = ["Enemies→Lovers", "Found family", "Slow burn", "Grumpy/Sunshine", "Secret Identity", "Small Town", "Time Travel", "Workplace"];
-
-    // ----- state -----
-    let selectedGenres = new Set();
-    let selectedMoods = new Set();
-    let selectedTropes = new Set();
-    let rating = 0;  // 0..6
-    let spice = 0;  // 0..5
-
-    // ----- helpers -----
-    function chipify(list, root, setRef) {
-        if (!root) return;
-        root.innerHTML = "";
-        list.forEach(val => {
-            const el = document.createElement("span");
-            el.className = "category";
-            el.textContent = val;
-            el.addEventListener("click", () => {
-                if (setRef.has(val)) { setRef.delete(val); el.classList.remove("active"); }
-                else { setRef.add(val); el.classList.add("active"); }
-            });
-            root.appendChild(el);
-        });
-    }
-
-    function oneOf(root, def) {
-        if (!root) return;
-        const chips = root.querySelectorAll(".category");
-        chips.forEach(ch => {
-            if (ch.dataset.val === def) ch.classList.add("active");
-            ch.addEventListener("click", () => {
-                chips.forEach(x => x.classList.remove("active"));
-                ch.classList.add("active");
-            });
-        });
-    }
-    function getActive(root) {
-        const el = root?.querySelector(".category.active");
-        return el ? el.dataset.val : "";
-    }
-
-    // Normalize + store a local file using PBFileStore if present
-    async function storeLocalFile(file, scope) {
-        if (!file) return null;
-
-        // Preferred: PBFileStore
-        if (window.PBFileStore?.save) {
-            try {
-                const meta = await PBFileStore.save({ file, scope });
-                // meta can vary; normalize to {url, name, size, type}
-                const url = meta?.url || meta?.blobUrl || meta?.href || null;
-                if (url) {
-                    return {
-                        url,
-                        name: file.name,
-                        size: file.size ?? null,
-                        type: file.type || (/\.(pdf)$/i.test(file.name) ? "application/pdf" : (/\.epub$/i.test(file.name) ? "application/epub+zip" : "")),
-                    };
-                }
-            } catch (e) {
-                console.warn("PBFileStore.save failed, using fallback", e);
-            }
+(function initChips() {
+    const C = window.PB_CONST || {};
+    function render(list, el) {
+        if (el && Array.isArray(list)) {
+            el.innerHTML = list.map(x => `<span class="category" data-val="${x}">${x}</span>`).join("");
         }
+    }
+    document.addEventListener("DOMContentLoaded", () => {
+        render(C.GENRES, $("#genres"));
+        render(C.MOODS, $("#moods"));
+        render(C.TROPES, $("#tropes"));
+    });
+})();
 
-        // Fallback: ephemeral ObjectURL (works for local reading)
-        const url = URL.createObjectURL(file);
-        return {
-            url,
-            name: file.name,
-            size: file.size ?? null,
-            type: file.type || (/\.(pdf)$/i.test(file.name) ? "application/pdf" : (/\.epub$/i.test(file.name) ? "application/epub+zip" : "")),
-        };
+document.addEventListener("DOMContentLoaded", () => {
+    // Default placeholder for cover preview (square with text)
+    const cover = $("#coverPreview");
+    if (cover && !cover.getAttribute("src")) {
+        cover.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+            `<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180">
+         <rect width="100%" height="100%" rx="12" fill="#e5e7eb"/>
+         <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle"
+               font-size="16" fill="#9aa3af" font-family="system-ui, -apple-system, Segoe UI, Roboto">Cover image</text>
+       </svg>`
+        );
     }
 
-    // Remove undefined recursively so Firestore won’t complain
-    function stripUndefined(obj) {
-        if (obj == null || typeof obj !== "object") return obj;
-        const out = Array.isArray(obj) ? [] : {};
-        for (const [k, v] of Object.entries(obj)) {
-            if (v === undefined) continue;
-            out[k] = stripUndefined(v);
-        }
-        return out;
-    }
+    // Mount rating widgets
+    PB_Rating.renderStars($("#ratingBar"), 0, 6);
+    PB_Rating.renderChilis($("#spiceBar"), 0, 5);
 
-    async function onSave() {
-        const user = fb?.auth?.currentUser;
-        if (!user) { alert("Please sign in again."); location.href = "auth.html"; return; }
+    // Click cover → open file picker (optional later)
+    $("#coverPreview")?.addEventListener("click", () => $("#bookFile")?.click());
 
-        const title = $("#title")?.value?.trim() || "";
-        const author = $("#author")?.value?.trim() || "";
-        if (!title || !author) {
-            alert("Title and Author are required");
-            return;
-        }
+    $("#saveBtn")?.addEventListener("click", async () => {
+        const u = firebase.auth().currentUser;
+        if (!u) { alert("Please sign in."); return; }
 
-        const status = getActive($("#statusChips")) || "reading";
-        const format = getActive($("#formatChips")) || "ebook";
-        const startedAt = $("#started")?.value ? new Date($("#started").value) : null;
-        const finishedAt = $("#finished")?.value ? new Date($("#finished").value) : null;
+        const title = $("#title")?.value.trim();
+        const author = $("#author")?.value.trim();
+        const started = $("#started")?.value || null;
+        const finished = $("#finished")?.value || null;
+        const review = $("#review")?.value || "";
 
-        // Optional file
-        let fileMeta = null;
-        const file = $("#bookFile")?.files?.[0];
-        if (file) fileMeta = await storeLocalFile(file, "books");
+        const rating = Number($("#ratingBar")?.dataset.value || 0); // halves supported
+        const spice = Number($("#spiceBar")?.dataset.value || 0);
 
-        // Only include cover if present
-        const coverSrc = $("#coverPreview")?.src;
-        const coverUrl = coverSrc && !/^\s*$/.test(coverSrc) ? coverSrc : null;
-
-        // Build document
-        const doc = {
-            title, author,
-            status, format,
-            startedAt, finishedAt,
-            genres: [...selectedGenres],
-            moods: [...selectedMoods],
-            tropes: [...selectedTropes],
-            rating, spice,
-            review: $("#review")?.value || "",
-            coverUrl: coverUrl || null,
-            // Only include file if we have a usable URL
-            file: fileMeta && fileMeta.url ? {
-                url: fileMeta.url,
-                name: fileMeta.name || null,
-                size: fileMeta.size ?? null,
-                type: fileMeta.type || null
-            } : null,
-            updatedAt: new Date(),
-            createdAt: new Date()
-        };
-
-        // Strip all undefined so Firestore accepts it
-        const clean = stripUndefined(doc);
-
-        await fb.db.collection("users").doc(user.uid).collection("books").add(clean);
+        if (!title || !author) { alert("Title and Author are required."); return; }
 
         try {
-            window.pbActivity?.post({ type: "book:add", text: `added “${title}”` });
-        } catch { }
-
-        alert("Saved!");
-        location.href = "index.html";
-    }
-
-    function boot() {
-        // chips
-        chipify(GENRES, $("#genres"), selectedGenres);
-        chipify(MOODS, $("#moods"), selectedMoods);
-        chipify(TROPES, $("#tropes"), selectedTropes);
-        oneOf($("#statusChips"), "reading");
-        oneOf($("#formatChips"), "ebook");
-
-        // rating + spice
-        window.RatingControls?.mount({
-            ratingEl: $("#ratingBar"),
-            spiceEl: $("#spiceBar"),
-            onChange({ rating: r, spice: s }) { rating = r; spice = s; }
-        });
-
-        // Save button
-        $("#saveBtn")?.addEventListener("click", async () => {
-            try { await onSave(); }
-            catch (e) { console.error(e); alert(e.message || "Save failed"); }
-        });
-    }
-
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", boot, { once: true });
-    } else {
-        boot();
-    }
-})();
+            await db.collection("users").doc(u.uid).collection("books").add({
+                title, author, started, finished, review,
+                rating, spice,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            location.href = "index.html";
+        } catch (e) {
+            console.error(e);
+            alert("Save failed");
+        }
+    });
+});

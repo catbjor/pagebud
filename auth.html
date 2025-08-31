@@ -1,46 +1,27 @@
 <!DOCTYPE html>
+
 <html lang="en">
 
 <head>
+    <script src="theme-init.js"></script>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta content="width=device-width, initial-scale=1" name="viewport" />
     <title>Sign in – PageBud</title>
     <!-- Put this inline snippet in the <head> of EVERY page BEFORE style.css -->
-    <script>
-        (function () {
-            // Apply immediately to avoid FOUC
-            function resolve(raw) {
-                if (raw === "system") {
-                    return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-                }
-                return raw || "default";
-            }
-            var raw = localStorage.getItem("pb:theme") || "default";
-            document.documentElement.setAttribute("data-theme", resolve(raw));
-            document.documentElement.setAttribute("data-tone", "pastel");
-        }());
-    </script>
-
 
     <!-- Base styles -->
-    <link rel="stylesheet" href="style.css" />
-    <link rel="stylesheet" href="auth.css" />
-
+    <link href="style.css" rel="stylesheet" />
+    <link href="auth.css" rel="stylesheet" />
     <!-- Apply saved theme -->
-    <script>
-        document.documentElement.setAttribute("data-theme", localStorage.getItem("pb:theme") || "default");
-    </script>
 
     <!-- 1) Firebase compat SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
-
     <script src="firebase-config.js"></script>
     <script src="firebase-init.js?v=dev-1"></script>
     <script src="profiles.js"></script>
-
     <!-- 2) 🔧 Inline config -->
     <script>
 
@@ -55,42 +36,34 @@
         };
     </script>
 
-    </script>
 </head>
 
 <body style="background: var(--background)">
     <div class="auth-shell">
         <div class="auth-card">
             <h1 class="auth-title">PageBud</h1>
-
             <!-- Google sign in -->
-            <button id="googleBtn" class="btn btn-google">
+            <button class="btn btn-google" id="googleBtn">
                 <i class="fab fa-google"></i> Sign in with Google
             </button>
-
             <div class="auth-sep"><span>or</span></div>
-
             <!-- Email/password form -->
-            <form id="emailForm" class="auth-form">
+            <form class="auth-form" id="emailForm">
                 <label>Email</label>
-                <input id="email" type="email" required placeholder="you@example.com" />
-
+                <input id="email" placeholder="you@example.com" required="" type="email" />
                 <label>Password</label>
-                <input id="password" type="password" minlength="6" required placeholder="••••••••" />
-
+                <input id="password" minlength="6" placeholder="••••••••" required="" type="password" />
                 <div class="row">
-                    <button type="submit" class="btn btn-primary">Sign in</button>
-                    <button type="button" id="createBtn" class="btn btn-muted">Create account</button>
+                    <button class="btn btn-primary" type="submit">Sign in</button>
+                    <button class="btn btn-muted" id="createBtn" type="button">Create account</button>
                 </div>
             </form>
-
             <p class="muted small" style="margin-top:10px">
                 Trouble signing in? Make sure your domain is whitelisted in Firebase Auth → Settings → Authorized
                 domains.
             </p>
         </div>
     </div>
-
     <script>
         // --- Auth handlers (runs AFTER firebase-init.js, so fb is defined) ---
         const emailEl = document.getElementById("email");
@@ -128,9 +101,8 @@
             }
         });
     </script>
-
     <!-- Icons -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js" defer></script>
+    <script defer="" src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js"></script>
 </body>
 
 </html>

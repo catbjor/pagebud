@@ -1,39 +1,22 @@
 <!DOCTYPE html>
+
 <html lang="en">
 
 <head>
+  <script src="theme-init.js"></script>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport" />
   <title>Add Book – PageBud</title>
-  <!-- Put this inline snippet in the <head> of EVERY page BEFORE style.css -->
-  <script>
-    (function () {
-      // Apply immediately to avoid FOUC
-      function resolve(raw) {
-        if (raw === "system") {
-          return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-        }
-        return raw || "default";
-      }
-      var raw = localStorage.getItem("pb:theme") || "default";
-      document.documentElement.setAttribute("data-theme", resolve(raw));
-      document.documentElement.setAttribute("data-tone", "pastel");
-    }());
-  </script>
 
-  <link rel="stylesheet" href="style.css" />
-  <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('pb:theme') || 'default');</script>
-
-  <!-- Firebase compat -->
+  <link href="style.css" rel="stylesheet" />
+  <script defer="" src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js"></script>
+  <!-- Firebase (compat) + app init -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
   <script src="firebase-config.js"></script>
-  <script src="firebase-init.js?v=dev-1"></script>
-  <script src="profiles.js"></script>
-  <script src="storage-fallback.js"></script>
-
+  <script src="firebase-init.js"></script>
 </head>
 
 <body>
@@ -44,122 +27,81 @@
         <button class="back-fab" onclick="history.back()"><i class="fa fa-chevron-left"></i></button>
       </div>
     </header>
-
-
     <div class="content-wrapper" style="padding:16px">
-      <form id="bookForm" class="card" style="padding:16px; display:grid; gap:14px">
+      <form class="card" id="bookForm" style="padding:16px; display:grid; gap:14px">
         <!-- Cover -->
         <div class="form-row">
           <label style="font-weight:700;display:block;margin-bottom:6px">Cover</label>
-          <div class="cover-wrap shimmer" style="max-width:180px">
-            <img id="coverPreview" class="cover" alt="Cover preview" />
+          <div class="cover-wrap" style="max-width:180px">
+            <img alt="Cover preview" class="cover" id="coverPreview" />
           </div>
         </div>
-
-
-        <!-- Required fields -->
+        <!-- Title & Author -->
         <div class="form-row" style="display:grid;gap:10px;grid-template-columns:1fr 1fr">
-          <div>
-            <label>Title *</label>
-            <input id="title" type="text" required placeholder="Title" />
-          </div>
-          <div>
-            <label>Author *</label>
-            <input id="author" type="text" required placeholder="Author" />
-          </div>
+          <div><label>Title *</label><input id="title" required="" type="text" /></div>
+          <div><label>Author *</label><input id="author" required="" type="text" /></div>
         </div>
-
         <!-- Status -->
         <div class="form-row">
-          <label style="font-weight:700;display:block;margin-bottom:6px">Status</label>
-          <div id="statusChips" class="categories">
+          <label>Status</label>
+          <div class="categories" id="statusChips">
             <span class="category" data-val="tbr">TBR</span>
             <span class="category" data-val="reading">Reading</span>
             <span class="category" data-val="finished">Finished</span>
             <span class="category" data-val="dnf">DNF</span>
-            <span class="category" data-val="favorite">Favorite</span>
-            <span class="category" data-val="wishlist">Wishlist</span>
-            <span class="category" data-val="owned">Owned</span>
           </div>
         </div>
-
         <!-- Dates -->
         <div class="form-row" style="display:grid;gap:10px;grid-template-columns:1fr 1fr">
-          <div>
-            <label>Started</label>
-            <input id="started" type="date" />
-          </div>
-          <div>
-            <label>Finished</label>
-            <input id="finished" type="date" />
-          </div>
+          <div><label>Started</label><input id="started" type="date" /></div>
+          <div><label>Finished</label><input id="finished" type="date" /></div>
         </div>
-        <a class="btn btn-primary" href="reader.html?id=BOOK_ID">Read</a>
-
-
         <!-- Format -->
         <div class="form-row">
-          <label style="font-weight:700;display:block;margin-bottom:6px">Format</label>
-          <div id="formatChips" class="categories">
+          <label>Format</label>
+          <div class="categories" id="formatChips">
             <span class="category" data-val="ebook">Ebook</span>
             <span class="category" data-val="paperback">Paperback</span>
             <span class="category" data-val="hardcover">Hardcover</span>
             <span class="category" data-val="audiobook">Audiobook</span>
           </div>
         </div>
-
-        <!-- Book file -->
+        <!-- Book File -->
         <div class="form-row">
-          <label style="font-weight:700;display:block;margin-bottom:6px">Book File (PDF/EPUB)</label>
-          <input id="bookFile" type="file" accept=".pdf,.epub" />
-          <div class="muted" style="margin-top:6px">PDF eller EPUB. Vi prøver å hente cover automatisk.</div>
+          <label>Book File (PDF/EPUB)</label>
+          <input accept=".pdf,.epub" id="bookFile" type="file" />
         </div>
-
-        <!-- ===== Foldbare: Genres / Moods / Tropes ===== -->
-        <details id="genresBox" class="card" open>
-          <summary style="cursor:pointer;font-weight:900">Genres</summary>
-          <div id="genres" class="categories" style="margin-top:8px"></div>
+        <!-- Genres/Moods/Tropes -->
+        <details class="card" id="genresBox" open="">
+          <summary style="font-weight:900">Genres</summary>
+          <div class="categories" id="genres" style="margin-top:8px"></div>
         </details>
-
-        <details id="moodsBox" class="card">
-          <summary style="cursor:pointer;font-weight:900">Moods</summary>
-          <div id="moods" class="categories" style="margin-top:8px"></div>
+        <details class="card" id="moodsBox">
+          <summary style="font-weight:900">Moods</summary>
+          <div class="categories" id="moods" style="margin-top:8px"></div>
         </details>
-
-        <details id="tropesBox" class="card">
-          <summary style="cursor:pointer;font-weight:900">Tropes</summary>
-          <div id="tropes" class="categories" style="margin-top:8px"></div>
+        <details class="card" id="tropesBox">
+          <summary style="font-weight:900">Tropes</summary>
+          <div class="categories" id="tropes" style="margin-top:8px"></div>
         </details>
-
-        <!-- Rating + Spice (ikonbarene fylles av rating-controls.js) -->
+        <!-- Rating & Spice -->
         <div class="form-row">
-          <div style="display:flex;gap:24px;flex-wrap:wrap">
-            <div>
-              <label style="display:block;font-weight:700;margin-bottom:6px">Rating (6 stars)</label>
-              <div id="ratingBar" class="rating"></div>
-            </div>
-            <div>
-              <label style="display:block;font-weight:700;margin-bottom:6px">Spice (5 chili)</label>
-              <div id="spiceBar" class="spice"></div>
-            </div>
-          </div>
+          <label>Rating</label>
+          <div class="rating" id="ratingBar"></div>
+          <label style="margin-top:8px">Spice</label>
+          <div class="spice" id="spiceBar"></div>
         </div>
-
         <!-- Review -->
         <div class="form-row">
           <label>Review</label>
-          <textarea id="review" rows="4" placeholder="Write your review…"
-            style="background:var(--surface);border:1px solid var(--border)"></textarea>
+          <textarea id="review" placeholder="Write your review…" rows="4"></textarea>
         </div>
       </form>
-
-      <!-- handling bar (ligger over nav) -->
       <div class="form-actions-fixed">
-        <button type="button" class="btn" onclick="history.back()">Cancel</button>
-        <button id="saveBtn" type="button" class="btn btn-primary">Save Book</button>
+        <button class="btn" onclick="history.back()" type="button">Cancel</button>
+        <button class="btn btn-primary" id="saveBtn" type="button">Save Book</button>
       </div>
     </div>
-
     <nav class="bottom-nav">
       <div class="nav-item active"><i class="fas fa-book"></i> Library</div>
       <div class="nav-item" onclick="location.href='stats.html'"><i class="fas fa-chart-line"></i> Stats</div>
@@ -167,14 +109,12 @@
       <div class="nav-item" onclick="location.href='settings.html'"><i class="fas fa-cog"></i> Settings</div>
     </nav>
   </div>
-
-  <!-- Ikoner -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js" defer></script>
-
-  <script src="pb-filestore.js" defer></script>
-  <script src="rating-controls.js" defer></script>
-  <script src="add-book.js" defer></script>
-
+  <!-- App constants (if you use them) -->
+  <script src="constants.js"></script>
+  <!-- ⭐ Mount the pickers (must match the filename exactly) -->
+  <script defer="" src="rating-controls.js"></script>
+  <!-- Page logic -->
+  <script defer="" src="add-book.js"></script>
 </body>
 
 </html>

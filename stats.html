@@ -1,58 +1,193 @@
 <!DOCTYPE html>
+
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script src="theme-init.js"></script>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport" />
   <title>Stats – PageBud</title>
-  <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("pb:theme") || "default");</script>
-  <!-- Put this inline snippet in the <head> of EVERY page BEFORE style.css -->
-  <script>
-    (function () {
-      // Apply immediately to avoid FOUC
-      function resolve(raw) {
-        if (raw === "system") {
-          return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-        }
-        return raw || "default";
-      }
-      var raw = localStorage.getItem("pb:theme") || "default";
-      document.documentElement.setAttribute("data-theme", resolve(raw));
-      document.documentElement.setAttribute("data-tone", "pastel");
-    }());
-  </script>
+  <!-- Apply saved theme early -->
 
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-  <link rel="stylesheet" href="style.css" />
-
+  <!-- Icons & CSS -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet" />
+  <link href="style.css?v=6" rel="stylesheet" />
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-  <!-- Firebase -->
+  <!-- Firebase compat + init -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
   <script src="firebase-config.js"></script>
   <script src="firebase-init.js"></script>
-  <script src="profiles.js"></script>
+  <script defer="" src="nav.js"></script>
 </head>
 
 <body>
   <div class="app-container">
     <header class="header">
       <h1>Stats</h1>
-      <div style="display:flex;gap:8px">
-        <button class="back-button" id="btnQuickReset" title="Reset caches"><i class="fa-solid fa-rotate"></i></button>
+      <div class="header-actions">
+        <button class="back-fab" id="btnQuickReset" title="Reset caches"><i class="fa-solid fa-rotate"></i></button>
       </div>
     </header>
-
-    <!-- keep your existing stats layout or the one we built earlier -->
-    <section class="card" style="margin:16px">
-      <div id="statsMount">Loading…</div>
+    <!-- Calendar + streak -->
+    <section class="calendar-card">
+      <div class="cal-head">
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap">
+          <div class="streak-badge" id="streakHeader" title="Reading streak">
+            <span>🔥</span><span id="streakDays">0</span><span>days</span>
+          </div>
+          <div class="calendar-year-selector" style="display:flex;align-items:center;gap:8px">
+            <button class="year-btn" id="prevYear">‹</button>
+            <div id="currentYear" style="font-weight:800"></div>
+            <button class="year-btn" id="nextYear">›</button>
+          </div>
+        </div>
+        <div class="calendar-month-nav">
+          <button class="month-btn" id="prevMonth">‹</button>
+          <div class="current-month" id="currentMonth"></div>
+          <button class="month-btn" id="nextMonth">›</button>
+        </div>
+      </div>
+      <div class="calendar-controls">
+        <div>
+          <label style="font-weight:700; font-size:.9rem; margin-right:6px;">Metric:</label>
+          <select class="month-btn" id="calendarMetric">
+            <option value="sessions">Reading minutes (heat)</option>
+            <option value="books">Reading days (finished spans)</option>
+          </select>
+        </div>
+        <div style="display:flex; align-items:center; gap:6px; opacity:.8">
+          <span style="font-size:.85rem">Heat:</span>
+          <div style="display:flex; gap:4px;">
+            <div style="width:14px;height:14px;border-radius:3px;background:#e8eefc;border:1px solid var(--border)">
+            </div>
+            <div style="width:14px;height:14px;border-radius:3px;background:#c7d3fa;border:1px solid var(--border)">
+            </div>
+            <div style="width:14px;height:14px;border-radius:3px;background:#8fa8f5;border:1px solid var(--border)">
+            </div>
+            <div style="width:14px;height:14px;border-radius:3px;background:#4e73df;border:1px solid var(--border)">
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="calendar-labels" id="calendarLabels"></div>
+      <div class="calendar-grid" id="calendarGrid"></div>
     </section>
+    <!-- Range filters -->
+    <div class="page-header">
+      <div class="time-filters">
+        <button class="time-filter-btn" data-range="daily">Daily</button>
+        <button class="time-filter-btn" data-range="weekly">Weekly</button>
+        <button class="time-filter-btn" data-range="monthly">Monthly</button>
+        <button class="time-filter-btn active" data-range="yearly">Yearly</button>
+      </div>
+    </div>
+    <!-- Stat cards -->
+    <section class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-title">Books Read</div>
+        <div class="stat-value" id="booksRead">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-title">Average Rating</div>
+        <div class="stat-value" id="avgRating">0.0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-title">Avg. Reading Time (Days)</div>
+        <div class="stat-value" id="readingTime">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-title">Pages Read</div>
+        <div class="stat-value" id="pagesRead">0</div>
+      </div>
+      <!-- Today progress ring -->
+      <div class="stat-card">
+        <div class="stat-title">Today</div>
+        <div class="today-ring">
+          <div class="ring-wrap" title="Today's reading">
+            <svg height="56" viewbox="0 0 56 56" width="56">
+              <circle cx="28" cy="28" fill="none" r="24" stroke="var(--border)" stroke-width="6"></circle>
+              <circle cx="28" cy="28" fill="none" id="todayRing" r="24" stroke="var(--primary)" stroke-dasharray="0 999"
+                stroke-linecap="round" stroke-width="6"></circle>
+            </svg>
+            <div class="ring-center" id="todayPct">0%</div>
+          </div>
+          <div>
+            <div class="stat-value" id="todayMinutes">0m</div>
+            <div class="muted-small"><span id="todayGoal">Goal: 20m</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <!-- Charts -->
+    <section class="charts-container">
+      <div class="chart-card">
+        <h3>Genres</h3>
+        <div style="height:240px"><canvas id="genresChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Moods</h3>
+        <div style="height:240px"><canvas id="moodsChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3 style="display:flex;align-items:center;justify-content:space-between">
+          <span>Reading Trends</span>
+          <select class="month-btn" id="trendMetric">
+            <option value="books">Books finished</option>
+            <option value="minutes">Minutes read</option>
+          </select>
+        </h3>
+        <div style="height:240px"><canvas id="readingTrendsChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Languages</h3>
+        <div style="height:240px"><canvas id="languagesChart"></canvas></div>
+      </div>
+    </section>
+    <!-- Top lists -->
+    <section class="top-lists">
+      <div class="stat-card">
+        <h3 style="margin:0 0 8px 0">Top Authors</h3>
+        <ul class="top-list" id="topAuthors">
+          <li class="loading">Loading…</li>
+        </ul>
+      </div>
+      <div class="stat-card">
+        <h3 style="margin:0 0 8px 0">Top Genres</h3>
+        <ul class="top-list" id="topGenres">
+          <li class="loading">Loading…</li>
+        </ul>
+      </div>
+      <div class="stat-card">
+        <h3 style="margin:0 0 8px 0">Highest Rated Books</h3>
+        <ul class="top-list" id="topBooks">
+          <li class="loading">Loading…</li>
+        </ul>
+      </div>
+    </section>
+    <div class="action-bar">
+      <button class="reset-btn" id="resetStatsBtn"><i class="fa-solid fa-trash"></i> Reset All Data</button>
+    </div>
   </div>
-
+  <!-- Scripts -->
+  <script src="reset-utils.js"></script>
   <script src="stats.js"></script>
-  <script src="nav.js" defer></script>
+  <script defer="" src="timer.js"></script>
+  <script>
+    // Quick reset button
+    document.getElementById("btnQuickReset")?.addEventListener("click", async () => {
+      if (!confirm("Reset caches (keep login)?")) return;
+      try { await pbResetCaches?.({ full: false }); location.reload(); } catch { }
+    });
+
+    // Do not redirect if signed-out; stats.js will show a message and wait for auth.
+    try {
+      requireAuth?.(() => { }); // no-op; keeps auth ready listener behavior consistent
+    } catch { }
+  </script>
 </body>
 
 </html>

@@ -1,37 +1,21 @@
 <!DOCTYPE html>
+
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script src="theme-init.js"></script>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport" />
   <title>PageBud</title>
 
-  <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("pb:theme") || "default");</script>
-  <!-- Put this inline snippet in the <head> of EVERY page BEFORE style.css -->
-  <script>
-    (function () {
-      // Apply immediately to avoid FOUC
-      function resolve(raw) {
-        if (raw === "system") {
-          return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-        }
-        return raw || "default";
-      }
-      var raw = localStorage.getItem("pb:theme") || "default";
-      document.documentElement.setAttribute("data-theme", resolve(raw));
-      document.documentElement.setAttribute("data-tone", "pastel");
-    }());
-  </script>
-
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-  <link rel="stylesheet" href="style.css" />
-
-  <!-- Firebase compat SDKs -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet" />
+  <link href="style.css" rel="stylesheet" />
+  <script defer="" src="rating-controls.js"></script>
+  <!-- Firebase compat -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
-
   <script src="firebase-config.js"></script>
   <script src="firebase-init.js"></script>
 </head>
@@ -42,11 +26,7 @@
       <h1>PageBud</h1>
       <div class="header-actions"></div>
     </header>
-
-    <div class="categories" style="border-top:1px solid var(--border);padding-top:12px;">
-      <input id="search-input" class="form-control" placeholder="Search by title or author…" />
-    </div>
-
+    <!-- Chips: one horizontal row -->
     <div class="categories scroll-x" id="filter-chips">
       <div class="category active" data-filter="all">All Books</div>
       <div class="category" data-filter="favorites">Favorites</div>
@@ -54,56 +34,63 @@
       <div class="category" data-filter="finished">Finished</div>
       <div class="category" data-filter="want">TBR</div>
       <div class="category" data-filter="dnf">DNF</div>
-      <div class="category" data-filter="owned">Owned</div>
+      <div class="category" data-filter="owned">Books I Own</div>
       <div class="category" data-filter="wishlist">Wishlist</div>
     </div>
-
-    <div class="categories promo-row" style="gap:12px">
-      <div class="btn btn-secondary" style="flex:1" onclick="location.href='discover.html'">
-        <div style="font-weight:800">Discover</div>
-        <div class="muted" style="font-size:.85rem">Trending & recommendations</div>
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <input class="form-control" id="search-input" placeholder="Search by title or author…" />
+      <div class="view-toggle">
+        <button class="btn" id="viewGrid" title="Grid">Grid</button>
+        <button class="btn" id="viewList" title="List">List</button>
       </div>
-      <div class="btn btn-secondary" style="flex:1" onclick="location.href='friends.html'">
+    </div>
+    <div class="categories promo-row" style="gap:12px">
+      <div class="btn btn-secondary" onclick="location.href='discover.html'" style="flex:1">
+        <div style="font-weight:800">Discover</div>
+        <div class="muted" style="font-size:.85rem">Trending &amp; recommendations</div>
+      </div>
+      <div class="btn btn-secondary" onclick="location.href='friends.html'" style="flex:1">
         <div style="font-weight:800">Friends</div>
         <div class="muted" style="font-size:.85rem">See what friends read</div>
       </div>
     </div>
-
     <section class="library">
       <h2>My Library</h2>
-      <div id="empty-state" class="empty-state" style="display:none">
+      <div class="empty-state" id="empty-state" style="display:none">
         <div class="empty-icon"><i class="fas fa-book-open"></i></div>
         <h3>Your library is empty…</h3>
         <p>Add your first book to get started</p>
       </div>
-      <div id="book-grid" class="book-grid"></div>
+      <div class="book-grid" id="book-grid"></div>
     </section>
-
     <section class="library">
       <h2>Friends activity</h2>
-      <div id="friends-feed" class="card" style="padding:12px"></div>
+      <div class="card" id="friends-feed" style="padding:12px"></div>
     </section>
-
-    <button id="add-book-btn" class="add-book" type="button" aria-label="Add Book" title="Add Book"
-      onclick="location.href='add-book.html'">
-      <i class="fas fa-plus"></i>
-    </button>
+    <!-- Add Book FAB -->
+    <button aria-label="Add Book" class="add-book" id="add-book-btn" onclick="location.href='add-book.html'"
+      title="Add Book" type="button"><i class="fas fa-plus"></i></button>
   </div>
-
-  <!-- Scripts -->
+  <script>
+    // Allow CSS to lift timer when add-fab exists
+    (function () { if (document.getElementById('add-book-btn')) document.body.classList.add('has-add-fab'); }());
+  </script>
+  <!-- App scripts -->
   <script src="reset-utils.js"></script>
-  <script src="nav.js" defer></script>
-  <!-- Feed + aktivitet -->
+  <script defer="" src="nav.js"></script>
   <script src="profiles.js"></script>
   <script src="activity.js"></script>
   <script src="social-feed.js"></script>
   <script src="script.js"></script>
-  <script src="timer.js" defer></script>
+  <script defer="" src="timer.js"></script>
+  <script src="goal-badge.js" defer></script>
+  <script src="index-actions.js" defer></script>
+
+
   <script>
-    // Start feeden når brukeren er innlogget
     requireAuth(() => startSocialFeed && startSocialFeed());
   </script>
-
 </body>
 
 </html>

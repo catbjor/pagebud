@@ -1,92 +1,60 @@
-/* ===========================================================
-  PageBud – push.js
-  Purpose: Handle client-side push (Firebase Cloud Messaging)
-  - Requests permission
-  - Retrieves + stores FCM token
-  - Listens for foreground messages
-=========================================================== */
-
+// push.js (merged)
 (function () {
   "use strict";
 
-  // Expose helper globally
-  window.pbEnablePush = async function () {
-    if (!("Notification" in window)) {
-      return "This browser does not support notifications.";
-    }
+  const PERM_KEY = "pb:push:permission";
 
-    // 1) Ask user permission
-    const perm = await Notification.requestPermission();
-    if (perm !== "granted") {
-      return "Notifications denied.";
-    }
+  async function ensureSW() {
+    if (!("serviceWorker" in navigator)) throw new Error("no-sw");
+    const reg = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+    return reg;
+  }
 
-    // 2) Init Messaging
-    let messaging;
-    try {
-      messaging = firebase.messaging();
-    } catch (e) {
-      console.error("[Push] Messaging not supported", e);
-      return "Messaging not supported.";
-    }
+  async function askPermission() {
+    if (!("Notification" in window)) throw new Error("no-notif");
+    const p = await Notification.requestPermission();
+    localStorage.setItem(PERM_KEY, p);
+    if (p !== "granted") throw new Error("denied");
+    return p;
+  }
 
-    // 3) Get registration of SW (must be /firebase-messaging-sw.js)
-    const reg = await navigator.serviceWorker.getRegistration("/firebase-messaging-sw.js");
-    if (!reg) {
-      return "Service worker not registered (firebase-messaging-sw.js missing).";
-    }
+  async function getTokenCompat(reg) {
+    // Use compat messaging
+    if (!firebase.messaging) throw new Error("no-messaging");
+    const messaging = firebase.messaging();
+    const token = await messaging.getToken({ serviceWorkerRegistration: reg });
+    if (!token) throw new Error("no-token");
+    return token;
+  }
 
-    // 4) Attach messaging to SW registration
-    messaging.useServiceWorker(reg);
+  async function saveToken(uid, token) {
+    await fb.db.collection("users").doc(uid).set({ fcmToken: token }, { merge: true });
+  }
 
-    // 5) Retrieve token
-    let token;
-    try {
-      token = await messaging.getToken({
-        vapidKey: "<BKB8Xl6_atfLTsLlo1lzN6wNj6jq8HFCusSEs92Z6WHDrSyC-F8ovQyATvOTjn1d1CDvpmi8nnSNZlqxFAM1nvA>" // 🔧 optional; set if you configured in Firebase console
-      });
-    } catch (e) {
-      console.error("[Push] getToken failed", e);
-      return "Failed to get token.";
-    }
+  async function enable() {
+    await new Promise(r => document.addEventListener("firebase-ready", r, { once: true }));
+    const u = fb.auth.currentUser || await new Promise(res => fb.auth.onAuthStateChanged(res));
+    if (!u) { location.href = "auth.html"; return; }
 
-    if (!token) {
-      return "No push token.";
-    }
+    const reg = await ensureSW();
+    await askPermission();
+    const token = await getTokenCompat(reg);
+    await saveToken(u.uid, token);
 
-    console.log("[Push] Token:", token);
-
-    // 6) Save token to Firestore under user doc
-    const user = fb.auth.currentUser;
-    if (user) {
-      await fb.db.collection("users").doc(user.uid).set({
-        pushToken: token,
-        pushEnabled: true,
-        updated: firebase.firestore.FieldValue.serverTimestamp()
-      }, { merge: true });
-    }
-
-    return "Push enabled ✓";
-  };
-
-  // Foreground handler: show simple notification banner
-  document.addEventListener("DOMContentLoaded", () => {
+    // Foreground handler
     try {
       const messaging = firebase.messaging();
-      messaging.onMessage((payload) => {
-        console.log("[Push] Foreground message", payload);
-        const n = payload?.notification || {};
-        const title = n.title || "PageBud";
-        const body = n.body || "Update received.";
-        // Simple toast fallback
-        if (window.pbToast) {
-          pbToast(`${title}: ${body}`);
-        } else {
-          alert(`${title}\n${body}`);
-        }
+      messaging.onMessage(payload => {
+        (window.toast ? toast(payload.notification?.title || "New message")
+          : alert(payload.notification?.title || "New message"));
       });
-    } catch (e) {
-      console.warn("[Push] Foreground handler skipped:", e);
-    }
-  });
+    } catch { }
+
+    return token;
+  }
+
+  window.pbEnablePush = function () {
+    enable().then(() => window.toast?.("Push enabled ✓"))
+      .catch(e => window.toast?.(`Push error: ${e?.message || e}`));
+  };
 })();

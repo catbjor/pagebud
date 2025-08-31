@@ -1,95 +1,93 @@
-/* pb-filestore.js
-   Local-only file storage (covers + book files) using IndexedDB.
-   Returns lightweight metadata; blobs are retrieved when needed.
-*/
+// pb-filestore.js (unified API: save, getURL, remove)
+// Saves to IndexedDB; if Firebase Storage is available, uploads too and returns cloud URL.
 (function () {
     "use strict";
 
-    const DB_NAME = "pb-files.v1";
+    const DB_NAME = "pbLocalFiles";
     const STORE = "files";
+    let dbp = null;
 
-    function withDB() {
-        return new Promise((resolve, reject) => {
-            const req = indexedDB.open(DB_NAME, 1);
-            req.onupgradeneeded = () => {
-                const db = req.result;
-                if (!db.objectStoreNames.contains(STORE)) {
-                    const os = db.createObjectStore(STORE, { keyPath: "id" });
-                    os.createIndex("byBook", ["uid", "bookId"], { unique: false });
-                }
+    function openDB() {
+        if (dbp) return dbp;
+        dbp = new Promise((res, rej) => {
+            const rq = indexedDB.open(DB_NAME, 1);
+            rq.onupgradeneeded = () => {
+                const db = rq.result;
+                if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: "id" });
             };
-            req.onsuccess = () => resolve(req.result);
-            req.onerror = () => reject(req.error);
+            rq.onsuccess = () => res(rq.result);
+            rq.onerror = () => rej(rq.error);
         });
+        return dbp;
     }
-
-    async function put(rec) {
-        const db = await withDB();
-        return new Promise((resolve, reject) => {
+    function idbPut(obj) {
+        return openDB().then(db => new Promise((res, rej) => {
             const tx = db.transaction(STORE, "readwrite");
-            tx.objectStore(STORE).put(rec);
-            tx.oncomplete = () => resolve(rec.id);
-            tx.onerror = () => reject(tx.error);
-        });
+            tx.objectStore(STORE).put(obj);
+            tx.oncomplete = () => res();
+            tx.onerror = () => rej(tx.error);
+        }));
     }
-
-    async function get(id) {
-        const db = await withDB();
-        return new Promise((resolve, reject) => {
+    function idbGet(id) {
+        return openDB().then(db => new Promise((res, rej) => {
             const tx = db.transaction(STORE, "readonly");
-            const req = tx.objectStore(STORE).get(id);
-            req.onsuccess = () => resolve(req.result || null);
-            req.onerror = () => reject(req.error);
-        });
+            const rq = tx.objectStore(STORE).get(id);
+            rq.onsuccess = () => res(rq.result || null);
+            rq.onerror = () => rej(rq.error);
+        }));
     }
-
-    async function del(id) {
-        const db = await withDB();
-        return new Promise((resolve, reject) => {
+    function idbDel(id) {
+        return openDB().then(db => new Promise((res, rej) => {
             const tx = db.transaction(STORE, "readwrite");
             tx.objectStore(STORE).delete(id);
-            tx.oncomplete = () => resolve(true);
-            tx.onerror = () => reject(tx.error);
-        });
+            tx.oncomplete = () => res();
+            tx.onerror = () => rej(tx.error);
+        }));
     }
 
-    function toMeta(id, file) {
-        return {
-            id,
-            name: file.name,
-            size: file.size,
-            type: file.type,
-            ext: (file.name.match(/\.[^.]+$/) || [""])[0].slice(1).toLowerCase(),
-            updatedAt: Date.now()
-        };
-    }
+    const fileType = (name = "") => name.toLowerCase().endsWith(".pdf") ? "pdf"
+        : name.toLowerCase().endsWith(".epub") ? "epub" : "";
 
-    async function save({ file, uid = "anon", bookId = "temp", kind = "book" }) {
+    async function save({ file, uid = "anon", bookId = "temp" }) {
         if (!file) throw new Error("No file");
-        const id = `${uid}_${bookId}_${kind}_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-        const rec = {
-            id,
-            uid,
-            bookId,
-            kind,                 // "cover" | "book" | other
-            name: file.name,
-            size: file.size,
-            type: file.type,
-            ext: (file.name.match(/\.[^.]+$/) || [""])[0].slice(1).toLowerCase(),
-            blob: file,
-            createdAt: Date.now()
-        };
-        await put(rec);
-        return toMeta(id, file);
+        // Always save locally (free)
+        const localId = `${uid}_${bookId}_${Date.now()}`;
+        await idbPut({ id: localId, name: file.name, size: file.size, type: file.type, blob: file, savedAt: Date.now() });
+
+        // Try cloud if storage exists (optional)
+        let cloud = null;
+        try {
+            if (window.fb?.storage) {
+                const path = `uploads/${uid}/${bookId}/${Date.now()}_${file.name}`;
+                const ref = fb.storage.ref(path);
+                const snap = await ref.put(file);
+                const url = await snap.ref.getDownloadURL();
+                cloud = { path, url };
+            }
+        } catch { /* ignore; keep local */ }
+
+        return cloud
+            ? { mode: "cloud+local", type: fileType(file.name), path: cloud.path, url: cloud.url, localId }
+            : { mode: "local", type: fileType(file.name), localId };
     }
 
-    async function getBlobUrl(id) {
-        const rec = await get(id);
-        if (!rec) return "";
-        const url = URL.createObjectURL(rec.blob);
-        // Call revokeObjectURL yourself when done showing.
-        return url;
+    async function getURL(meta) {
+        if (!meta) return null;
+        if (meta.url) return meta.url;
+        if (meta.localId) {
+            const rec = await idbGet(meta.localId);
+            return rec?.blob ? URL.createObjectURL(rec.blob) : null;
+        }
+        return null;
     }
 
-    window.PBFileStore = { save, get, getBlobUrl, delete: del };
+    async function remove(meta) {
+        if (!meta) return;
+        if (meta.path && window.fb?.storage) {
+            try { await fb.storage.ref(meta.path).delete(); } catch { }
+        }
+        if (meta.localId) { try { await idbDel(meta.localId); } catch { } }
+    }
+
+    window.PBFileStore = { save, getURL, remove };
 })();
