@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Reader – PageBud</title>
+
+  <!-- Apply theme immediately -->
+  <script>
+    (function () {
+      function resolve(raw) {
+        return raw === "system"
+          ? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+          : (raw || "default");
+      }
+      document.documentElement.setAttribute("data-theme", resolve(localStorage.getItem("pb:theme") || "default"));
+    }());
+  </script>
+
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- Firebase (compat) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="firebase-init.js?v=dev-1"></script>
+
+  <!-- Local file store (your offline/local storage helper) -->
+  <script src="pb-filestore.js" defer></script>
+
+  <!-- Readers -->
+  <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
+  <script src="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+</head>
+
+<body>
+  <div class="app-container" data-current-book-id="">
+    <header class="header">
+      <h1 id="bookTitle">Reader</h1>
+      <div class="header-actions">
+        <button class="back-fab" onclick="history.back()" title="Back"><i class="fa fa-chevron-left"></i></button>
+      </div>
+    </header>
+
+    <div class="container" style="padding:12px">
+      <!-- EPUB container -->
+      <div id="epubContainer"
+        style="display:none; min-height:60vh; border:1px solid var(--border); border-radius:12px; background:var(--card); overflow:hidden">
+      </div>
+
+      <!-- PDF container -->
+      <div id="pdfContainer" style="display:none; text-align:center">
+        <canvas id="pdfCanvas"
+          style="max-width:100%; width:100%; background:var(--card); border:1px solid var(--border); border-radius:12px;"></canvas>
+        <div class="muted" id="pdfStatus" style="margin-top:8px"></div>
+      </div>
+    </div>
+
+    <!-- Floating action bar above bottom nav -->
+    <div class="form-actions-fixed">
+      <div style="margin-right:auto;display:flex;align-items:center;gap:10px">
+        <span id="posLabel" class="muted"></span>
+      </div>
+      <button class="btn" id="btnPrev" type="button">Prev</button>
+      <button class="btn" id="btnNext" type="button">Next</button>
+    </div>
+
+    <nav class="bottom-nav">
+      <div class="nav-item active"><i class="fas fa-book"></i> Library</div>
+      <div class="nav-item" onclick="location.href='stats.html'"><i class="fas fa-chart-line"></i> Stats</div>
+      <div class="nav-item" onclick="location.href='discover.html'"><i class="fas fa-compass"></i> Discover</div>
+      <div class="nav-item" onclick="location.href='settings.html'"><i class="fas fa-cog"></i> Settings</div>
+    </nav>
+  </div>
+
+  <!-- Icons -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js" defer></script>
+
+  <!-- Reader logic -->
+  <script src="reader-init.js"></script>
+</body>
+
+</html>

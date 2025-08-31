@@ -2,135 +2,158 @@
 <html lang="en">
 
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>PageBud – Settings</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Settings – PageBud</title>
+    <!-- Put this inline snippet in the <head> of EVERY page BEFORE style.css -->
+    <script>
+        (function () {
+            // Apply immediately to avoid FOUC
+            function resolve(raw) {
+                if (raw === "system") {
+                    return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+                }
+                return raw || "default";
+            }
+            var raw = localStorage.getItem("pb:theme") || "default";
+            document.documentElement.setAttribute("data-theme", resolve(raw));
+            document.documentElement.setAttribute("data-tone", "pastel");
+        }());
+    </script>
+
+
+    <!-- Apply saved theme immediately (no FOUC) -->
+    <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("pb:theme") || "default");</script>
+
+    <!-- Icons + App styles -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-    <link rel="stylesheet" href="style.css?v=2025-08-29-29" />
-    <link rel="manifest" href="manifest.json" />
-    <meta name="theme-color" content="#111111">
+    <link rel="stylesheet" href="style.css" />
+
+    <!-- Firebase (load but do NOT block DOM: use defer) -->
+    <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+    <script defer src="firebase-config.js"></script>
+    <script defer src="firebase-init.js?v=dev-1"></script>
+
+    <!-- Page scripts (also deferred) -->
+    <script defer src="reset-utils.js"></script>
+    <script defer src="settings.js"></script>
+    <script defer src="settings-timer.js"></script>
+    <script defer src="nav.js"></script>
+    <script defer src="timer.js"></script>
 </head>
 
 <body>
     <div class="app-container">
-        <div class="stats-header">
-            <div class="back-button" onclick="location.href='index.html'"><i class="fas fa-arrow-left"></i></div>
+        <header class="header">
             <h1>Settings</h1>
-            <div style="width:32px;"></div>
+            <!-- header actions via nav.js -->
+        </header>
+
+        <div class="container">
+            <!-- THEME -->
+            <section class="card">
+                <h2>Theme</h2>
+                <div class="muted" id="themeStatus" style="margin-bottom:10px">
+                    Current: <b id="themeName">default</b>
+                </div>
+                <div id="themeGrid" class="theme-previews"></div>
+                <div class="settings-actions" style="margin-top:12px">
+                    <button class="btn" id="btnMatchSystem">Match system</button>
+                </div>
+            </section>
+
+            <!-- TIMER -->
+            <section class="card" style="margin-top:16px;padding:16px">
+                <h2 style="margin-bottom:12px">Reading Timer</h2>
+
+                <section class="section" style="padding:0">
+                    <div class="section-header">
+                        <div class="section-title" style="font-weight:800">
+                            <i class="fa-solid fa-bullseye"></i> Daily reading goal
+                        </div>
+                    </div>
+                    <p class="muted" style="margin-top:6px">Sett et daglig mål i minutter. Brukes i kalenderen og
+                        statistikken.</p>
+                    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:8px">
+                        <input id="goalMin" type="number" min="0" max="300" step="5" style="width:90px;padding:8px" />
+                        <input id="goalRange" type="range" min="0" max="300" step="5" style="flex:1;min-width:200px" />
+                        <button id="goalSave" class="btn" type="button"
+                            style="background:var(--primary);border-color:var(--primary);color:#000">Save</button>
+                        <span id="goalStatus" class="muted"></span>
+                    </div>
+                </section>
+
+                <div class="section" style="padding:0;margin-top:12px">
+                    <label style="font-weight:600">Dock side</label>
+                    <div style="display:flex;gap:12px;align-items:center;margin-top:6px">
+                        <label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="radio"
+                                name="pb-timer-side" value="left" /> Left</label>
+                        <label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="radio"
+                                name="pb-timer-side" value="right" /> Right</label>
+                    </div>
+                    <div class="muted" style="margin-top:6px">Flytt timer-docken til venstre eller høyre.</div>
+                </div>
+
+                <div class="section" style="padding:0;margin-top:12px">
+                    <label style="font-weight:600;display:flex;align-items:center;gap:8px;cursor:pointer">
+                        <input id="pb-timer-collapsed" type="checkbox" /> Start collapsed (kun klokke-ikon)
+                    </label>
+                    <div class="muted" style="margin-top:6px">Når påslått: timeren starter skjult og vises først når du
+                        trykker på klokke-ikonet.</div>
+                </div>
+
+                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+                    <button id="pb-timer-apply" class="btn" type="button"
+                        style="background:var(--primary);border-color:var(--primary);color:#000">Apply now</button>
+                    <button id="pb-timer-toggle" class="btn" type="button">Show/Hide now</button>
+                    <button id="pb-timer-reset" class="btn" type="button"
+                        style="background:#ff6b6b;border-color:#ff6b6b;color:#000">Reset timer state</button>
+                </div>
+            </section>
+
+            <!-- RESET -->
+            <section class="card" style="margin-top:16px">
+                <h2>Reset cache</h2>
+                <p class="muted">Bruk hvis appen ikke oppdateres pga. PWA cache. “Full reset” logger deg ut.</p>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    <button class="btn" id="btnResetKeep">Reset caches (keep login)</button>
+                    <button class="btn" id="btnResetFull">Full reset (sign out)</button>
+                </div>
+                <div id="resetStatus" class="muted" style="margin-top:8px"></div>
+            </section>
+
+            <!-- NOTIFICATIONS -->
+            <section class="card" style="margin-top:16px">
+                <h2>Notifications</h2>
+                <p class="muted">Varsler for venneforespørsler og meldinger.</p>
+                <button class="btn" id="btnEnablePush">Enable push</button>
+                <div class="muted" id="pushStatus" style="margin-top:8px"></div>
+            </section>
+
+            <!-- ACCOUNT -->
+            <section class="card" style="margin-top:16px">
+                <h2>Account</h2>
+                <button class="btn" id="btnLogout" style="background:#ff6b6b;border-color:#ff6b6b;color:#000">Log
+                    out</button>
+            </section>
         </div>
-
-        <div class="content-wrapper">
-            <!-- Appearance -->
-            <div class="stats-section">
-                <div class="section-header">
-                    <div class="section-title"><i class="fas fa-palette"></i><span>Appearance</span></div>
-                </div>
-                <div class="theme-previews">
-                    <div class="theme-preview" data-theme="default">
-                        <div class="theme-colors">
-                            <div class="color-swatch" style="background:#7BDFF2"></div>
-                            <div class="color-swatch" style="background:#B4F8C8"></div>
-                            <div class="color-swatch" style="background:#F7D6E0"></div>
-                        </div>
-                        <div class="theme-name">Pink & Blue</div>
-                    </div>
-                    <div class="theme-preview" data-theme="pink-beige">
-                        <div class="theme-colors">
-                            <div class="color-swatch" style="background:#F3B3CD"></div>
-                            <div class="color-swatch" style="background:#F1C4A5"></div>
-                            <div class="color-swatch" style="background:#F7DDCE"></div>
-                        </div>
-                        <div class="theme-name">Pink & Beige</div>
-                    </div>
-                    <div class="theme-preview" data-theme="barbie">
-                        <div class="theme-colors">
-                            <div class="color-swatch" style="background:#FE9DD0"></div>
-                            <div class="color-swatch" style="background:#8BD2F1"></div>
-                            <div class="color-swatch" style="background:#F8C9EB"></div>
-                        </div>
-                        <div class="theme-name">Barbie</div>
-                    </div>
-                    <div class="theme-preview" data-theme="goth">
-                        <div class="theme-colors">
-                            <div class="color-swatch" style="background:#1E1E22"></div>
-                            <div class="color-swatch" style="background:#3E2D36"></div>
-                            <div class="color-swatch" style="background:#5C3F49"></div>
-                        </div>
-                        <div class="theme-name">Goth</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Notifications -->
-            <div class="stats-section">
-                <div class="section-header">
-                    <div class="section-title"><i class="fas fa-bell"></i><span>Notifications (FCM)</span></div>
-                </div>
-                <button id="enablePushBtn" class="btn btn-secondary full-width">Enable Push (FCM)</button>
-                <div class="muted" style="margin-top:8px">Requires browser permission + your VAPID public key.</div>
-            </div>
-
-            <!-- Account -->
-            <div class="stats-section">
-                <div class="section-header">
-                    <div class="section-title"><i class="fas fa-user"></i><span>Account</span></div>
-                </div>
-                <button class="btn btn-secondary full-width"
-                    onclick="fb.auth.signOut().then(()=>location.href='auth.html')">
-                    <i class="fas fa-sign-out-alt"></i> Log out
-                </button>
-            </div>
-        </div>
-
-        <nav class="bottom-nav">
-            <div class="nav-item" onclick="location.href='index.html'"><i class="fas fa-book"></i> Library</div>
-            <div class="nav-item" onclick="location.href='stats.html'"><i class="fas fa-chart-line"></i> Stats</div>
-            <div class="nav-item" onclick="location.href='buddy-read.html'"><i class="fas fa-users"></i> Buddy Read
-            </div>
-            <div class="nav-item active"><i class="fas fa-cog"></i> Settings</div>
-        </nav>
     </div>
 
-    <!-- App -->
-    <script src="script.js?v=2025-08-29-02"></script>
+    <div id="pb-toast" role="status" aria-live="polite"></div>
 
-    <!-- Firebase (compat) -->
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
-    <script src="firebase-init.js"></script>
-    <script src="sync.js"></script>
-
+    <!-- Page-only helpers -->
     <script>
-        const VAPID_PUBLIC_KEY = "BJuvG6f4DO9_FG-tk1h9gQ5Ry1yeU9CYcrnZ-qRcIAbn4BgNnG73dHur62WbtBu_t9-XqeTHuGmR7UsASZPe0_g";
-        async function enablePush() {
-            try {
-                const reg = await navigator.serviceWorker.getRegistration();
-                if (!reg) { alert("Service Worker not registered yet."); return; }
-                const messaging = firebase.messaging();
-                const perm = await Notification.requestPermission();
-                if (perm !== "granted") return;
-                const token = await messaging.getToken({ vapidKey: VAPID_PUBLIC_KEY, serviceWorkerRegistration: reg });
-                if (!token) throw new Error("No token");
-                const u = fb.auth.currentUser;
-                if (u) {
-                    await fb.db.collection("users").doc(u.uid).collection("webPushTokens")
-                        .doc(token).set({
-                            token, ua: navigator.userAgent,
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                        });
-                }
-                alert("Push enabled ✓");
-            } catch (e) { console.error(e); alert("Push feilet – se console"); }
-        }
-        document.getElementById("enablePushBtn").addEventListener("click", enablePush);
-
-        // Sync
-        requireAuth(async () => { PBSync.subscribe(); await PBSync.pushAll(); });
+        // Safe logout button wiring
+        document.addEventListener("DOMContentLoaded", () => {
+            document.getElementById("btnLogout")?.addEventListener("click", async () => {
+                try { await fb.auth.signOut(); location.href = "auth.html"; }
+                catch (e) { alert(e?.message || "Failed to log out"); }
+            });
+        });
     </script>
-    <script src="script.js?v=2025-08-29-30"></script>
-    <script src="reader-init.js?v=2025-08-29-30"></script>
 </body>
 
 </html>

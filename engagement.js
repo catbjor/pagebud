@@ -1,52 +1,75 @@
-// engagement.js
-// Web Push (FCM) – bruker din VAPID public key
-const VAPID_PUBLIC_KEY = "BJuvG6f4DO9_FG-tk1h9gQ5Ry1yeU9CYcrnZ-qRcIAbn4BgNnG73dHur62WbtBu_t9-XqeTHuGmR7UsASZPe0_g";
+/* ===========================================================
+ PageBud – engagement.js
+ Purpose: Manage optional web push notifications
+ =========================================================== */
 
-async function enablePush() {
-    try {
-        if (!('Notification' in window)) return alert("Nettleseren støtter ikke Notifications.");
-        if (!('serviceWorker' in navigator)) return alert("Service Worker ikke tilgjengelig.");
+(function () {
+    "use strict";
 
-        // sørg for at sw.js er registrert (åpne via index.html først)
-        let reg = await navigator.serviceWorker.getRegistration();
-        if (!reg) {
-            reg = await navigator.serviceWorker.register('./sw.js');
-            await new Promise(r => setTimeout(r, 300)); // gi SW et lite øyeblikk
-        }
-
-        // be om tillatelse
-        const perm = await Notification.requestPermission();
-        if (perm !== "granted") return alert("Du må tillate varsler for å aktivere push.");
-
-        // hent token fra FCM – vi gjenbruker din sw.js
-        const messaging = firebase.messaging();
-        const token = await messaging.getToken({
-            vapidKey: VAPID_PUBLIC_KEY,
-            serviceWorkerRegistration: reg
-        });
-        if (!token) throw new Error("Fikk ikke FCM token.");
-
-        // lagre token under bruker
-        const u = fb.auth.currentUser;
-        if (u) {
-            await fb.db.collection("users").doc(u.uid)
-                .collection("webPushTokens").doc(token)
-                .set({ token, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-        }
-
-        // foreground-meldinger
-        messaging.onMessage(({ notification }) => {
-            if (!notification) return;
-            new Notification(notification.title || "PageBud", {
-                body: notification.body || "",
-                icon: "/icons/icon-192.png"
-            });
-        });
-
-        alert("Push aktivert ✅");
-        console.log("[FCM] token", token);
-    } catch (e) {
-        console.error("[FCM] error", e);
-        alert("Push feilet – " + (e && e.message ? e.message : e));
+    // Guard if Firebase Messaging isn’t available
+    if (!window.firebase?.messaging) {
+        console.info("[Engagement] Firebase messaging not loaded on this page.");
+        return;
     }
-}
+
+    // Reference to Firebase Messaging
+    const messaging = firebase.messaging();
+
+    /**
+     * Ask permission from the user and get a token
+     */
+    async function requestPermission() {
+        try {
+            console.log("[Engagement] Requesting notification permission...");
+            const status = await Notification.requestPermission();
+            if (status !== "granted") throw new Error("Permission not granted for Notifications");
+
+            const token = await messaging.getToken({
+                vapidKey: "YOUR_PUBLIC_VAPID_KEY" // replace with your own if set up
+            });
+
+            if (!token) throw new Error("No registration token received");
+
+            console.log("[Engagement] Token received:", token);
+
+            // Save to Firestore under user profile if logged in
+            if (window.fb?.auth?.currentUser) {
+                const uid = fb.auth.currentUser.uid;
+                await fb.db.collection("users").doc(uid).set(
+                    { fcmToken: token, fcmUpdated: Date.now() },
+                    { merge: true }
+                );
+                console.log("[Engagement] Token saved to Firestore.");
+            }
+
+            return token;
+        } catch (err) {
+            console.error("[Engagement] Error getting permission or token:", err);
+            throw err;
+        }
+    }
+
+    /**
+     * Hook up to global window for settings.js to call
+     */
+    window.pbEnablePush = async function () {
+        try {
+            const token = await requestPermission();
+            return "Push enabled ✓";
+        } catch (e) {
+            return "Push failed: " + (e.message || e);
+        }
+    };
+
+    // Foreground message handler
+    messaging.onMessage((payload) => {
+        console.log("[Engagement] Message received in foreground:", payload);
+
+        // Show a toast if available
+        if (window.pbToast) {
+            pbToast(payload?.notification?.title || "New message!");
+        } else {
+            alert(payload?.notification?.title || "New message!");
+        }
+    });
+})();

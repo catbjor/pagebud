@@ -1,131 +1,116 @@
-// /friends.js
-(function () {
-  const $ = (s, r = document) => r.querySelector(s);
+< !--Load the compat SDKs * before * firebase.js on each page-- >
+< !--
+< script src = "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js" ></script >
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>  <!--optional, only if you upload files-- >
+  -->
 
-  async function findUserByEmail(email) {
-    const q = await fb.db.collection("users").where("email", "==", email).limit(1).get();
-    if (q.empty) return null;
-    const d = q.docs[0]; return { uid: d.id, ...d.data() };
+< !-- 🔧 Inline config MUST be present on each page that loads firebase.js-- >
+< !--
+< script id = "pb-firebase-config" type = "application/json" >
+{
+  "apiKey": "AIzaSyCEV-dncbsQPn79p9AvF2_Re93L-VHN-2Cg",
+  "authDomain": "pagebud-cb6d9.firebaseapp.com",
+  "projectId": "pagebud-cb6d9",
+  "storageBucket": "pagebud-cb6d9.appspot.com",
+  "messagingSenderId": "974455288174",
+  "appId": "1:974455288174:web:84d8a2e424ca193391d17f",
+  "measurementId": "G-TK4VCBT1V9"
+}
+</script >
+  -->
+
+  <script>
+/* firebase.js — bootstrap Firebase compat + helpers
+    Requires:
+    - compat SDKs loaded before this file
+    - <script id="pb-firebase-config" type="application/json"> on the page
+      Exposes:
+      - window.fb = {app, auth, db, storage ? }
+      - window.requireAuth(callback)
+      - dispatches: document event "pb:fbReady" with {app, auth, db, storage}
+      */
+
+      (function () {
+        "use strict";
+
+      // Prevent double-initialize if included twice
+      if (window.fb && window.fb.__ready) {
+    // Already initialized; still emit ready event for late listeners
+    try {
+        document.dispatchEvent(new CustomEvent("pb:fbReady", { detail: { ...window.fb } }));
+    } catch { }
+      return;
   }
 
-  async function sendRequest(toEmail) {
-    const me = fb.auth.currentUser; if (!me) return { ok: false, msg: "Not signed in" };
-    const to = await findUserByEmail(toEmail);
-    if (!to) return { ok: false, msg: "User not found" };
-    if (to.uid === me.uid) return { ok: false, msg: "That's you 😅" };
+      // Compat SDK guard
+      if (!window.firebase || !firebase.app) {
+        console.error("[firebase.js] Firebase compat SDKs not loaded before firebase.js.");
+      return;
+  }
 
-    // Lag en request under mottaker
-    await fb.db.collection("users").doc(to.uid).collection("requests").doc(me.uid).set({
-      fromUid: me.uid,
-      fromEmail: me.email || "",
-      fromName: me.displayName || (me.email || "").split("@")[0],
-      at: firebase.firestore.FieldValue.serverTimestamp()
+      // Read inline config
+      let cfg = null;
+      try {
+    const node = document.getElementById("pb-firebase-config");
+      if (!node) throw new Error("Missing <script id='pb-firebase-config' type='application/json'> on page.");
+        cfg = JSON.parse(node.textContent.trim() || "{ }");
+  } catch (e) {
+          console.error("[firebase.js] Failed to parse pb-firebase-config:", e);
+        return;
+  }
+
+        // Initialize app (no-op if already initialized elsewhere)
+        try {
+    if (!firebase.apps.length) {
+          firebase.initializeApp(cfg);
+    }
+  } catch (e) {
+          console.error("[firebase.js] initializeApp failed:", e);
+        return;
+  }
+
+        // Build helpers (storage is optional — only if SDK present)
+        const app = firebase.app();
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const storage = (firebase.storage ? firebase.storage() : undefined);
+
+        // Lightweight gate for authed pages (redirects to auth.html if not signed in)
+        function requireAuth(onReady) {
+    if (!auth || typeof auth.onAuthStateChanged !== "function") {
+          console.error("[firebase.js] Auth not available.");
+      return () => { };
+    }
+    return auth.onAuthStateChanged((user) => {
+      if (user) {
+        try {onReady(user); } catch (e) {console.error("[requireAuth] callback error:", e); }
+      } else {
+          // Redirect to sign-in
+          location.href = "auth.html";
+      }
     });
-    // marker som outgoing hos meg
-    await fb.db.collection("users").doc(me.uid).collection("outgoing").doc(to.uid).set({
-      toUid: to.uid,
-      toEmail: to.email || "",
-      toName: to.displayName || (to.email || "").split("@")[0],
-      at: firebase.firestore.FieldValue.serverTimestamp()
-    });
-
-    return { ok: true, msg: "Request sent ✓" };
   }
 
-  async function accept(uid) {
-    const me = fb.auth.currentUser;
-    const myRef = fb.db.collection("users").doc(me.uid);
-    const frRef = fb.db.collection("users").doc(uid);
-
-    // toveis vennskap
-    await myRef.collection("friends").doc(uid).set({ since: firebase.firestore.FieldValue.serverTimestamp() });
-    await frRef.collection("friends").doc(me.uid).set({ since: firebase.firestore.FieldValue.serverTimestamp() });
-
-    // rydde requests
-    await myRef.collection("requests").doc(uid).delete().catch(() => { });
-  }
-
-  async function removeFriend(uid) {
-    const me = fb.auth.currentUser;
-    await fb.db.collection("users").doc(me.uid).collection("friends").doc(uid).delete();
-    await fb.db.collection("users").doc(uid).collection("friends").doc(me.uid).delete();
-  }
-
-  function renderIncoming(root, list) {
-    if (!list.length) { root.innerHTML = `<div class="muted">No requests</div>`; return; }
-    root.innerHTML = list.map(x => `
-      <div class="card" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
-        <div><b>${x.fromName || x.fromEmail}</b><div class="muted" style="font-size:.85rem">${x.fromEmail}</div></div>
-        <div style="display:flex;gap:8px">
-          <button class="btn btn-primary" data-acc="${x.fromUid}">Accept</button>
-          <button class="btn btn-secondary" data-dec="${x.fromUid}">Decline</button>
-        </div>
-      </div>
-    `).join("");
-
-    root.querySelectorAll("[data-acc]").forEach(b => b.addEventListener("click", async () => {
-      await accept(b.dataset.acc);
-    }));
-    root.querySelectorAll("[data-dec]").forEach(b => b.addEventListener("click", async () => {
-      const me = fb.auth.currentUser;
-      await fb.db.collection("users").doc(me.uid).collection("requests").doc(b.dataset.dec).delete();
-    }));
-  }
-
-  function renderFriends(root, list) {
-    if (!list.length) { root.innerHTML = `<div class="muted">No friends yet</div>`; return; }
-    root.innerHTML = list.map(x => `
-      <div class="card" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
-        <div><b>${x.name}</b><div class="muted" style="font-size:.85rem">${x.email || ""}</div></div>
-        <button class="btn btn-secondary" data-rem="${x.uid}">Remove</button>
-      </div>
-    `).join("");
-
-    root.querySelectorAll("[data-rem]").forEach(b => b.addEventListener("click", async () => {
-      if (!confirm("Remove friend?")) return;
-      await removeFriend(b.dataset.rem);
-    }));
-  }
-
-  window.startFriends = function () {
-    const email = $("#friend-email");
-    const sendBtn = $("#send-req");
-    const status = $("#req-status");
-    const incoming = $("#incoming");
-    const list = $("#friend-list");
-
-    sendBtn.addEventListener("click", async () => {
-      const v = (email.value || "").trim().toLowerCase();
-      if (!v) return;
-      status.textContent = "Sending …";
-      const res = await sendRequest(v);
-      status.textContent = res.msg;
-      if (res.ok) email.value = "";
-    });
-
-    // live requests
-    const me = fb.auth.currentUser;
-    fb.db.collection("users").doc(me.uid).collection("requests")
-      .orderBy("at", "desc")
-      .onSnapshot(s => {
-        const arr = []; s.forEach(d => arr.push({ id: d.id, ...d.data() }));
-        renderIncoming(incoming, arr);
-      });
-
-    // live friends
-    fb.db.collection("users").doc(me.uid).collection("friends")
-      .onSnapshot(async s => {
-        const ids = []; s.forEach(d => ids.push(d.id));
-        if (!ids.length) { renderFriends(list, []); return; }
-
-        // hent navn/email for visning
-        const out = [];
-        for (const uid of ids) {
-          const doc = await fb.db.collection("users").doc(uid).get();
-          const d = doc.data() || {};
-          out.push({ uid, name: d.displayName || (d.email || "").split("@")[0], email: d.email || "" });
-        }
-        renderFriends(list, out);
-      });
+        // Publish fb global
+        window.fb = {
+          app,
+          auth,
+          db,
+          storage,
+          requireAuth,
+          __ready: true
   };
+
+        // Signal ready (for pages that wait for fb)
+        try {
+          document.dispatchEvent(new CustomEvent("pb:fbReady", {
+            detail: { app, auth, db, storage }
+          }));
+  } catch { }
+
+  // Optional: log minimal info in dev
+  // console.log("[firebase.js] Ready:", app.name, app.options.projectId);
 })();
+      </script>

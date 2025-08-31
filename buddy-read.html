@@ -4,21 +4,56 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Buddy Read - PageBud</title>
+  <title>Buddy Read – PageBud</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <!-- Put this inline snippet in the <head> of EVERY page BEFORE style.css -->
+  <script>
+    (function () {
+      // Apply immediately to avoid FOUC
+      function resolve(raw) {
+        if (raw === "system") {
+          return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        }
+        return raw || "default";
+      }
+      var raw = localStorage.getItem("pb:theme") || "default";
+      document.documentElement.setAttribute("data-theme", resolve(raw));
+      document.documentElement.setAttribute("data-tone", "pastel");
+    }());
+  </script>
+
   <link rel="stylesheet" href="style.css" />
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#111111" />
+  <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("pb:theme") || "default");</script>
+
+  <!-- Firebase compat SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+
+  <script src="firebase-config.js"></script>
+  <script src="firebase-init.js?v=dev-1"></script>
+  <script src="profiles.js"></script>
   <script>
-    document.documentElement.setAttribute('data-theme', localStorage.getItem('pb:theme') || 'default');
+    window.__PB_FIREBASE = {
+      apiKey: "AIzaSyCEV-dncbQSnP7q9AvF2_Re93l-VHN-2cg",
+      authDomain: "pagebud-cb6d9.firebaseapp.com",
+      projectId: "pagebud-cb6d9",
+      storageBucket: "pagebud-cb6d9.firebasestorage.app",
+      messagingSenderId: "974455288174",
+      appId: "1:974455288174:web:84d8a2e442ca193391d17f",
+      measurementId: "G-TK4VCBT1V9"
+    };
   </script>
 </head>
 
-<body>
+<body class="no-bottom-nav">
   <div class="app-container">
     <div class="header">
       <h1>Buddy Read</h1>
-      <div class="back-button" onclick="location.href='index.html'"><i class="fas fa-arrow-left"></i></div>
+      <!-- header actions injiseres av nav.js -->
     </div>
 
     <div class="content-wrapper">
@@ -95,34 +130,19 @@
         </div>
       </div>
     </div>
-
-    <nav class="bottom-nav">
-      <div class="nav-item" onclick="location.href='index.html'"><i class="fas fa-book"></i>Library</div>
-      <div class="nav-item" onclick="location.href='stats.html'"><i class="fas fa-chart-line"></i>Stats</div>
-      <div class="nav-item active"><i class="fas fa-users"></i>Buddy Read</div>
-      <div class="nav-item" onclick="location.href='settings.html'"><i class="fas fa-cog"></i>Settings</div>
-    </nav>
+    <!-- bottom-nav er deaktivert pga .no-bottom-nav -->
   </div>
 
-  <!-- Firebase + app -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-  <script src="firebase-init.js"></script>
-  <script src="sync.js"></script>
-
-  <!-- Chat glue (lokalt per bruker, som i din fil) -->
+  <!-- Page scripts -->
   <script src="buddy-chat.js"></script>
+  <script src="nav.js" defer></script>
+  <script src="timer.js" defer></script>
 
-  <script src="script.js"></script>
   <script>
-    requireAuth(async () => {
-      PBSync.subscribe();
-      await PBSync.pushAll();
+    requireAuth(async (user) => {
+      // init for buddy chat om ønskelig
     });
   </script>
-  <script src="script.js?v=2025-08-29-30"></script>
-  <script src="reader-init.js?v=2025-08-29-30"></script>
 </body>
 
 </html>

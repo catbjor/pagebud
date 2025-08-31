@@ -2,77 +2,118 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>Friends – PageBud</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-    <link rel="stylesheet" href="style.css?v=2025-08-28-30" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Friends – PageBud</title>
+  <!-- Put this inline snippet in the <head> of EVERY page BEFORE style.css -->
+  <script>
+    (function () {
+      // Apply immediately to avoid FOUC
+      function resolve(raw) {
+        if (raw === "system") {
+          return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        }
+        return raw || "default";
+      }
+      var raw = localStorage.getItem("pb:theme") || "default";
+      document.documentElement.setAttribute("data-theme", resolve(raw));
+      document.documentElement.setAttribute("data-tone", "pastel");
+    }());
+  </script>
+
+  <link rel="stylesheet" href="style.css" />
+  <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('pb:theme') || 'default');</script>
+
+  <!-- 1) Firebase compat SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+
+  <script src="firebase-config.js"></script>
+  <script src="firebase-init.js?v=dev-1"></script>
+  <script src="profiles.js"></script>
+  <script src="social.js"></script>
+
+  <!-- 2) 🔧 Inline config -->
+  <script>
+
+    window.__PB_FIREBASE = {
+      apiKey: "AIzaSyCEV-dncbQSnP7q9AvF2_Re93l-VHN-2cg",
+      authDomain: "pagebud-cb6d9.firebaseapp.com",
+      projectId: "pagebud-cb6d9",
+      storageBucket: "pagebud-cb6d9.firebasestorage.app",
+      messagingSenderId: "974455288174",
+      appId: "1:974455288174:web:84d8a2e442ca193391d17f",
+      measurementId: "G-TK4VCBT1V9"
+    };
+  </script>
+
 </head>
 
 <body>
-    <div class="app-container">
-        <div class="header">
-            <h1>Friends</h1>
-            <div class="back-button" onclick="location.href='index.html'"><i class="fas fa-arrow-left"></i></div>
-        </div>
-
-        <div class="content-wrapper">
-            <div class="stats-section">
-                <div class="section-header">
-                    <div class="section-title"><i class="fa-solid fa-user-plus"></i><span>Add a friend</span></div>
-                </div>
-                <div class="form-group">
-                    <label for="friend-email">By email (must be a PageBud user)</label>
-                    <input id="friend-email" class="form-control" placeholder="friend@example.com" />
-                </div>
-                <button id="send-req" class="btn btn-primary full-width">Send request</button>
-                <div id="req-status" class="muted" style="margin-top:8px"></div>
-            </div>
-
-            <div class="stats-section">
-                <div class="section-header">
-                    <div class="section-title"><i class="fa-solid fa-inbox"></i><span>Requests</span></div>
-                </div>
-                <div id="incoming"></div>
-            </div>
-
-            <div class="stats-section">
-                <div class="section-header">
-                    <div class="section-title"><i class="fa-solid fa-user-group"></i><span>Your friends</span></div>
-                </div>
-                <div id="friend-list"></div>
-            </div>
-        </div>
-
-        <nav class="bottom-nav">
-            <div class="nav-item" onclick="location.href='index.html'"><i class="fas fa-book"></i> Library</div>
-            <div class="nav-item" onclick="location.href='discover.html'"><i class="fas fa-compass"></i> Discover</div>
-            <div class="nav-item active"><i class="fas fa-users"></i> Friends</div>
-            <div class="nav-item" onclick="location.href='settings.html'"><i class="fas fa-cog"></i> Settings</div>
-        </nav>
+  <div class="app-container">
+    <div class="header">
+      <h1>Friends</h1>
+      <div class="back-button" onclick="location.href='index.html'"><i class="fas fa-arrow-left"></i></div>
     </div>
 
-    <!-- Firebase -->
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-    <!-- (legg til messaging-compat der du trenger web push) -->
-    <script src="firebase-init.js"></script>
+    <header class="header">
+      <h1>Friends</h1>
+      <div class="header-actions">
+        <button class="back-fab" style="position:static" onclick="history.back()" title="Back">
+          <i class="fa-solid fa-arrow-left"></i>
+        </button>
+      </div>
+    </header>
+    <script src="nav.js" defer></script>
 
-    <script src="firebase-init.js"></script>
-    <script src="friends.js"></script>
-    <script> requireAuth(() => startFriends()); </script>
-    <script src="firebase-init.js"></script>
-    <script src="sync.js"></script>
-    <script>
-        requireAuth(async (user) => {
-            PBSync.subscribe();
-            await PBSync.pushAll();
-        });
-    </script>
-    <script src="script.js?v=2025-08-29-30"></script>
-    <script src="reader-init.js?v=2025-08-29-30"></script>
 
+    <div class="content-wrapper">
+      <div class="stats-section">
+        <div class="section-header">
+          <div class="section-title"><i class="fa-solid fa-user-plus"></i><span>Add a friend</span></div>
+        </div>
+        <div class="form-group"><label>Email</label><input id="friend-email" class="form-control"
+            placeholder="friend@example.com" /></div>
+        <button id="send-req" class="btn btn-primary full-width">Send request</button>
+        <div id="req-status" class="muted" style="margin-top:8px"></div>
+      </div>
+
+      <div class="stats-section">
+        <div class="section-header">
+          <div class="section-title"><i class="fa-solid fa-inbox"></i><span>Requests</span></div>
+        </div>
+        <div id="incoming"></div>
+      </div>
+
+      <div class="stats-section">
+        <div class="section-header">
+          <div class="section-title"><i class="fa-solid fa-user-group"></i><span>Your friends</span></div>
+        </div>
+        <div id="friend-list"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="sync.js"></script>
+  <script src="friends.js"></script>
+  <script>
+    requireAuth(async (user) => {
+      if (window.PBSync) { PBSync.subscribe(); await PBSync.pushAll(); }
+      startFriends && startFriends();
+    });
+  </script>
+  <script>
+    requireAuth(async (user) => {
+      // her er du garantert innlogget og fb.auth/fb.db finnes
+      // last data / start lyttere
+    });
+  </script>
+  <script>
+    requireAuth(() => startFriends && startFriends());
+  </script>
 </body>
 
 </html>

@@ -6,40 +6,47 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>PageBud</title>
 
-  <!-- Styles -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-  <link rel="stylesheet" href="style.css?v=2025-08-29-31" />
+  <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("pb:theme") || "default");</script>
+  <!-- Put this inline snippet in the <head> of EVERY page BEFORE style.css -->
+  <script>
+    (function () {
+      // Apply immediately to avoid FOUC
+      function resolve(raw) {
+        if (raw === "system") {
+          return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        }
+        return raw || "default";
+      }
+      var raw = localStorage.getItem("pb:theme") || "default";
+      document.documentElement.setAttribute("data-theme", resolve(raw));
+      document.documentElement.setAttribute("data-tone", "pastel");
+    }());
+  </script>
 
-  <!-- PWA -->
-  <link rel="manifest" href="manifest.json" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <link rel="apple-touch-icon" href="icons/icon-192.png" />
-  <meta name="theme-color" content="#111111" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- Firebase compat SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+
+  <script src="firebase-config.js"></script>
+  <script src="firebase-init.js"></script>
 </head>
 
 <body>
   <div class="app-container">
-
-    <!-- Header -->
     <header class="header">
       <h1>PageBud</h1>
-      <div style="display:flex;gap:8px">
-        <button class="back-button" onclick="location.href='discover.html'" title="Discover">
-          <i class="fa-solid fa-compass"></i>
-        </button>
-        <button class="back-button" onclick="location.href='friends.html'" title="Friends">
-          <i class="fa-solid fa-user-group"></i>
-        </button>
-      </div>
+      <div class="header-actions"></div>
     </header>
 
-    <!-- Search -->
-    <div class="categories" style="border-top:1px solid var(--border); padding-top:12px;">
+    <div class="categories" style="border-top:1px solid var(--border);padding-top:12px;">
       <input id="search-input" class="form-control" placeholder="Search by title or author…" />
     </div>
 
-    <!-- Filter chips -->
     <div class="categories scroll-x" id="filter-chips">
       <div class="category active" data-filter="all">All Books</div>
       <div class="category" data-filter="favorites">Favorites</div>
@@ -51,7 +58,6 @@
       <div class="category" data-filter="wishlist">Wishlist</div>
     </div>
 
-    <!-- Discover / Friends short-cuts -->
     <div class="categories promo-row" style="gap:12px">
       <div class="btn btn-secondary" style="flex:1" onclick="location.href='discover.html'">
         <div style="font-weight:800">Discover</div>
@@ -63,64 +69,41 @@
       </div>
     </div>
 
-    <!-- Library -->
     <section class="library">
       <h2>My Library</h2>
       <div id="empty-state" class="empty-state" style="display:none">
         <div class="empty-icon"><i class="fas fa-book-open"></i></div>
-        <h3>Oh-oh! Your library is empty…</h3>
+        <h3>Your library is empty…</h3>
         <p>Add your first book to get started</p>
       </div>
       <div id="book-grid" class="book-grid"></div>
     </section>
 
-    <!-- Friends feed -->
     <section class="library">
       <h2>Friends activity</h2>
       <div id="friends-feed" class="card" style="padding:12px"></div>
     </section>
 
-    <!-- FAB -->
-    <button id="add-book-btn" class="add-book" title="Add Book" aria-label="Add Book">
+    <button id="add-book-btn" class="add-book" type="button" aria-label="Add Book" title="Add Book"
+      onclick="location.href='add-book.html'">
       <i class="fas fa-plus"></i>
     </button>
-
-    <!-- Bottom Nav -->
-    <nav class="bottom-nav">
-      <div class="nav-item active"><i class="fas fa-book"></i> Library</div>
-      <div class="nav-item" onclick="location.href='stats.html'"><i class="fas fa-chart-line"></i> Stats</div>
-      <div class="nav-item" onclick="location.href='buddy-read.html'"><i class="fas fa-users"></i> Buddy Read</div>
-      <div class="nav-item" onclick="location.href='settings.html'"><i class="fas fa-cog"></i> Settings</div>
-    </nav>
   </div>
 
-  <!-- App logic (må lastes FØR Firebase for å kunne koble hendelser etc.) -->
-  <script src="script.js?v=2025-08-29-32"></script>
-
-  <!-- Firebase (compat) -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-
-  <!-- Init + Sync (definerer window.fb, requireAuth, PBSync) -->
-  <script src="firebase-init.js"></script>
-  <script src="sync.js"></script>
-
-  <!-- Friends feed (leser fra Firestore etter at fb/PBSync finnes) -->
+  <!-- Scripts -->
+  <script src="reset-utils.js"></script>
+  <script src="nav.js" defer></script>
+  <!-- Feed + aktivitet -->
+  <script src="profiles.js"></script>
+  <script src="activity.js"></script>
   <script src="social-feed.js"></script>
-
-  <!-- Kjør først når alt over er lastet -->
+  <script src="script.js"></script>
+  <script src="timer.js" defer></script>
   <script>
-    requireAuth(async () => {
-      if (window.PBSync) {
-        PBSync.subscribe();
-        await PBSync.pushAll();
-      }
-      if (typeof startSocialFeed === "function") {
-        startSocialFeed();
-      }
-    });
+    // Start feeden når brukeren er innlogget
+    requireAuth(() => startSocialFeed && startSocialFeed());
   </script>
+
 </body>
 
 </html>

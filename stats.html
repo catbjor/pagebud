@@ -2,42 +2,57 @@
 <html lang="en">
 
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Stats – PageBud</title>
-  <link rel="stylesheet" href="style.css">
-  <!-- Firebase (if you want cloud later on this page too) -->
+  <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("pb:theme") || "default");</script>
+  <!-- Put this inline snippet in the <head> of EVERY page BEFORE style.css -->
+  <script>
+    (function () {
+      // Apply immediately to avoid FOUC
+      function resolve(raw) {
+        if (raw === "system") {
+          return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        }
+        return raw || "default";
+      }
+      var raw = localStorage.getItem("pb:theme") || "default";
+      document.documentElement.setAttribute("data-theme", resolve(raw));
+      document.documentElement.setAttribute("data-tone", "pastel");
+    }());
+  </script>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link rel="stylesheet" href="style.css" />
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-  <!-- (legg til messaging-compat der du trenger web push) -->
+  <script src="firebase-config.js"></script>
   <script src="firebase-init.js"></script>
-
+  <script src="profiles.js"></script>
 </head>
 
 <body>
   <div class="app-container">
-    <div class="stats-header">
-      <div class="back-button" onclick="location.href='index.html'"><i class="fas fa-arrow-left"></i></div>
+    <header class="header">
       <h1>Stats</h1>
-      <div style="width:32px;"></div>
-    </div>
+      <div style="display:flex;gap:8px">
+        <button class="back-button" id="btnQuickReset" title="Reset caches"><i class="fa-solid fa-rotate"></i></button>
+      </div>
+    </header>
 
-    <!-- JS will render content inside here -->
-    <div class="content-wrapper"></div>
-
-    <nav class="bottom-nav">
-      <div class="nav-item" onclick="location.href='index.html'"><i class="fas fa-book"></i> Library</div>
-      <div class="nav-item active"><i class="fas fa-chart-line"></i> Stats</div>
-      <div class="nav-item" onclick="location.href='buddy-read.html'"><i class="fas fa-users"></i> Buddy Read</div>
-      <div class="nav-item" onclick="location.href='settings.html'"><i class="fas fa-cog"></i> Settings</div>
-    </nav>
+    <!-- keep your existing stats layout or the one we built earlier -->
+    <section class="card" style="margin:16px">
+      <div id="statsMount">Loading…</div>
+    </section>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js" defer></script>
-  <script src="script.js"></script>
-  <script src="script.js?v=2025-08-29-30"></script>
-  <script src="reader-init.js?v=2025-08-29-30"></script>
+  <script src="stats.js"></script>
+  <script src="nav.js" defer></script>
 </body>
 
 </html>

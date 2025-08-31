@@ -1,121 +1,132 @@
-/* =========================================================
-   PageBud — EPUB Reader Themes (light/dark) + toggle button
-   ---------------------------------------------------------
-   Bruk:
-   1) Etter at du har laget ePub.js `rendition`, kall:
-        window.PBReaderTheme.attach(rendition, { mount: '#reader-toolbar' })
-      - Hvis du ikke har #reader-toolbar, dropp mount: knappen flyter øverst til høyre.
-
-   2) Leser tema huskes i localStorage: key "pb:reader:theme"
-   ========================================================= */
-
+/* reader-theme.js
+   Sync EPUB reader appearance with app theme (pb:theme)
+   Works with epub.js v0.3.x
+*/
 (function () {
-    const STORAGE_KEY = "pb:reader:theme";
-    const THEME_LIGHT = "pb-light";
-    const THEME_DARK = "pb-dark";
+    "use strict";
 
-    // ePub.js CSS-objekter
-    const PB_LIGHT = {
-        "html, body": { "background": "#FFFFFF", "color": "#161616" },
-        "p, h1, h2, h3, h4, h5, h6, li, blockquote": { "color": "#161616", "line-height": "1.6" },
-        "a": { "color": "#243b7a" }
-    };
-    const PB_DARK = {
-        "html, body": { "background": "#161616", "color": "#FFFFFF" },
-        "p, h1, h2, h3, h4, h5, h6, li, blockquote": { "color": "#FFFFFF", "line-height": "1.6" },
-        "a": { "color": "#9bb5ff" }
+    const STATE = {
+        rendition: null,
+        fontPercent: Number(localStorage.getItem("pb:reader:font") || "100"), // base 100%
     };
 
-    function createButton() {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.id = "pb-reader-theme-toggle";
-        btn.textContent = "Aa";
-        btn.title = "Toggle light/dark";
-        btn.setAttribute("aria-label", "Toggle light/dark");
+    // --- Map app theme -> reader base theme ---
+    function mapAppThemeToReader(appTheme) {
+        // app themes you already support in style.css
+        // map them to a small set epub theme ids: 'light' | 'dark' | 'sepia'
+        const t = (appTheme || localStorage.getItem("pb:theme") || "default").toLowerCase();
 
-        // Enkel, mørk stil. Endre farger om du vil.
-        btn.style.cssText = `
-      display:inline-flex; align-items:center; justify-content:center;
-      width:38px; height:32px; border-radius:8px;
-      border:1px solid #2a3244; background:#0f1625; color:#cbd5e1;
-      font-weight:700; cursor:pointer; user-select:none;
-    `;
-        return btn;
+        if (t === "sepia") return "sepia";
+        if (t === "dark" || t === "amoled" || t === "goth") return "dark";
+        // everything else -> light
+        return "light";
     }
 
-    function applyButtonStyleFor(theme, btn) {
-        if (!btn) return;
-        if (theme === THEME_DARK) {
-            btn.style.background = "#243b7a";
-            btn.style.borderColor = "#3852a3";
-            btn.style.color = "#ffffff";
-        } else {
-            btn.style.background = "#0f1625";
-            btn.style.borderColor = "#2a3244";
-            btn.style.color = "#cbd5e1";
+    // --- EPUB CSS themes (reader content) ---
+    // These only affect the book iframe (rendition), not your outer UI.
+    const EPUB_THEMES = {
+        light: {
+            "body": {
+                "background": "#ffffff !important",
+                "color": "#1f2937 !important",
+                "line-height": "1.6",
+                "font-family": "system-ui, -apple-system, Segoe UI, Inter, Roboto, Arial, sans-serif"
+            },
+            "img": { "max-width": "100%", "height": "auto" },
+            "a": { "color": "#1d4ed8" }
+        },
+        dark: {
+            "body": {
+                "background": "#0f0f10 !important",
+                "color": "#e5e7eb !important",
+                "line-height": "1.6",
+                "font-family": "system-ui, -apple-system, Segoe UI, Inter, Roboto, Arial, sans-serif"
+            },
+            "img": { "max-width": "100%", "height": "auto", "filter": "brightness(0.92)" },
+            "a": { "color": "#93c5fd" }
+        },
+        sepia: {
+            "body": {
+                "background": "#f5efe6 !important",
+                "color": "#3e2f22 !important",
+                "line-height": "1.7",
+                "font-family": "Georgia, 'Times New Roman', serif"
+            },
+            "img": { "max-width": "100%", "height": "auto" },
+            "a": { "color": "#7f5d3a" }
+        }
+    };
+
+    // Register & apply theme to rendition
+    function applyReaderTheme(rendition) {
+        if (!rendition) return;
+        // register once (idempotent)
+        try {
+            rendition.themes.register("light", EPUB_THEMES.light);
+            rendition.themes.register("dark", EPUB_THEMES.dark);
+            rendition.themes.register("sepia", EPUB_THEMES.sepia);
+        } catch (e) {
+            // no-op; epub.js may throw if re-registering—safe to ignore
+        }
+
+        const appTheme = localStorage.getItem("pb:theme") || "default";
+        const readerTheme = mapAppThemeToReader(appTheme);
+        rendition.themes.select(readerTheme);
+
+        // apply font scale
+        setFontScale(STATE.fontPercent);
+    }
+
+    function setFontScale(percent) {
+        STATE.fontPercent = Math.max(60, Math.min(200, Math.round(percent || 100))); // clamp 60–200%
+        localStorage.setItem("pb:reader:font", String(STATE.fontPercent));
+        if (STATE.rendition) {
+            STATE.rendition.themes.fontSize(STATE.fontPercent + "%");
         }
     }
 
-    function mountFloating(btn) {
-        // flytende øverst til høyre om ingen mount finnes
-        const wrap = document.createElement("div");
-        wrap.style.cssText = `
-      position:fixed; top:12px; right:12px; z-index:9999; 
-      display:flex; gap:8px; background:transparent;
-    `;
-        wrap.appendChild(btn);
-        document.body.appendChild(wrap);
-        return wrap;
+    function increaseFont(step = 10) {
+        setFontScale(STATE.fontPercent + step);
+    }
+    function decreaseFont(step = 10) {
+        setFontScale(STATE.fontPercent - step);
     }
 
-    window.PBReaderTheme = {
-        attach(rendition, opts = {}) {
-            if (!rendition) {
-                console.warn("[PBReaderTheme] rendition mangler");
-                return;
+    // Public API
+    const API = {
+        /**
+         * Initialize reader theme with an epub.js rendition
+         * call after: const rendition = book.renderTo('#viewer', { ... })
+         */
+        init(rendition) {
+            STATE.rendition = rendition;
+            // apply immediately when displayed
+            if (rendition.book) {
+                // when new spine items load
+                rendition.hooks && rendition.hooks.content && rendition.hooks.content.register(() => {
+                    // ensure theme persists across chapters
+                    applyReaderTheme(rendition);
+                });
             }
+            applyReaderTheme(rendition);
+        },
 
-            // Registrer temaer
-            rendition.themes.register(THEME_LIGHT, PB_LIGHT);
-            rendition.themes.register(THEME_DARK, PB_DARK);
+        /** Re-apply based on current pb:theme */
+        applyFromApp() {
+            applyReaderTheme(STATE.rendition);
+        },
 
-            // Velg lagret tema (default: lys)
-            const saved = localStorage.getItem(STORAGE_KEY) || THEME_LIGHT;
-            rendition.themes.select(saved);
-
-            // Lag/monter knapp
-            const btn = createButton();
-            let mount;
-            if (opts.mount) {
-                mount = (typeof opts.mount === "string") ? document.querySelector(opts.mount) : opts.mount;
-                if (!mount) mount = mountFloating(btn);
-                else mount.appendChild(btn);
-            } else {
-                mount = mountFloating(btn);
-            }
-            applyButtonStyleFor(saved, btn);
-
-            // Toggle
-            function toggle() {
-                const current = (rendition.themes._current || THEME_LIGHT);
-                const next = current === THEME_LIGHT ? THEME_DARK : THEME_LIGHT;
-                rendition.themes.select(next);
-                localStorage.setItem(STORAGE_KEY, next);
-                applyButtonStyleFor(next, btn);
-            }
-            btn.addEventListener("click", toggle);
-            window.addEventListener("keydown", (e) => {
-                if (e.key.toLowerCase() === "t") toggle();
-            });
-
-            // Eksponér for ev. andre kontroller
-            window.__pbSetReaderTheme = (name) => {
-                if (![THEME_LIGHT, THEME_DARK].includes(name)) return;
-                rendition.themes.select(name);
-                localStorage.setItem(STORAGE_KEY, name);
-                applyButtonStyleFor(name, btn);
-            };
-        }
+        /** Font controls */
+        increaseFont,
+        decreaseFont,
+        setFont: setFontScale
     };
+
+    // Listen for global theme changes triggered by settings.js
+    document.addEventListener("pb:themeChanged", () => {
+        API.applyFromApp();
+    });
+
+    // Expose
+    window.PBReaderTheme = API;
 })();

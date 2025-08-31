@@ -1,352 +1,328 @@
-// discover.js – Discover with curated shelves + add-to-library
-// Uses Open Library search API. Self-contained local storage helpers included.
+// discover.js
+// Lightweight Discover page: Open Library search + subjects with infinite scroll.
+// Optional: “Add to Library” (Firestore) when fb/auth is present.
 
-// ------------------ Config ------------------
-const GENRES = [
-    "All genres", "Romance", "Fantasy", "Mystery", "Horror", "Science fiction",
-    "Young adult", "Historical fiction", "Thriller", "Nonfiction", "Poetry", "Comics"
-];
+(() => {
+    "use strict";
+    const $ = (s, r = document) => r.querySelector(s);
 
-// Curated shelves: each entry resolves to an array of Open Library fetches merged & de-duped.
-const CURATED = {
-    "Popular on BookTok": {
-        // A pragmatic “BookTok-ish” set of titles/phrases frequently seen (not exhaustive/authoritative).
-        // We query each and merge results.
-        titles: [
-            "Fourth Wing", "Iron Flame", "A Court of Thorns and Roses", "It Ends With Us",
-            "The Seven Husbands of Evelyn Hugo", "The Song of Achilles", "Red, White & Royal Blue",
-            "The Love Hypothesis", "The Atlas Six", "The Cruel Prince", "From Blood and Ash",
-            "Legendborn", "We Were Liars", "The Invisible Life of Addie LaRue"
-        ],
-        limit: 24
-    },
-    "Dark Romance": {
-        subjects: ["Romance", "Dark Romance", "Erotic"], // OL doesn't always have "Dark Romance" as subject, mix with keyword
-        keywords: ["dark romance", "mafia romance", "billionaire romance", "forbidden love"],
-        limit: 24
-    },
-    "Cozy Fantasy": {
-        keywords: ["cozy fantasy", "found family fantasy", "slice of life fantasy", "tea shop fantasy"],
-        subjects: ["Fantasy"],
-        limit: 24
-    },
-    "Enemies to Lovers": {
-        keywords: ["enemies to lovers", "\"enemies-to-lovers\"", "rivals to lovers"],
-        subjects: ["Romance", "Young adult", "Fantasy"],
-        limit: 24
-    }
-};
-
-// ------------------ DOM ------------------
-const els = {
-    list: document.getElementById("results"),
-    g: document.getElementById("genreList"),
-    q: document.getElementById("q"),
-    qBtn: document.getElementById("qBtn"),
-    sortPopular: document.getElementById("sortPopular"),
-    sortNew: document.getElementById("sortNew"),
-};
-
-// Inject curated row below the sort pills
-(function injectCuratedRow() {
-    const main = document.querySelector(".disc-main");
-    if (!main || !els.sortPopular) return;
-    const sortRow = els.sortPopular.parentElement;
-    const row = document.createElement("div");
-    row.id = "curatedRow";
-    row.style.display = "flex";
-    row.style.flexWrap = "wrap";
-    row.style.gap = "8px";
-    row.style.margin = "6px 2px 12px";
-    row.innerHTML = Object.keys(CURATED)
-        .map(name => `<span class="pill curated" data-shelf="${name}">${name}</span>`)
-        .join("");
-    sortRow.insertAdjacentElement("afterend", row);
-})();
-
-// ------------------ Local helpers ------------------
-const LS_BOOKS = "pb:books";
-const nowIso = () => new Date().toISOString();
-
-function loadBooks() {
-    try { return JSON.parse(localStorage.getItem(LS_BOOKS) || "[]"); }
-    catch { return []; }
-}
-function saveBooks(arr) {
-    localStorage.setItem(LS_BOOKS, JSON.stringify(arr));
-    document.dispatchEvent(new CustomEvent("pb:booksSyncedLocal"));
-}
-function upsertBook(b) {
-    const arr = loadBooks();
-    if (!b.id) b.id = Math.random().toString(36).slice(2);
-    b.lastUpdated = nowIso();
-    const i = arr.findIndex(x => x.id === b.id);
-    if (i >= 0) arr[i] = b; else arr.push(b);
-    saveBooks(arr);
-    try { PBSync?.pushOne?.(b); } catch { }
-    return b.id;
-}
-
-function coverUrl(obj) {
-    const id = obj.cover_i || obj.cover_id;
-    return id ? `https://covers.openlibrary.org/b/id/${id}-M.jpg`
-        : "https://covers.openlibrary.org/b/id/240727-M.jpg";
-}
-function authorOf(b) {
-    return (b.author_name?.[0] || b.authors?.[0]?.name || "") + "";
-}
-function stableIdFromOL(b) {
-    // Prefer edition/record keys when present
-    const edKey = (b.cover_edition_key || (b.edition_key?.[0]));
-    const workKey = (b.key || "").replace(/^\/works\//, "");
-    return edKey ? `ol:ed:${edKey}` : (workKey ? `ol:work:${workKey}` : `ol:${(b.title || "")}:${authorOf(b)}`.toLowerCase().slice(0, 100));
-}
-function mapOLtoPB(b) {
-    return {
-        id: stableIdFromOL(b),
-        title: (b.title || "Untitled").slice(0, 140),
-        author: (authorOf(b) || "").slice(0, 120),
-        cover: coverUrl(b),
-        status: "want",
-        rating: 0,
-        genres: [],
-        moods: [],
-        tropes: [],
-        tags: [],
-        review: "",
-        notes: "",
-        quotes: [],
-        fileUrl: "",
-        fileName: "",
-        fileType: "",
-        lastUpdated: nowIso()
+    // ---- Config ----
+    const PAGE_SIZE = 20; // Open Library supports 'limit' with pagination via 'page'
+    const SUBJECT_MAP = {
+        Romance: "romance",
+        Fantasy: "fantasy",
+        Mystery: "mystery",
+        Horror: "horror",
+        "Sci-Fi": "science_fiction",
+        "YA": "young_adult",
+        Thriller: "thriller",
+        "Non-fiction": "nonfiction"
     };
-}
 
-// ------------------ Fetchers (Open Library) ------------------
-function setLoading() { els.list.innerHTML = `<div class="muted">Loading…</div>`; }
+    // ---- State ----
+    const state = {
+        mode: "subject",       // 'subject' | 'search'
+        subject: "romance",
+        query: "",
+        sort: "popular",       // 'popular' | 'new'
+        page: 1,
+        loading: false,
+        done: false
+    };
 
-async function olFetch(url) {
-    const r = await fetch(url);
-    if (!r.ok) throw new Error(`Fetch failed: ${r.status}`);
-    const j = await r.json();
-    return (j.docs || []).slice(0, 50);
-}
+    // ---- Helpers ----
+    const coverURL = (doc) => {
+        // Prefer cover_i; fall back to first edition cover if present
+        const id = doc.cover_i || (doc.cover_edition_key ? doc.cover_edition_key : null);
+        if (!id) return ""; // no cover
+        // For cover_i use /b/id/; for edition keys it's /b/olid/.. (but we only have id usually)
+        if (doc.cover_i) return `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg`;
+        return `https://covers.openlibrary.org/b/olid/${doc.cover_edition_key}-M.jpg`;
+    };
 
-async function fetchPopular(subject) { // many editions ≈ popularity proxy
-    const s = subject && subject !== "All genres" ? `&subject=${encodeURIComponent(subject)}` : "";
-    const url = `https://openlibrary.org/search.json?sort=editions&limit=30${s}`;
-    return olFetch(url).then(rows => rows.slice(0, 24));
-}
-async function fetchNewThisYear(subject) {
-    const year = new Date().getFullYear();
-    const s = subject && subject !== "All genres" ? `&subject=${encodeURIComponent(subject)}` : "";
-    const url = `https://openlibrary.org/search.json?published_in=${year}-${year}&limit=30${s}`;
-    return olFetch(url).then(rows => rows.slice(0, 24));
-}
-async function searchAny(q) {
-    const url = `https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=30`;
-    return olFetch(url).then(rows => rows.slice(0, 24));
-}
-
-async function fetchCurated(name) {
-    const spec = CURATED[name];
-    if (!spec) return [];
-    const tasks = [];
-
-    // Titles list → per-title search
-    if (spec.titles?.length) {
-        spec.titles.forEach(t => {
-            tasks.push(olFetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(t)}&limit=3`));
-        });
-    }
-    // Subject-weighted fetch
-    if (spec.subjects?.length) {
-        spec.subjects.forEach(s =>
-            tasks.push(olFetch(`https://openlibrary.org/search.json?sort=editions&limit=10&subject=${encodeURIComponent(s)}`)));
-    }
-    // Keyword searches
-    if (spec.keywords?.length) {
-        spec.keywords.forEach(k =>
-            tasks.push(olFetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(k)}&limit=10`)));
-    }
-
-    const chunks = await Promise.all(tasks);
-    const flat = chunks.flat();
-    // de-dup by our stableId
-    const seen = new Set();
-    const dedup = [];
-    for (const b of flat) {
-        const id = stableIdFromOL(b);
-        if (seen.has(id)) continue;
-        seen.add(id);
-        dedup.push(b);
-        if (spec.limit && dedup.length >= spec.limit) break;
-    }
-    return dedup;
-}
-
-// ------------------ Rendering ------------------
-function tile(b) {
-    const title = (b.title || "Untitled").slice(0, 140);
-    const author = authorOf(b).slice(0, 120);
-    const year = b.first_publish_year || b.first_publish_date || "";
-    const id = stableIdFromOL(b);
-
-    // inline-light actions UI; uses existing styles where possible
-    return `<div class="tile" data-olid="${id}">
-    <img class="cover" src="${coverUrl(b)}" alt="">
-    <div>
-      <div class="t">${title}</div>
-      <div class="a">${author}</div>
-      <div class="actions" style="margin-top:6px; display:flex; flex-wrap:wrap; gap:6px; align-items:center">
-        <select class="stSel" title="Status" style="padding:6px;border-radius:8px;border:1px solid var(--border);background:var(--card)">
-          <option value="want">TBR</option>
-          <option value="reading">Reading</option>
-          <option value="finished">Finished</option>
-          <option value="dnf">DNF</option>
-        </select>
-        <label style="font-size:.8rem;"><input type="checkbox" class="tgFav"> Favorite</label>
-        <label style="font-size:.8rem;"><input type="checkbox" class="tgOwned"> Owned</label>
-        <label style="font-size:.8rem;"><input type="checkbox" class="tgWish"> Wishlist</label>
-        <button class="btn addBtn" style="width:auto;padding:6px 10px">Save</button>
-      </div>
-    </div>
-    <div class="meta">${year ? `First published<br><b>${year}</b>` : ""}</div>
-  </div>`;
-}
-
-function bindTileEvents() {
-    document.querySelectorAll(".tile").forEach(tileEl => {
-        const addBtn = tileEl.querySelector(".addBtn");
-        if (!addBtn) return;
-
-        addBtn.addEventListener("click", () => {
-            const stSel = tileEl.querySelector(".stSel");
-            const fav = tileEl.querySelector(".tgFav").checked;
-            const owned = tileEl.querySelector(".tgOwned").checked;
-            const wish = tileEl.querySelector(".tgWish").checked;
-
-            // Reconstruct a minimal OL-like obj from DOM (we stored data-olid as id; but we need title/author/cover)
-            // Instead, read from the markup:
-            const title = tileEl.querySelector(".t")?.textContent?.trim() || "Untitled";
-            const author = tileEl.querySelector(".a")?.textContent?.trim() || "";
-            const cover = tileEl.querySelector(".cover")?.getAttribute("src") || "";
-
-            const pb = {
-                id: tileEl.getAttribute("data-olid") || null,
-                title, author, cover,
-                status: stSel?.value || "want",
-                rating: 0,
-                genres: [],
-                moods: [],
-                tropes: [],
-                tags: [],
-                review: "",
-                notes: "",
-                quotes: [],
-                fileUrl: "",
-                fileName: "",
-                fileType: "",
-                lastUpdated: nowIso()
-            };
-            if (fav) pb.tags.push("favorite");
-            if (owned) pb.tags.push("owned");
-            if (wish) pb.tags.push("wishlist");
-
-            upsertBook(pb);
-            alert(`Saved: ${pb.title} ✓`);
-        });
+    const normalizeDoc = (doc) => ({
+        title: doc.title || "Untitled",
+        author: Array.isArray(doc.author_name) ? doc.author_name[0] : (doc.author_name || "Unknown"),
+        year: doc.first_publish_year || "",
+        cover: coverURL(doc)
     });
-}
 
-// ------------------ State + controller ------------------
-let currentGenre = "All genres";
-let currentFetcher = fetchPopular;
-let currentShelf = null;
-
-async function render() {
-    setLoading();
-    try {
-        let rows = [];
-        if (currentShelf) {
-            rows = await fetchCurated(currentShelf);
+    function setLoading(on) {
+        state.loading = on;
+        const results = $("#results");
+        if (!results) return;
+        if (on) {
+            const sk = document.createElement("div");
+            sk.id = "disc-sk";
+            sk.innerHTML = Array.from({ length: 4 }).map(() => `
+        <div class="tile" aria-hidden="true">
+          <div class="cover" style="background:#eee"></div>
+          <div>
+            <div class="t" style="height:14px;background:#eee;border-radius:6px;width:70%;margin-bottom:6px"></div>
+            <div class="a" style="height:12px;background:#eee;border-radius:6px;width:40%"></div>
+          </div>
+          <div class="meta" style="height:12px;background:#eee;border-radius:6px;width:48px"></div>
+        </div>
+      `).join("");
+            results.appendChild(sk);
         } else {
-            rows = await currentFetcher(currentGenre);
+            $("#disc-sk")?.remove();
         }
-        if (!rows.length) {
-            els.list.innerHTML = `<div class="muted">No results.</div>`;
-            return;
-        }
-        els.list.innerHTML = rows.map(tile).join("");
-        bindTileEvents();
-    } catch (e) {
-        console.error(e);
-        els.list.innerHTML = `<div class="muted">Failed to load.</div>`;
     }
-}
 
-function renderGenres() {
-    els.g.innerHTML = GENRES
-        .map(g => `<span class="side-link ${g === currentGenre ? 'active' : ''}" data-g="${g}">${g}</span>`)
-        .join("");
-    els.g.querySelectorAll(".side-link").forEach(el => {
-        el.onclick = () => {
-            currentGenre = el.dataset.g;
-            currentShelf = null;                               // leave curated mode
-            // clear curated active visual
-            document.querySelectorAll("#curatedRow .pill.curated").forEach(p => p.classList.remove("active"));
-            renderGenres();
-            render();
-        };
-    });
-}
+    function clearResults() {
+        const results = $("#results");
+        if (results) results.innerHTML = "";
+    }
 
-function wireCuratedRow() {
-    const row = document.getElementById("curatedRow");
-    if (!row) return;
-    row.querySelectorAll(".pill.curated").forEach(pill => {
-        pill.addEventListener("click", () => {
-            // toggle active style
-            row.querySelectorAll(".pill.curated").forEach(p => p.classList.remove("active"));
-            pill.classList.add("active");
+    function showEmpty(msg = "No results") {
+        const results = $("#results");
+        if (!results) return;
+        results.innerHTML = `<div class="muted" style="text-align:center;padding:16px">${msg}</div>`;
+    }
 
-            // enter curated mode
-            currentShelf = pill.dataset.shelf;
-            render();
+    // ---- Rendering ----
+    function renderItems(docs = []) {
+        const host = $("#results");
+        if (!host || !docs.length) return;
+        const items = docs.map(normalizeDoc);
+        const canWrite = !!(window.fb && fb.auth?.currentUser && fb.db);
+
+        const html = items.map(b => `
+      <div class="tile">
+        <img class="cover" src="${b.cover || ""}" alt="" onerror="this.style.background='#eee';this.src='';" />
+        <div>
+          <div class="t">${escapeHtml(b.title)}</div>
+          <div class="a">${escapeHtml(b.author)}</div>
+        </div>
+        <div class="meta">
+          ${b.year ? b.year : ""}
+          ${canWrite ? `<div><button class="btn btn-secondary" data-add='${encodeURIComponent(JSON.stringify(b))}' style="margin-top:6px;padding:6px 10px">Add</button></div>` : ""}
+        </div>
+      </div>
+    `).join("");
+
+        host.insertAdjacentHTML("beforeend", html);
+
+        if (canWrite) {
+            host.querySelectorAll("[data-add]").forEach(btn => {
+                btn.addEventListener("click", async () => {
+                    try {
+                        const book = JSON.parse(decodeURIComponent(btn.getAttribute("data-add")));
+                        await addToLibrary(book);
+                        toast("Added to your library ✓");
+                    } catch (e) {
+                        console.warn(e);
+                        alert("Could not add this book.");
+                    }
+                });
+            });
+        }
+    }
+
+    // ---- API calls ----
+    async function fetchSearch(q, page = 1, sort = "popular") {
+        // Open Library /search.json supports: q, page, sort? (sort=relevance or sort=editions?)
+        // We'll emulate 'new' by filtering client-side on year DESC
+        const url = new URL("https://openlibrary.org/search.json");
+        url.searchParams.set("q", q || "");
+        url.searchParams.set("page", String(page));
+        url.searchParams.set("limit", String(PAGE_SIZE));
+        const res = await fetch(url.toString());
+        if (!res.ok) throw new Error("Search failed");
+        const data = await res.json();
+        let docs = Array.isArray(data.docs) ? data.docs : [];
+        if (sort === "new") {
+            docs = docs.sort((a, b) => (b.first_publish_year || 0) - (a.first_publish_year || 0));
+        }
+        return { docs, numFound: data.numFound || 0 };
+    }
+
+    async function fetchSubject(subject, page = 1, sort = "popular") {
+        // Using the search endpoint with subject query for consistency
+        // e.g., q=subject:fantasy
+        const url = new URL("https://openlibrary.org/search.json");
+        url.searchParams.set("q", `subject:${subject}`);
+        url.searchParams.set("page", String(page));
+        url.searchParams.set("limit", String(PAGE_SIZE));
+        const res = await fetch(url.toString());
+        if (!res.ok) throw new Error("Subject fetch failed");
+        const data = await res.json();
+        let docs = Array.isArray(data.docs) ? data.docs : [];
+        if (sort === "new") {
+            docs = docs.sort((a, b) => (b.first_publish_year || 0) - (a.first_publish_year || 0));
+        }
+        return { docs, numFound: data.numFound || 0 };
+    }
+
+    // ---- Boot + Events ----
+    function bindUI() {
+        // Genre sidebar (already injected in HTML by discover.html fallback or your own code)
+        const genreList = $("#genreList");
+        if (genreList && !genreList.children.length) {
+            const names = Object.keys(SUBJECT_MAP);
+            genreList.innerHTML = names
+                .map((g, i) => `<div class="side-link ${i === 0 ? "active" : ""}" data-subj="${SUBJECT_MAP[g]}">${g}</div>`)
+                .join("");
+        }
+
+        genreList?.addEventListener("click", (e) => {
+            const link = e.target.closest(".side-link");
+            if (!link) return;
+            genreList.querySelectorAll(".side-link").forEach(n => n.classList.remove("active"));
+            link.classList.add("active");
+            state.mode = "subject";
+            state.subject = link.getAttribute("data-subj") || "romance";
+            state.page = 1; state.done = false;
+            clearResults();
+            loadMore(true);
         });
-    });
-}
 
-// ------------------ Boot ------------------
-document.addEventListener("DOMContentLoaded", () => {
-    renderGenres();
-    wireCuratedRow();
+        $("#qBtn")?.addEventListener("click", () => {
+            const q = ($("#q")?.value || "").trim();
+            state.mode = "search";
+            state.query = q;
+            state.page = 1; state.done = false;
+            clearResults();
+            loadMore(true);
+        });
 
-    els.qBtn.onclick = async () => {
-        const q = els.q.value.trim();
-        if (!q) return;
-        currentShelf = null;
-        document.querySelectorAll("#curatedRow .pill.curated").forEach(p => p.classList.remove("active"));
-        setLoading();
-        const rows = await searchAny(q);
-        els.list.innerHTML = rows.map(tile).join("");
-        bindTileEvents();
+        $("#sortPopular")?.addEventListener("click", (e) => {
+            state.sort = "popular";
+            $("#sortPopular")?.classList.add("active");
+            $("#sortNew")?.classList.remove("active");
+            state.page = 1; state.done = false;
+            clearResults();
+            loadMore(true);
+        });
+
+        $("#sortNew")?.addEventListener("click", (e) => {
+            state.sort = "new";
+            $("#sortNew")?.classList.add("active");
+            $("#sortPopular")?.classList.remove("active");
+            state.page = 1; state.done = false;
+            clearResults();
+            loadMore(true);
+        });
+
+        attachInfiniteScroll();
+    }
+
+    async function loadMore(first = false) {
+        if (state.loading || state.done) return;
+        if (first) state.page = 1;
+
+        setLoading(true);
+        try {
+            const { mode, subject, query, page, sort } = state;
+            const fn = mode === "search" ? fetchSearch : fetchSubject;
+            const arg = mode === "search" ? query : subject;
+            const { docs, numFound } = await fn(arg, page, sort);
+
+            if (first && (!docs || docs.length === 0)) {
+                showEmpty("No results found");
+                state.done = true;
+                setLoading(false);
+                return;
+            }
+
+            if (!docs || docs.length === 0) {
+                state.done = true;
+                setLoading(false);
+                return;
+            }
+
+            renderItems(docs);
+            state.page += 1;
+
+            // If fewer than PAGE_SIZE came back, likely done
+            if (docs.length < PAGE_SIZE || state.page * PAGE_SIZE >= (numFound || 999999)) {
+                state.done = true;
+            }
+        } catch (err) {
+            console.warn(err);
+            if (first) showEmpty("Could not load results.");
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    function attachInfiniteScroll() {
+        const host = $("#results");
+        if (!host) return;
+        const sentinel = document.createElement("div");
+        sentinel.id = "disc-sentinel";
+        sentinel.style.height = "1px";
+        host.after(sentinel);
+
+        const io = new IntersectionObserver((entries) => {
+            entries.forEach(e => {
+                if (e.isIntersecting) loadMore();
+            });
+        }, { root: null, rootMargin: "600px 0px 600px 0px", threshold: 0.01 });
+
+        io.observe(sentinel);
+    }
+
+    // ---- Add to Library (optional Firestore) ----
+    async function addToLibrary(book) {
+        // Requires firebase-init.js initialized and signed-in user.
+        const user = fb.auth.currentUser;
+        if (!user) throw new Error("Not signed in");
+        const id = randomId();
+        const doc = {
+            id,
+            title: book.title || "Untitled",
+            author: book.author || "",
+            coverUrl: book.cover || "",
+            status: "want",
+            rating: 0,
+            createdAt: new Date().toISOString(),
+            fileType: null,
+            fileUrl: null
+        };
+        await fb.db.collection("users").doc(user.uid)
+            .collection("books").doc(id).set(doc, { merge: true });
+        return id;
+    }
+
+    // ---- Utilities ----
+    function randomId() {
+        return Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10);
+    }
+
+    function toast(msg = "Done") {
+        let el = $("#pb-toast");
+        if (!el) {
+            el = document.createElement("div");
+            el.id = "pb-toast";
+            document.body.appendChild(el);
+        }
+        el.textContent = msg;
+        el.classList.add("show");
+        setTimeout(() => el.classList.remove("show"), 1600);
+    }
+
+    function escapeHtml(str) {
+        return String(str).replace(/[&<>"']/g, s => ({
+            "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+        }[s]));
+    }
+
+    // ---- Public boot (called by discover.html) ----
+    window.startDiscover = function startDiscover() {
+        // Init UI bindings only once
+        if (!window.__discBound) {
+            bindUI();
+            window.__discBound = true;
+        }
+
+        // Initial load (subject Romance default)
+        state.mode = "subject";
+        state.subject = state.subject || "romance";
+        state.sort = state.sort || "popular";
+        state.page = 1; state.done = false;
+        clearResults();
+        loadMore(true);
     };
-    els.q.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") els.qBtn.click();
-    });
-
-    els.sortPopular.onclick = () => {
-        currentShelf = null;
-        document.querySelectorAll("#curatedRow .pill.curated").forEach(p => p.classList.remove("active"));
-        currentFetcher = fetchPopular; render();
-    };
-    els.sortNew.onclick = () => {
-        currentShelf = null;
-        document.querySelectorAll("#curatedRow .pill.curated").forEach(p => p.classList.remove("active"));
-        currentFetcher = fetchNewThisYear; render();
-    };
-
-    render();
-});
+})();

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chat – PageBud</title>
+    <!-- Put this inline snippet in the <head> of EVERY page BEFORE style.css -->
+    <script>
+        (function () {
+            // Apply immediately to avoid FOUC
+            function resolve(raw) {
+                if (raw === "system") {
+                    return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+                }
+                return raw || "default";
+            }
+            var raw = localStorage.getItem("pb:theme") || "default";
+            document.documentElement.setAttribute("data-theme", resolve(raw));
+            document.documentElement.setAttribute("data-tone", "pastel");
+        }());
+    </script>
+
+
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="chat.css" />
+    <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('pb:theme') || 'default');</script>
+
+    <!-- Firebase compat -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="firebase-config.js"></script>
+    <script src="firebase-init.js?v=dev-1"></script>
+    <!-- Put this inline snippet in the <head> of EVERY page BEFORE style.css -->
+    <script>
+        (function () {
+            // Apply immediately to avoid FOUC
+            function resolve(raw) {
+                if (raw === "system") {
+                    return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+                }
+                return raw || "default";
+            }
+            var raw = localStorage.getItem("pb:theme") || "default";
+            document.documentElement.setAttribute("data-theme", resolve(raw));
+            document.documentElement.setAttribute("data-tone", "pastel");
+        }());
+    </script>
+
+</head>
+
+<body>
+    <div class="app-container" style="padding:16px">
+        <div class="chat-shell">
+            <div class="chat-header">
+                <div class="title">Chat</div>
+                <button class="btn" onclick="history.back()">← Back</button>
+            </div>
+
+            <div id="chatBox" class="chat-messages"></div>
+
+            <div class="chat-input">
+                <input id="msg" type="text" placeholder="Write a message…" />
+                <button id="send" class="send-btn">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="chat.js"></script>
+    <script>
+        requireAuth(() => startChatFromURL && startChatFromURL());
+    </script>
+</body>
+
+</html>

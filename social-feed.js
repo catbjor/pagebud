@@ -1,75 +1,128 @@
-// social-feed.js
+// social-feed.js — reads friends' activity, renders into #friends-feed, enables like/comment
 (function () {
-    const FEED_LIMIT = 20;
-    const ESC = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
-    function escapeHTML(s) { return String(s || "").replace(/[&<>"']/g, m => ESC[m]); }
+  "use strict";
+  const $ = (s, r = document) => r.querySelector(s);
 
-    // Kalles når bruker lagrer bok med rating
-    window.publishActivity = async function (book) {
-        try {
-            const u = fb.auth.currentUser; if (!u) return;
-            if (!book?.title || !book?.rating) return;
+  async function getFriendsUids(uid) {
+    // friends subcollection: { friendUid, status: "accepted" }
+    const out = new Set([uid]); // include self
+    try {
+      const col = fb.db.collection("users").doc(uid).collection("friends");
+      const snap = await col.where("status", "==", "accepted").get();
+      snap.forEach(d => { const x = d.data(); if (x.friendUid) out.add(x.friendUid); });
+    } catch { }
+    return Array.from(out);
+  }
 
-            const ref = fb.db.collection("users").doc(u.uid).collection("activities").doc();
-            await ref.set({
-                type: "rating",
-                title: book.title || "",
-                author: book.author || "",
-                rating: Number(book.rating) || 0,
-                bookId: book.id || "",
-                at: firebase.firestore.FieldValue.serverTimestamp(),
-                user: {
-                    uid: u.uid,
-                    name: u.displayName || (u.email || "").split("@")[0],
-                    photoURL: u.photoURL || ""
-                }
-            });
-        } catch (e) { console.warn("publishActivity failed", e); }
-    };
+  async function loadActivities(uids, limitPerUser = 15) {
+    const all = [];
+    for (const id of uids) {
+      try {
+        const snap = await fb.db.collection("users").doc(id).collection("activity")
+          .orderBy("createdAt", "desc").limit(limitPerUser).get();
+        snap.forEach(d => all.push({ id: d.id, owner: id, ...d.data() }));
+      } catch { }
+    }
+    // sort global
+    all.sort((a, b) => (b.createdAt?.toMillis?.() || new Date(b.createdAt || 0).getTime()) -
+      (a.createdAt?.toMillis?.() || new Date(a.createdAt || 0).getTime()));
+    return all.slice(0, 60);
+  }
 
-    // Leser venners aktiviteter
-    window.startSocialFeed = async function () {
-        const u = fb.auth.currentUser; if (!u) return;
-        const feedEl = document.getElementById("friends-feed");
-        if (!feedEl) return;
+  function iconFor(type) {
+    if (type === "started") return "fa-play";
+    if (type === "finished") return "fa-flag-checkered";
+    if (type === "rated") return "fa-star";
+    if (type === "note") return "fa-pen";
+    return "fa-book";
+  }
 
-        const friendsSnap = await fb.db.collection("users").doc(u.uid).collection("friends").get();
-        const friendIds = friendsSnap.docs.map(d => d.id);
+  function lineFor(item) {
+    const t = item.type;
+    if (t === "started") return `started <b>${esc(item.title)}</b>`;
+    if (t === "finished") return `finished <b>${esc(item.title)}</b> ${item.rating ? `(${item.rating}★)` : ""}`;
+    if (t === "rated") return `rated <b>${esc(item.title)}</b> ${item.rating}★`;
+    if (t === "note") return `wrote a note on <b>${esc(item.title)}</b>`;
+    return `updated <b>${esc(item.title)}</b>`;
+  }
 
-        if (!friendIds.length) {
-            feedEl.innerHTML = `<div class="muted">Add friends to see their ratings.</div>`;
-            return;
-        }
+  function esc(s) { return (s || "").replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
 
-        const unsubs = [];
-        const items = [];
-        function render() {
-            if (!items.length) {
-                feedEl.innerHTML = `<div class="muted">No recent activity yet.</div>`;
-                return;
-            }
-            const sorted = items.sort((a, b) => (b.at?.toMillis?.() || 0) - (a.at?.toMillis?.() || 0)).slice(0, FEED_LIMIT);
-            feedEl.innerHTML = sorted.map(x => `
-        <div style="display:flex;gap:10px;align-items:flex-start;border-bottom:1px solid var(--border);padding:10px 0">
-          <img src="${x.user.photoURL || 'icons/icon-192.png'}" alt="" style="width:32px;height:32px;border-radius:50%">
-          <div>
-            <div><b>${escapeHTML(x.user.name || 'Friend')}</b> rated <b>${escapeHTML(x.title)}</b> ${"★".repeat(Math.round(x.rating))}</div>
-            <div class="muted" style="font-size:.85rem">${escapeHTML(x.author || "")}</div>
+  function itemHTML(it, meUid) {
+    const liked = false; // we resolve on click; for speed we don’t prefetch
+    const cover = it.cover ? `<img src="${it.cover}" alt="" style="width:42px;height:58px;object-fit:cover;border-radius:6px;border:1px solid var(--border)">` : "";
+    const when = it.createdAt?.toDate ? it.createdAt.toDate().toLocaleString() : (new Date(it.createdAt || Date.now())).toLocaleString();
+    return `
+      <div class="feed-item" data-owner="${it.owner}" data-id="${it.id}" style="display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border)">
+        ${cover}
+        <div style="flex:1;min-width:0">
+          <div class="muted" style="font-size:.85rem"><i class="fa-solid ${iconFor(it.type)}"></i> ${when}</div>
+          <div style="font-weight:700;margin:2px 0">${lineFor(it)}</div>
+          ${it.type === "note" && it.text ? `<div class="muted" style="margin-top:4px">${esc(it.text)}</div>` : ``}
+          <div class="row" style="display:flex;gap:8px;align-items:center;margin-top:8px">
+            <button class="btn btn-secondary btn-like"><i class="fa-solid fa-heart"></i> ${Number(it.likeCount || 0)}</button>
+            <button class="btn btn-secondary btn-comment"><i class="fa-solid fa-comment"></i> ${Number(it.commentCount || 0)}</button>
+            ${it.bookId ? `<a class="btn" href="reader.html?id=${encodeURIComponent(it.bookId)}"><i class="fa-solid fa-book-open"></i> Open</a>` : ``}
           </div>
-        </div>`).join("");
-        }
+          <div class="comment-box" style="display:none;margin-top:8px">
+            <input class="comment-input" placeholder="Write a comment…" />
+            <button class="btn btn-primary btn-send" style="margin-left:6px">Send</button>
+          </div>
+        </div>
+      </div>`;
+  }
 
-        friendIds.forEach(fid => {
-            const unsub = fb.db.collection("users").doc(fid).collection("activities")
-                .orderBy("at", "desc").limit(10)
-                .onSnapshot(s => {
-                    for (let i = items.length - 1; i >= 0; i--) if (items[i].user?.uid === fid) items.splice(i, 1);
-                    s.forEach(d => items.push(d.data()));
-                    render();
-                });
-            unsubs.push(unsub);
-        });
+  function bindActions(container) {
+    container.addEventListener("click", async (e) => {
+      const root = e.target.closest(".feed-item"); if (!root) return;
+      const owner = root.dataset.owner, id = root.dataset.id;
 
-        window.addEventListener("beforeunload", () => unsubs.forEach(u => u && u()));
-    };
+      if (e.target.closest(".btn-like")) {
+        try {
+          const liked = await window.PBActivity?.like(owner, id);
+          // quick bump in UI
+          const b = root.querySelector(".btn-like");
+          const n = Number((b.textContent || "0").replace(/\D/g, "")) || 0;
+          const next = liked ? n + 1 : Math.max(0, n - 1);
+          b.innerHTML = `<i class="fa-solid fa-heart"></i> ${next}`;
+        } catch { }
+      }
+
+      if (e.target.closest(".btn-comment")) {
+        const box = root.querySelector(".comment-box");
+        if (box) box.style.display = box.style.display === "none" ? "" : "none";
+      }
+
+      if (e.target.closest(".btn-send")) {
+        const inp = root.querySelector(".comment-input");
+        const txt = (inp?.value || "").trim();
+        if (!txt) return;
+        try {
+          await window.PBActivity?.comment(owner, id, txt);
+          const b = root.querySelector(".btn-comment");
+          const n = Number((b.textContent || "0").replace(/\D/g, "")) || 0;
+          b.innerHTML = `<i class="fa-solid fa-comment"></i> ${n + 1}`;
+          inp.value = "";
+        } catch { }
+      }
+    });
+  }
+
+  async function renderFeed() {
+    const feed = $("#friends-feed"); if (!feed) return;
+    feed.innerHTML = `<div class="muted">Loading…</div>`;
+    const u = fb?.auth?.currentUser; if (!u) return;
+
+    const uids = await getFriendsUids(u.uid);
+    const items = await loadActivities(uids);
+    if (!items.length) {
+      feed.innerHTML = `<div class="muted">No recent activity yet.</div>`;
+      return;
+    }
+    feed.innerHTML = items.map(it => itemHTML(it, u.uid)).join("");
+    bindActions(feed);
+  }
+
+  // Public
+  window.startSocialFeed = renderFeed;
 })();

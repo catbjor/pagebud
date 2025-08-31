@@ -5,71 +5,93 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Discover – PageBud</title>
-    <link rel="stylesheet" href="style.css">
+    <!-- Put this inline snippet in the <head> of EVERY page BEFORE style.css -->
+    <script>
+        (function () {
+            // Apply immediately to avoid FOUC
+            function resolve(raw) {
+                if (raw === "system") {
+                    return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+                }
+                return raw || "default";
+            }
+            var raw = localStorage.getItem("pb:theme") || "default";
+            document.documentElement.setAttribute("data-theme", resolve(raw));
+            document.documentElement.setAttribute("data-tone", "pastel");
+        }());
+    </script>
+
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <link rel="stylesheet" href="style.css" />
+    <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("pb:theme") || "default");</script>
+
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+    <script src="firebase-config.js"></script>
+    <script src="firebase-init.js?v=dev-1"></script>
+    <script src="profiles.js"></script>
+
     <style>
         .disc-shell {
             display: grid;
             grid-template-columns: 220px 1fr;
             gap: 16px;
-            padding: 16px;
+            padding: 16px
         }
 
         @media (max-width:860px) {
             .disc-shell {
-                grid-template-columns: 1fr;
+                grid-template-columns: 1fr
             }
         }
 
-        .disc-side {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 14px;
-            padding: 12px;
-        }
-
+        .disc-side,
         .disc-main {
             background: var(--card);
             border: 1px solid var(--border);
             border-radius: 14px;
-            padding: 12px;
+            padding: 12px
         }
 
         .side-title {
             font-weight: 900;
-            margin: 4px 0 10px;
+            margin: 4px 0 10px
         }
 
         .side-link {
             display: block;
             padding: 8px 10px;
             border-radius: 10px;
-            cursor: pointer;
+            cursor: pointer
         }
 
         .side-link:hover {
-            background: var(--hover);
+            background: var(--hover)
         }
 
         .active.side-link {
-            background: var(--primary-soft);
-            color: var(--primary-ink);
-            font-weight: 800;
+            background: color-mix(in oklab, var(--primary) 20%, transparent);
+            border: 1px solid var(--primary)
         }
 
         .search-row {
             display: flex;
             gap: 8px;
-            margin-bottom: 10px;
+            margin-bottom: 10px
         }
 
         .search-row input {
-            flex: 1;
+            flex: 1
         }
 
         .list {
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 12px
         }
 
         .tile {
@@ -80,7 +102,7 @@
             border: 1px solid var(--border);
             background: var(--surface);
             border-radius: 12px;
-            padding: 8px;
+            padding: 8px
         }
 
         .cover {
@@ -88,23 +110,23 @@
             height: 125px;
             object-fit: cover;
             border-radius: 8px;
-            background: #eee;
+            background: #222
         }
 
         .t {
             font-weight: 900;
-            margin-bottom: 4px;
+            margin-bottom: 4px
         }
 
         .a {
             color: var(--text-light);
-            font-size: .9rem;
+            font-size: .9rem
         }
 
         .meta {
             text-align: right;
             color: var(--text-light);
-            font-size: .85rem;
+            font-size: .85rem
         }
 
         .pill {
@@ -112,21 +134,17 @@
             border: 1px solid var(--border);
             border-radius: 999px;
             padding: 4px 8px;
-            font-size: .75rem;
+            font-size: .75rem
         }
     </style>
-
-    <!-- Firebase (optional her – kun for requireAuth hvis du vil låse siden) -->
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-    <script src="firebase-init.js"></script>
 </head>
 
 <body>
     <div class="app-container">
-        <div class="header">
+        <header class="header">
             <h1>Discover</h1>
-        </div>
+            <!-- header actions via nav.js -->
+        </header>
 
         <div class="disc-shell">
             <aside class="disc-side">
@@ -137,7 +155,7 @@
             <main class="disc-main">
                 <div class="search-row">
                     <input id="q" class="form-control" placeholder="Search by keyword…" />
-                    <button id="qBtn" class="btn btn-secondary" style="width:auto">Search</button>
+                    <button id="qBtn" class="btn" style="width:auto">Search</button>
                 </div>
 
                 <div style="display:flex;gap:8px;margin:6px 2px 12px;">
@@ -148,18 +166,18 @@
                 <div id="results" class="list" aria-live="polite"></div>
             </main>
         </div>
-
-        <nav class="bottom-nav">
-            <div class="nav-item" onclick="location.href='index.html'"><i class="fas fa-book"></i> Library</div>
-            <div class="nav-item active"><i class="fas fa-compass"></i> Discover</div>
-            <div class="nav-item" onclick="location.href='settings.html'"><i class="fas fa-cog"></i> Settings</div>
-        </nav>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js" defer></script>
     <script src="discover.js"></script>
-    <script src="script.js?v=2025-08-29-30"></script>
-    <script src="reader-init.js?v=2025-08-29-30"></script>
+    <script src="nav.js" defer></script>
+    <script src="timer.js" defer></script>
+    <script>
+        requireAuth(async (user) => {
+            // her er du garantert innlogget og fb.auth/fb.db finnes
+            // last data / start lyttere
+        });
+    </script>
+
 </body>
 
 </html>

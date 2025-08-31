@@ -1,38 +1,92 @@
-< !--push.js -->
-  <script>
-    const VAPID_PUBLIC_KEY = "BJuvG6f4DO9_FG-tk1h9gQ5Ry1yeU9CYcrnZ-qRcIAbn4BgNnG73dHur62WbtBu_t9-XqeTHuGmR7UsASZPe0_g";
+/* ===========================================================
+  PageBud – push.js
+  Purpose: Handle client-side push (Firebase Cloud Messaging)
+  - Requests permission
+  - Retrieves + stores FCM token
+  - Listens for foreground messages
+=========================================================== */
 
-    async function enablePush() {
-  try {
-    if (!('Notification' in window)) throw new Error("Browser mangler Notification API");
-    const perm = await Notification.requestPermission();
-    if (perm !== "granted") throw new Error("Bruker avslo varsel-tilgang");
+(function () {
+  "use strict";
 
-    // Viktig: bruk compat, og IKKE pass serviceWorkerRegistration når du har firebase-messaging-sw.js i rot
-    const messaging = firebase.messaging();
-    const token = await messaging.getToken({vapidKey: VAPID_PUBLIC_KEY });
-    if (!token) throw new Error("Kunne ikke hente FCM token");
-
-    console.log("[FCM] token", token);
-
-    // Lagre token under bruker (greit å ha til senere sending)
-    const u = fb.auth.currentUser;
-    if (u) {
-      await fb.db.collection("users").doc(u.uid)
-        .collection("webPushTokens").doc(token)
-        .set({ token, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+  // Expose helper globally
+  window.pbEnablePush = async function () {
+    if (!("Notification" in window)) {
+      return "This browser does not support notifications.";
     }
 
-    // Foreground-meldinger (app åpen)
-    messaging.onMessage(({notification}) => {
-      if (!notification) return;
-    alert(`${notification.title}\n\n${notification.body || ""}`);
-    });
+    // 1) Ask user permission
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") {
+      return "Notifications denied.";
+    }
 
-    alert("Push skrudd på ✅");
-  } catch (err) {
-      console.error("[FCM] error", err);
-    alert("Push feilet – se console");
-  }
-}
-  </script>
+    // 2) Init Messaging
+    let messaging;
+    try {
+      messaging = firebase.messaging();
+    } catch (e) {
+      console.error("[Push] Messaging not supported", e);
+      return "Messaging not supported.";
+    }
+
+    // 3) Get registration of SW (must be /firebase-messaging-sw.js)
+    const reg = await navigator.serviceWorker.getRegistration("/firebase-messaging-sw.js");
+    if (!reg) {
+      return "Service worker not registered (firebase-messaging-sw.js missing).";
+    }
+
+    // 4) Attach messaging to SW registration
+    messaging.useServiceWorker(reg);
+
+    // 5) Retrieve token
+    let token;
+    try {
+      token = await messaging.getToken({
+        vapidKey: "<BKB8Xl6_atfLTsLlo1lzN6wNj6jq8HFCusSEs92Z6WHDrSyC-F8ovQyATvOTjn1d1CDvpmi8nnSNZlqxFAM1nvA>" // 🔧 optional; set if you configured in Firebase console
+      });
+    } catch (e) {
+      console.error("[Push] getToken failed", e);
+      return "Failed to get token.";
+    }
+
+    if (!token) {
+      return "No push token.";
+    }
+
+    console.log("[Push] Token:", token);
+
+    // 6) Save token to Firestore under user doc
+    const user = fb.auth.currentUser;
+    if (user) {
+      await fb.db.collection("users").doc(user.uid).set({
+        pushToken: token,
+        pushEnabled: true,
+        updated: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+    }
+
+    return "Push enabled ✓";
+  };
+
+  // Foreground handler: show simple notification banner
+  document.addEventListener("DOMContentLoaded", () => {
+    try {
+      const messaging = firebase.messaging();
+      messaging.onMessage((payload) => {
+        console.log("[Push] Foreground message", payload);
+        const n = payload?.notification || {};
+        const title = n.title || "PageBud";
+        const body = n.body || "Update received.";
+        // Simple toast fallback
+        if (window.pbToast) {
+          pbToast(`${title}: ${body}`);
+        } else {
+          alert(`${title}\n${body}`);
+        }
+      });
+    } catch (e) {
+      console.warn("[Push] Foreground handler skipped:", e);
+    }
+  });
+})();
