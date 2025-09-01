@@ -1365,3 +1365,47 @@ input[type="file"]::file-selector-button:hover {
   margin-top: 4px;
   /* tett under PageBud */
 }
+
+/* Stack tittel + hilsen i headeren uten å påvirke resten */
+.header .title-stack {
+  display: flex;
+  flex-direction: column;
+}
+
+.header .title-stack .page-subtle {
+  margin-top: 2px;
+  font-weight: 500;
+  /* tynnere */
+  font-size: 0.95rem;
+  color: var(--text-light);
+}
+
+/* --- Fix: anchor-kort + to-kol grid --- */
+
+/* La <a class="card"> rendres som kort */
+a.card {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
+/* Sikre at card-link ikke får underlinje ved hover/focus */
+.card.card-link:hover,
+.card.card-link:focus {
+  text-decoration: none;
+}
+
+/* To kolonner side-om-side */
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+
+/* Behold to kolonner også på mobil (juster hvis du vil ha 1-kol på veldig smalt) */
+@media (max-width: 360px) {
+  .grid-2 {
+    grid-template-columns: 1fr 1fr;
+  }
+}

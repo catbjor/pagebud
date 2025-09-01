@@ -1,8 +1,7 @@
-// index-actions.js — binder header-ikoner + dynamisk greeting under "PageBud"
+// index-actions.js — binder eksisterende header-ikoner (ingen nye elementer)
 (function () {
     "use strict";
 
-    // ---------- helpers ----------
     function hookBtn(selector, onClick) {
         const el = document.querySelector(selector);
         if (!el) return;
@@ -14,6 +13,14 @@
     function setHref(selector, href) {
         const el = document.querySelector(selector);
         if (el && el.tagName === "A") el.setAttribute("href", href);
+        // Hvis det ikke er <a>, gjør vi det klikkbart uten å endre markupen
+        if (el && el.tagName !== "A") {
+            el.addEventListener("click", (e) => {
+                e.preventDefault();
+                location.href = href;
+            }, { once: false });
+            el.style.cursor = "pointer";
+        }
     }
     async function doUpdate() {
         const ok = confirm("Update the app now? This will reload the page.");
@@ -26,69 +33,23 @@
         } catch { location.reload(); }
     }
 
-    // ---------- greeting ----------
-    async function getFirstName() {
-        try {
-            const auth = (window.fb?.auth) || firebase.auth();
-            const user = auth.currentUser || await new Promise((res) => {
-                const unsub = auth.onAuthStateChanged(u => { unsub(); res(u); });
-            });
-            if (!user) return null;
+    // -------- boot --------
+    function boot() {
+        // Behold disse
+        setHref("#btnFriends,[data-action='friends']", "feed.html");
+        hookBtn("#btnUpdateApp,[data-action='update']", doUpdate);
 
-            const dn = (user.displayName || "").trim();
-            if (dn) return dn.split(" ")[0];
+        // NYTT: kalender -> stats (uansett om det er <a> eller <button>)
+        setHref("#btnCalendar,[data-action='calendar']", "stats.html");
 
-            try {
-                const db = window.fb?.db || firebase.firestore();
-                const snap = await db.collection("users").doc(user.uid).get();
-                const prof = snap.exists ? snap.data() : null;
-                if (prof?.displayName) return String(prof.displayName).split(" ")[0];
-            } catch { }
+        // (valgfritt) goal-badge kan også linke til stats hvis den finnes
+        setHref("#goalBadge,[data-action='goal']", "stats.html");
 
-            const em = (user.email || "").split("@")[0];
-            if (em) return em.charAt(0).toUpperCase() + em.slice(1);
-
-            return "Reader";
-        } catch {
-            return "Reader";
-        }
+        // Hilsen under PageBud (fra tidligere)
+        initGreeting();
     }
 
-    function pickGreeting(name) {
-        const hour = new Date().getHours();
-        const when = hour < 12 ? "morning" : (hour < 18 ? "afternoon" : "evening");
-
-        const i18n = window.PB_I18N;
-        const fallback = {
-            morning: [
-                "Good morning, {name}!", "Morning, {name} — ready to read?", "Rise and shine, {name}."
-            ],
-            afternoon: [
-                "Good afternoon, {name}!", "Nice to see you, {name}. Time for a chapter?", "A perfect time to read, {name}."
-            ],
-            evening: [
-                "Good evening, {name}!", "Cozy reading time, {name}?", "Unwind with a book, {name}."
-            ],
-            fun: [
-                "Books > notifications, {name}.", "One page is a tiny adventure, {name}.", "Stories are brain cardio, {name}."
-            ],
-            wisdom: [
-                "Small pages add up, {name}.", "Read a little, learn a lot, {name}.", "Today’s words, tomorrow’s ideas, {name}."
-            ]
-        };
-
-        const base = {
-            morning: (i18n?.list("greetings.morning") || fallback.morning),
-            afternoon: (i18n?.list("greetings.afternoon") || fallback.afternoon),
-            evening: (i18n?.list("greetings.evening") || fallback.evening),
-            fun: (i18n?.list("greetings.fun") || fallback.fun),
-            wisdom: (i18n?.list("greetings.wisdom") || fallback.wisdom)
-        };
-
-        const pool = [...base[when], ...((Math.random() < 0.5) ? base.fun : base.wisdom)];
-        return pool[Math.floor(Math.random() * pool.length)].replace("{name}", name);
-    }
-
+    // -------- greeting --------
     async function initGreeting() {
         const el = document.getElementById("homeGreeting");
         if (!el) return;
@@ -96,24 +57,43 @@
         const cached = sessionStorage.getItem("pb_greeting");
         if (cached) { el.textContent = cached; return; }
 
-        // last brukerens språk (hvis i18n er med)
         if (window.PB_I18N?.loadUserLang) {
             try { await window.PB_I18N.loadUserLang(); } catch { }
         }
 
-        const name = await getFirstName();
-        const line = pickGreeting(name || "Reader");
+        const firstName = await resolveFirstName();
+        const line = pickGreeting(firstName);
         sessionStorage.setItem("pb_greeting", line);
         el.textContent = line;
     }
 
-    // ---------- boot ----------
-    function boot() {
-        setHref("#btnDiscover,[data-action='discover']", "discover.html");
-        setHref("#btnFriends,[data-action='friends']", "feed.html");
-        hookBtn("#btnUpdateApp,[data-action='update']", doUpdate);
+    async function resolveFirstName() {
+        try {
+            const auth = (window.fb?.auth) || firebase.auth();
+            const user = auth.currentUser || await new Promise(res => {
+                const u = auth.onAuthStateChanged(x => { u(); res(x); });
+            });
+            if (!user) return "Reader";
+            const dn = (user.displayName || "").trim();
+            if (dn) return dn.split(" ")[0];
+            try {
+                const db = window.fb?.db || firebase.firestore();
+                const s = await db.collection("users").doc(user.uid).get();
+                const n = s.exists && s.data()?.displayName;
+                if (n) return String(n).split(" ")[0];
+            } catch { }
+            const em = (user.email || "").split("@")[0];
+            return em ? em.charAt(0).toUpperCase() + em.slice(1) : "Reader";
+        } catch { return "Reader"; }
+    }
 
-        initGreeting(); // hilsen under PageBud
+    function pickGreeting(name) {
+        const h = new Date().getHours();
+        const when = h < 12 ? "morning" : (h < 18 ? "afternoon" : "evening");
+        const L = window.PB_I18N, F = (k) => (L?.list("greetings." + k) || []);
+        const pool = [...F(when), ...((Math.random() < 0.5) ? F("fun") : F("wisdom"))];
+        const msg = (pool[Math.floor(Math.random() * pool.length)] || "Good day, {name}!").replace("{name}", name);
+        return msg;
     }
 
     if (document.readyState === "loading") {

@@ -2,29 +2,19 @@
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport" />
   <title>PageBud</title>
 
-  <script>
-    (function () {
-      function resolve(raw) {
-        if (raw === "system") {
-          return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-        }
-        return raw || "default";
-      }
-      var raw = localStorage.getItem("pb:theme") || "default";
-      document.documentElement.setAttribute("data-theme", resolve(raw));
-      document.documentElement.setAttribute("data-tone", "pastel");
-    }());
-  </script>
+  <!-- Apply theme ASAP -->
+  <script src="theme-init.js"></script>
 
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-  <link rel="stylesheet" href="style.css" />
-  <script src="rating-controls.js" defer></script>
+  <!-- Styles -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet" />
+  <link href="style.css?v=cards2" rel="stylesheet" />
+  <script defer src="rating-controls.js"></script>
 
-  <!-- Firebase compat -->
+  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -36,12 +26,16 @@
 <body>
   <div class="app-container">
     <header class="header">
-      <h1 class="page-title">PageBud</h1>
-      <div id="homeGreeting" class="page-subtle"></div>
+      <!-- Title + greeting stacked -->
+      <div class="title-stack">
+        <h1 class="page-title">PageBud</h1>
+        <div id="homeGreeting" class="page-subtle"></div>
+      </div>
+      <!-- No Discover button here -->
       <div class="header-actions"></div>
     </header>
 
-    <!-- Chips: one horizontal row -->
+    <!-- Filter chips -->
     <div class="categories scroll-x" id="filter-chips">
       <div class="category active" data-filter="all">All Books</div>
       <div class="category" data-filter="favorites">Favorites</div>
@@ -53,84 +47,86 @@
       <div class="category" data-filter="wishlist">Wishlist</div>
     </div>
 
-    <!-- Her kommer resten av din layout (bokkort, feed, osv) -->
-    <main>
-      <!-- ... -->
-    </main>
+    <!-- Search + view toggle -->
+    <div class="row pad">
+      <input class="input" id="searchInput" placeholder="Search by title or author..." type="search" />
+      <div class="chip-group" id="viewToggle">
+        <button class="chip active" data-view="grid">Grid</button>
+        <button class="chip" data-view="list">List</button>
+      </div>
+    </div>
 
-    <nav class="bottom-nav">
-      <div class="nav-item active"><i class="fas fa-book"></i> Library</div>
-      <div class="nav-item" onclick="location.href='stats.html'"><i class="fas fa-chart-line"></i> Stats</div>
-      <div class="nav-item" onclick="location.href='discover.html'"><i class="fas fa-compass"></i> Discover</div>
-      <div class="nav-item" onclick="location.href='settings.html'"><i class="fas fa-cog"></i> Settings</div>
-    </nav>
+    <!-- Discover + Friends preview cards (to kort side-om-side) -->
+    <section class="grid-2 pad">
+      <a class="card card-link" href="discover.html">
+        <div class="card-head">
+          <h2>Discover</h2>
+        </div>
+        <div class="muted">Trending &amp; recommendations</div>
+      </a>
+
+      <a class="card card-link" href="feed.html">
+        <div class="card-head">
+          <h2>Friends</h2>
+        </div>
+        <div class="muted">See what friends read</div>
+      </a>
+    </section>
+
+
+    <!-- My Library -->
+    <section class="pad">
+      <div class="card">
+        <div class="card-head">
+          <h2>My Library</h2>
+        </div>
+        <div class="books-grid" id="books-grid"></div>
+        <div class="muted small" id="empty-library" style="display:none;padding:12px">
+          Your library is empty. Tap + to add a book.
+        </div>
+      </div>
+    </section>
+
+    <!-- Friends activity -->
+    <section class="pad" id="friends-activity">
+      <div class="card">
+        <div class="card-head">
+          <h2>Friends activity</h2>
+        </div>
+        <div class="feed-list" id="friends-feed" style="padding:12px"></div>
+      </div>
+    </section>
+
+    <!-- Add Book FAB -->
+    <button aria-label="Add Book" class="add-book" id="add-book-btn" onclick="location.href='add-book.html'"
+      title="Add Book" type="button"><i class="fas fa-plus"></i></button>
   </div>
+
+  <script>
+    // Ensure layout reserves space for the FAB
+    (function () { if (document.getElementById('add-book-btn')) document.body.classList.add('has-add-fab'); }());
+    // Kick off friends feed if auth ok (existing helper)
+    requireAuth?.(() => window.startSocialFeed && window.startSocialFeed());
+  </script>
 
   <!-- App scripts -->
   <script src="reset-utils.js"></script>
-  <script src="nav.js" defer></script>
+  <script defer src="nav.js"></script>
   <script src="profiles.js"></script>
   <script src="activity.js"></script>
   <script src="social-feed.js"></script>
   <script src="script.js"></script>
   <script src="toast.js" defer></script>
-  <script src="timer.js" defer></script>
+  <script defer src="timer.js"></script>
   <script src="sync.js" defer></script>
   <script src="social-feed-preview.js" defer></script>
 
-  <!-- Viktig: i18n.js før index-actions.js -->
+  <!-- IMPORTANT: i18n before index-actions -->
   <script src="i18n.js?v=1"></script>
   <script src="header-actions.js" defer></script>
+  <script src="index-actions.js?v=greet3"></script>
   <script src="goal-badge.js" defer></script>
   <script src="library-enricher.js" defer></script>
-  <script src="index-actions.js?v=greet1"></script>
-
-  <!-- Fallback greeting (kjører hvis index-actions.js ikke rakk det) -->
-  <script>
-    (function () {
-      function ready(fn) {
-        document.readyState === 'loading'
-          ? document.addEventListener('DOMContentLoaded', fn, { once: true })
-          : fn();
-      }
-      ready(async function () {
-        if (!document.getElementById('homeGreeting')) return;
-        if (sessionStorage.getItem('pb_greeting')) return;
-        try { await window.PB_I18N?.loadUserLang?.(); } catch { }
-
-        async function getFirstName() {
-          try {
-            const auth = (window.fb?.auth) || firebase.auth();
-            const user = auth.currentUser || await new Promise(res => {
-              const unsub = auth.onAuthStateChanged(u => { unsub(); res(u); });
-            });
-            if (!user) return 'Reader';
-            const dn = (user.displayName || '').trim(); if (dn) return dn.split(' ')[0];
-            try {
-              const db = window.fb?.db || firebase.firestore();
-              const s = await db.collection('users').doc(user.uid).get();
-              if (s.exists && s.data()?.displayName) return String(s.data().displayName).split(' ')[0];
-            } catch { }
-            const em = (user.email || '').split('@')[0];
-            return em ? em.charAt(0).toUpperCase() + em.slice(1) : 'Reader';
-          } catch { return 'Reader'; }
-        }
-
-        function pick(name) {
-          const h = new Date().getHours();
-          const when = h < 12 ? 'morning' : (h < 18 ? 'afternoon' : 'evening');
-          const L = window.PB_I18N, F = (k) => (L?.list('greetings.' + k) || []);
-          const pool = [...F(when), ...((Math.random() < 0.5) ? F('fun') : F('wisdom'))];
-          const msg = (pool[Math.floor(Math.random() * pool.length)] || "Good day, {name}!")
-            .replace("{name}", name);
-          sessionStorage.setItem('pb_greeting', msg);
-          document.getElementById('homeGreeting').textContent = msg;
-        }
-
-        pick(await getFirstName());
-      });
-    })();
-  </script>
 </body>
 
 </html>

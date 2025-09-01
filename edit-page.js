@@ -1,9 +1,5 @@
 /* =========================================================
- PageBud – edit-page.js (stabil, storage-fix + Read-knapp)
- - Laster bok (?id=...)
- - Viser valgt filnavn og "Read"-knapp
- - Lagrer endringer + laster opp ny fil/cover til Storage
- - Sletter sitater trygt med transaksjon
+ PageBud – edit-page.js (stabil, chips-fix + Read lagrer først)
 ========================================================= */
 
 (function () {
@@ -16,36 +12,32 @@
   const qs = (k) => new URLSearchParams(location.search).get(k);
   const FB = (window.fb || window);
 
-  // ---------- Elements (kun det vi faktisk bruker her) ----------
+  // ---------- Elements ----------
   const titleEl = byId("title");
   const authorEl = byId("author");
   const startedEl = byId("started");
   const finishedEl = byId("finished");
   const reviewEl = byId("review");
 
-  // rating/spice beholdes – vi leser kun dataset når vi lagrer
+  // rating/chili – UI styres av rating-controls.js. Vi leser KUN dataset.value.
   const ratingBar = byId("ratingBar");
   const spiceBar = byId("spiceBar");
 
-  // pickers beholdes – vi rører ikke genereringen deres
   const statusWrap = byId("statusChips");
   const formatWrap = byId("formatChips");
   const genresWrap = byId("genres");
   const moodsWrap = byId("moods");
   const tropesWrap = byId("tropes");
 
-  // fil
   const fileInput = byId("bookFile");
   const fileChip = byId("btnPickFile");
   const fileName = byId("fileName");
   const coverPreview = byId("coverPreview");
 
-  // quotes (beholdes som før)
   const quoteInput = byId("quoteInput");
   const addQuoteBtn = byId("addQuoteBtn");
   const quotesList = byId("quotesList");
 
-  // actions
   const saveBtn = byId("saveBtn");
   const deleteBtn = byId("deleteBtn");
 
@@ -62,69 +54,66 @@
   let existingQuotes = [];
   let pendingQuotes = [];
 
-  let fileMeta = null;   // {name,type,size}
-  let coverBlob = null;  // Blob (cover fra pdf/epub hvis vi klarer)
+  let fileMeta = null;
+  let coverBlob = null;
 
-  // ---------- UI wiring (kun fil + quotes) ----------
-  fileChip?.addEventListener("click", () => fileInput?.click());
+  // ---------- Lister ----------
+  const CONST = window.PB_CONST || {};
+  const GENRES = CONST.GENRES || [];
+  const MOODS = (CONST.MOODS || []).map(x => (typeof x === "string" ? x : x.name || ""));
+  const TROPES = CONST.TROPES || [];
 
-  fileInput?.addEventListener("change", async () => {
-    const f = fileInput.files && fileInput.files[0];
-    if (fileName) fileName.textContent = f ? f.name : "";
-
-    // Vis Read-knapp når det finnes en valgt fil
-    if (f && bookId) ensureReadButton(bookId);
-
-    if (!f) return;
-    fileMeta = {
-      name: f.name,
-      type: /\.pdf$/i.test(f.name) ? "pdf" : (/\.epub$/i.test(f.name) ? "epub" : "unknown"),
-      size: f.size
-    };
-    coverBlob = await tryExtractCover(f);
-    if (coverBlob && coverPreview) {
-      const url = URL.createObjectURL(coverBlob);
-      coverPreview.src = url;
-    }
-  });
-
-  addQuoteBtn?.addEventListener("click", () => {
-    const t = (quoteInput?.value || "").trim();
-    if (!t) return;
-    pendingQuotes.push({ text: t, createdAt: Date.now() });
-    quoteInput.value = "";
-    renderQuotes();
-  });
-  quoteInput?.addEventListener("keydown", (e) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") addQuoteBtn?.click();
-  });
-
-  // ---------- Read button ----------
-  function ensureReadButton(bookId) {
-    // legg knappen rett ved siden av filnavnet (samme rad)
-    const container = fileName?.parentElement || document.body;
-    let btn = byId("readNowBtn");
-    if (!btn) {
-      btn = document.createElement("button");
-      btn.id = "readNowBtn";
-      btn.className = "btn";
-      btn.style.marginLeft = "8px";
-      btn.textContent = "Read";
-      container.appendChild(btn);
-    }
-    btn.onclick = () => location.href = `reader.html?id=${bookId}`;
+  // ---------- Chips ----------
+  function buildMulti(container, items, picked) {
+    if (!container) return;
+    container.innerHTML = "";
+    items.forEach(txt => {
+      if (!txt) return;
+      const el = document.createElement("span");
+      el.className = "category";
+      el.textContent = txt;
+      el.dataset.val = txt;
+      if (picked.has(txt)) el.classList.add("active");
+      container.appendChild(el);
+    });
+    container.addEventListener("click", (e) => {
+      const btn = e.target.closest(".category");
+      if (!btn || !container.contains(btn)) return;
+      e.preventDefault(); e.stopPropagation();
+      const v = btn.dataset.val;
+      if (picked.has(v)) { picked.delete(v); btn.classList.remove("active"); }
+      else { picked.add(v); btn.classList.add("active"); }
+    });
   }
 
-  function maybeShowReadButton(d) {
-    const hasFile = !!(
-      d?.fileUrl ||
-      d?.fileName ||
-      (d?.file && (d.file.url || d.file.blobUrl))
-    );
-    if (hasFile && bookId) ensureReadButton(bookId);
+  function bindSingle(container, onPick) {
+    if (!container) return;
+    container.addEventListener("click", (e) => {
+      const btn = e.target.closest(".category");
+      if (!btn || !container.contains(btn)) return;
+      e.preventDefault(); e.stopPropagation();
+      $$(".category", container).forEach(n => n.classList.remove("active"));
+      btn.classList.add("active");
+      onPick(btn.dataset.val);
+    });
   }
 
-  // ---------- Quotes render/delete (uendret oppførsel) ----------
+  function syncSingleActive(container, value) {
+    if (!container) return;
+    $$(".category", container).forEach(n => {
+      n.classList.toggle("active", n.dataset.val === value);
+    });
+  }
+
+  function populatePickers() {
+    buildMulti(genresWrap, GENRES, pickedGenres);
+    buildMulti(moodsWrap, MOODS, pickedMoods);
+    buildMulti(tropesWrap, TROPES, pickedTropes);
+    bindSingle(statusWrap, (v) => activeStatus = v);
+    bindSingle(formatWrap, (v) => activeFormat = v);
+  }
+
+  // ---------- Quotes ----------
   function renderQuotes() {
     if (!quotesList) return;
     quotesList.innerHTML = "";
@@ -162,7 +151,7 @@
   }
 
   async function deleteSavedQuote(quoteId) {
-    const u = FB.auth?.currentUser || FB.auth().currentUser;
+    const u = await getAuthUser();
     if (!u || !bookId) return;
 
     const db = FB.db || FB.firestore();
@@ -179,7 +168,28 @@
     renderQuotes();
   }
 
-  // ---------- Cover extraction (best-effort, endrer ikke design) ----------
+  // ---------- File UI ----------
+  fileChip?.addEventListener("click", () => fileInput?.click());
+
+  fileInput?.addEventListener("change", async () => {
+    const f = fileInput.files && fileInput.files[0];
+    if (fileName) fileName.textContent = f ? f.name : "";
+    if (f && bookId) ensureReadButton(); // trykk -> lagre så lese
+
+    if (!f) return;
+    fileMeta = {
+      name: f.name,
+      type: /\.pdf$/i.test(f.name) ? "pdf" : (/\.epub$/i.test(f.name) ? "epub" : "unknown"),
+      size: f.size
+    };
+    coverBlob = await tryExtractCover(f);
+    if (coverBlob && coverPreview) {
+      const url = URL.createObjectURL(coverBlob);
+      coverPreview.src = url;
+    }
+  });
+
+  // ---------- Cover extraction ----------
   async function tryExtractCover(file) {
     try {
       if (!file) return null;
@@ -206,6 +216,34 @@
     return null;
   }
 
+  // ---------- Read-knapp (lagrer alltid før åpning) ----------
+  function ensureReadButton() {
+    const container = fileName?.parentElement || document.body;
+    let btn = byId("readNowBtn");
+    if (!btn) {
+      btn = document.createElement("button");
+      btn.id = "readNowBtn";
+      btn.className = "btn";
+      btn.style.marginLeft = "8px";
+      btn.textContent = "Read";
+      container.appendChild(btn);
+    }
+    btn.onclick = async () => {
+      try {
+        await saveChanges();                // lagre endringer
+        location.href = `reader.html?id=${bookId}`;
+      } catch (e) {
+        console.error(e);
+        alert("Could not open the reader yet. Try saving again.");
+      }
+    };
+  }
+
+  function maybeShowReadButton(d) {
+    const hasFile = !!(d?.fileUrl || d?.fileName);
+    if (hasFile && bookId) ensureReadButton();
+  }
+
   // ---------- Save / Delete ----------
   function collectBase() {
     return {
@@ -213,13 +251,11 @@
       author: (authorEl?.value || "").trim(),
       started: startedEl?.value || null,
       finished: finishedEl?.value || null,
-      // les status/format/valgte – vi rører ikke UI, bare leser state
       status: activeStatus || null,
       format: activeFormat || null,
       genres: Array.from(pickedGenres),
       moods: Array.from(pickedMoods),
       tropes: Array.from(pickedTropes),
-      // rating/spice: les fra data-attributtene hvis widgetene er tegnet
       rating: Number(ratingBar?.dataset.value || 0),
       spice: Number(spiceBar?.dataset.value || 0),
       review: (reviewEl?.value || "").trim(),
@@ -227,9 +263,8 @@
     };
   }
 
-  // *** STORAGE FIX – bruker FB.storage.ref(...) (ikke FB.storage()) ***
   async function uploadToStorage(uid, bookId, file, cover) {
-    const storage = FB.storage; // compat-objekt med .ref()
+    const storage = FB.storage;
     let fileUrl = null, coverUrl = null;
 
     if (file) {
@@ -253,10 +288,7 @@
 
     saveBtn && (saveBtn.disabled = true);
     try {
-      const u = FB.auth?.currentUser || (await new Promise((res, rej) => {
-        const unsub = (FB.auth ? FB.auth() : FB.firebase.auth()).onAuthStateChanged((x) => { unsub(); x ? res(x) : rej(new Error("Not signed in")); });
-      }));
-
+      const u = await getAuthUser();
       const db = FB.db || FB.firestore();
       const ref = db.collection("users").doc(u.uid).collection("books").doc(bookId);
 
@@ -290,9 +322,7 @@
       await ref.set(base, { merge: true });
       renderQuotes();
 
-      // Sørg for at Read-knappen vises når vi nettopp lastet ny fil
-      if ((up.fileUrl || base.fileName) && bookId) ensureReadButton(bookId);
-
+      if ((up.fileUrl || base.fileName) && bookId) ensureReadButton();
       alert("Changes saved ✓");
     } catch (e) {
       console.error(e);
@@ -307,14 +337,10 @@
     if (!confirm("Delete this book?")) return;
     deleteBtn && (deleteBtn.disabled = true);
     try {
-      const u = FB.auth?.currentUser || (await new Promise((res, rej) => {
-        const unsub = (FB.auth ? FB.auth() : FB.firebase.auth()).onAuthStateChanged((x) => { unsub(); x ? res(x) : rej(new Error("Not signed in")); });
-      }));
-
+      const u = await getAuthUser();
       const db = FB.db || FB.firestore();
       await db.collection("users").doc(u.uid).collection("books").doc(bookId).delete();
 
-      // best-effort: fjern filer i Storage
       try {
         const storage = FB.storage;
         const tryDel = async (p) => { try { await storage.ref(p).delete(); } catch { } };
@@ -332,7 +358,20 @@
     }
   }
 
-  // ---------- Apply loaded doc to UI (rører ikke layout) ----------
+  // Robust auth
+  async function getAuthUser() {
+    const auth =
+      (FB && FB.auth) ||
+      (FB && FB.firebase && FB.firebase.auth && FB.firebase.auth()) ||
+      (firebase && firebase.auth && firebase.auth());
+    const cur = auth && auth.currentUser;
+    if (cur) return cur;
+    return await new Promise((res, rej) => {
+      const unsub = auth.onAuthStateChanged(u => { unsub(); u ? res(u) : rej(new Error("Not signed in")); });
+    });
+  }
+
+  // ---------- Apply loaded doc ----------
   function applyDocToUI(d) {
     titleEl && (titleEl.value = d.title || "");
     authorEl && (authorEl.value = d.author || "");
@@ -340,12 +379,16 @@
     finishedEl && (finishedEl.value = d.finished || "");
     reviewEl && (reviewEl.value = d.review || "");
 
-    // behold state – vi tukler ikke med hvordan chips bygges i HTMLen din
     activeStatus = d.status || null;
     activeFormat = d.format || null;
     pickedGenres = new Set(Array.isArray(d.genres) ? d.genres : []);
     pickedMoods = new Set(Array.isArray(d.moods) ? d.moods : []);
     pickedTropes = new Set(Array.isArray(d.tropes) ? d.tropes : []);
+
+    // marker aktive etter at pickers er bygd
+    syncSingleActive(statusWrap, activeStatus);
+    syncSingleActive(formatWrap, activeFormat);
+    // Multi er allerede markert i buildMulti via picked-sets (kalles på nytt under init hvis ønskelig)
 
     if (d.coverUrl && coverPreview) coverPreview.src = d.coverUrl;
 
@@ -353,29 +396,45 @@
     pendingQuotes = [];
     renderQuotes();
 
-    // Vis filnavn om det finnes
     if (fileName && d.fileName && !fileName.textContent) fileName.textContent = d.fileName;
+
+    // Sett rating/spice verdi og trigge eksisterende widget til å re-rendere
+    if (ratingBar) {
+      ratingBar.dataset.value = String(Number(d.rating || 0));
+      const img = ratingBar.querySelector("img"); img && img.dispatchEvent(new Event("mouseleave"));
+    }
+    if (spiceBar) {
+      spiceBar.dataset.value = String(Number(d.spice || 0));
+      const img = spiceBar.querySelector("img"); img && img.dispatchEvent(new Event("mouseleave"));
+    }
   }
 
   // ---------- Init ----------
   document.addEventListener("DOMContentLoaded", async () => {
     if (!bookId) { alert("Missing ?id="); return; }
 
+    populatePickers();                 // bygg chips først
     saveBtn?.addEventListener("click", saveChanges);
     deleteBtn?.addEventListener("click", deleteBook);
 
     try {
-      const u = FB.auth?.currentUser || (await new Promise((res, rej) => {
-        const unsub = (FB.auth ? FB.auth() : FB.firebase.auth()).onAuthStateChanged((x) => { unsub(); x ? res(x) : rej(new Error("Not signed in")); });
-      }));
-
+      const u = await getAuthUser();
       const db = FB.db || FB.firestore();
-      const snap = await db.collection("users").doc(u.uid).collection("books").doc(bookId).get();
+      const ref = db.collection("users").doc(u.uid).collection("books").doc(bookId);
+      const snap = await ref.get();
       if (!snap.exists) { alert("Book not found."); return; }
-
       docData = snap.data() || {};
+
+      // buildMulti bruker picked-sets. Rebuild etter vi vet hva som er valgt:
+      pickedGenres = new Set(Array.isArray(docData.genres) ? docData.genres : []);
+      pickedMoods = new Set(Array.isArray(docData.moods) ? docData.moods : []);
+      pickedTropes = new Set(Array.isArray(docData.tropes) ? docData.tropes : []);
+      buildMulti(genresWrap, GENRES, pickedGenres);
+      buildMulti(moodsWrap, MOODS, pickedMoods);
+      buildMulti(tropesWrap, TROPES, pickedTropes);
+
       applyDocToUI(docData);
-      maybeShowReadButton(docData); // knappen vises når fil finnes
+      maybeShowReadButton(docData);
     } catch (e) {
       console.error(e);
       alert("Could not load the book. See console for details.");

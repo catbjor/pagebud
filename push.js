@@ -58,3 +58,6 @@
       .catch(e => window.toast?.(`Push error: ${e?.message || e}`));
   };
 })();
+
+// når ny hendelse kommer inn:
+window.pbFriendsBadge?.bump();

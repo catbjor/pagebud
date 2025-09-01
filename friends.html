@@ -91,6 +91,13 @@
   <script>
     requireAuth(() => startFriends && startFriends());
   </script>
+  <script>
+    // Når feed lastes, nullstill badge
+    try { localStorage.setItem('pb_feed_unread_count', '0'); } catch { }
+    // hvis headeren finnes på samme side, oppdater direkte også:
+    window.pbFriendsBadge?.clear();
+  </script>
+
 </body>
 
 </html>

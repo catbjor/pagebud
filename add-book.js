@@ -1,9 +1,5 @@
 /* =========================================================
- PageBud – add-book.js (stabil)
- - Binder Save-knappen trygt (funksjon i samme scope som handleSave)
- - Lagrer bok, laster opp fil/cover via FB.storage.ref(...)
- - Viser "Read"-knapp etter første lagring hvis fil finnes
- - Rører IKKE stjerne-/chili-widgeter eller layouten din
+ PageBud – add-book.js (stabil, chips-fix + Read lagrer først)
 ========================================================= */
 
 (function () {
@@ -29,14 +25,15 @@
     const tropesWrap = byId("tropes");
 
     const fileInput = byId("bookFile");
-    const fileChip = byId("btnPickFile"); // hvis du har en chip-knapp i HTML
-    const fileName = byId("fileName");    // label for filnavn
+    const fileChip = byId("btnPickFile");
+    const fileName = byId("fileName");
     const coverPreview = byId("coverPreview");
 
+    // rating/chili – UI styres av rating-controls.js. Vi leser KUN dataset.value.
     const ratingBar = byId("ratingBar");
     const spiceBar = byId("spiceBar");
-    const reviewEl = byId("review");
 
+    const reviewEl = byId("review");
     const quoteInput = byId("quoteInput");
     const addQuoteBtn = byId("addQuoteBtn");
     const quotesList = byId("quotesList");
@@ -48,9 +45,6 @@
     let pendingQuotes = [];
     let savedQuotes = [];
 
-    let ratingValue = 0;
-    let spiceValue = 0;
-
     let activeStatus = null;
     let activeFormat = null;
     let pickedGenres = new Set();
@@ -58,27 +52,15 @@
     let pickedTropes = new Set();
 
     let fileMeta = null;  // {name,type,size}
-    let coverBlob = null;  // blob for cover (om vi klarer å trekke ut)
+    let coverBlob = null;  // Blob (fra pdf/epub om vi klarer)
 
-    // ---------- Lister (bruker dine hvis definert) ----------
+    // ---------- Lister ----------
     const CONST = window.PB_CONST || {};
     const GENRES = CONST.GENRES || [];
     const MOODS = (CONST.MOODS || []).map(x => (typeof x === "string" ? x : x.name || ""));
     const TROPES = CONST.TROPES || [];
 
-    // ---------- Rating / Spice (IKKE endre UI; les verdier fra data-attrib om ønskelig) ----------
-    function initRatings() {
-        // Hvis du bruker PB_Rating i HTML, lar vi det tegne som før.
-        // Vi leser verdiene fra data-attributtene ved klikk, ellers fallback ved lagring.
-        ratingBar?.addEventListener("click", () => {
-            ratingValue = Number(ratingBar?.dataset.value || 0);
-        });
-        spiceBar?.addEventListener("click", () => {
-            spiceValue = Number(spiceBar?.dataset.value || 0);
-        });
-    }
-
-    // ---------- Pickers ----------
+    // ---------- Chips ----------
     function buildMulti(container, items, picked) {
         if (!container) return;
         container.innerHTML = "";
@@ -88,19 +70,25 @@
             el.className = "category";
             el.textContent = txt;
             el.dataset.val = txt;
-            el.addEventListener("click", () => {
-                const v = el.dataset.val;
-                if (picked.has(v)) { picked.delete(v); el.classList.remove("active"); }
-                else { picked.add(v); el.classList.add("active"); }
-            });
+            if (picked.has(txt)) el.classList.add("active");
             container.appendChild(el);
+        });
+        // solid delegasjon – stopp bubbling så <details> ikke spiser klikk
+        container.addEventListener("click", (e) => {
+            const btn = e.target.closest(".category");
+            if (!btn || !container.contains(btn)) return;
+            e.preventDefault(); e.stopPropagation();
+            const v = btn.dataset.val;
+            if (picked.has(v)) { picked.delete(v); btn.classList.remove("active"); }
+            else { picked.add(v); btn.classList.add("active"); }
         });
     }
     function buildSingle(container, onPick) {
         if (!container) return;
         container.addEventListener("click", (e) => {
             const btn = e.target.closest(".category");
-            if (!btn) return;
+            if (!btn || !container.contains(btn)) return;
+            e.preventDefault(); e.stopPropagation();
             $$(".category", container).forEach(n => n.classList.remove("active"));
             btn.classList.add("active");
             onPick(btn.dataset.val);
@@ -119,7 +107,6 @@
         if (!quotesList) return;
         quotesList.innerHTML = "";
 
-        // lagrede (med delete)
         savedQuotes.forEach(q => {
             const row = document.createElement("div");
             row.className = "card";
@@ -127,29 +114,17 @@
             row.style.display = "grid";
             row.style.gridTemplateColumns = "1fr auto";
             row.style.gap = "8px";
-
-            const txt = document.createElement("div");
-            txt.textContent = q.text;
-
+            const txt = document.createElement("div"); txt.textContent = q.text;
             const del = document.createElement("button");
-            del.className = "btn";
-            del.style.background = "#e23a3a";
-            del.style.color = "#fff";
-            del.textContent = "Delete";
-            del.addEventListener("click", () => deleteSavedQuote(q.id));
-
-            row.appendChild(txt);
-            row.appendChild(del);
-            quotesList.appendChild(row);
+            del.className = "btn"; del.style.background = "#e23a3a"; del.style.color = "#fff"; del.textContent = "Delete";
+            del.addEventListener("click", () => { savedQuotes = savedQuotes.filter(x => x.id !== q.id); renderQuotes(); });
+            row.appendChild(txt); row.appendChild(del); quotesList.appendChild(row);
         });
 
-        // pending (uten delete)
         pendingQuotes.forEach(q => {
             const row = document.createElement("div");
-            row.className = "card";
-            row.style.padding = "10px";
-            row.textContent = q.text;
-            quotesList.appendChild(row);
+            row.className = "card"; row.style.padding = "10px";
+            row.textContent = q.text; quotesList.appendChild(row);
         });
     }
 
@@ -163,25 +138,6 @@
     quoteInput?.addEventListener("keydown", (e) => {
         if ((e.metaKey || e.ctrlKey) && e.key === "Enter") addQuoteBtn?.click();
     });
-
-    async function deleteSavedQuote(quoteId) {
-        if (!createdBookId) return;
-        const u = FB.auth?.currentUser || FB.auth().currentUser;
-        if (!u) return;
-
-        const db = FB.db || FB.firestore();
-        const ref = db.collection("users").doc(u.uid).collection("books").doc(createdBookId);
-
-        await db.runTransaction(async (tx) => {
-            const snap = await tx.get(ref);
-            if (!snap.exists) return;
-            const arr = Array.isArray(snap.data().quotes) ? snap.data().quotes : [];
-            tx.update(ref, { quotes: arr.filter(q => q.id !== quoteId) });
-        });
-
-        savedQuotes = savedQuotes.filter(q => q.id !== quoteId);
-        renderQuotes();
-    }
 
     // ---------- File UI ----------
     fileChip?.addEventListener("click", () => fileInput?.click());
@@ -199,9 +155,10 @@
             const url = URL.createObjectURL(coverBlob);
             coverPreview.src = url;
         }
+        ensureReadButton(); // vis med én gang – klikker lagrer først
     });
 
-    // ---------- Cover extraction (best-effort) ----------
+    // ---------- Cover extraction ----------
     async function tryExtractCover(file) {
         try {
             if (!file) return null;
@@ -228,8 +185,8 @@
         return null;
     }
 
-    // ---------- Read-knapp ----------
-    function ensureReadButton(bookId) {
+    // ---------- Read-knapp (lagrer alltid først) ----------
+    function ensureReadButton() {
         const container = fileName?.parentElement || document.body;
         let btn = document.getElementById("readNowBtn");
         if (!btn) {
@@ -240,7 +197,15 @@
             btn.textContent = "Read";
             container.appendChild(btn);
         }
-        btn.onclick = () => location.href = `reader.html?id=${bookId}`;
+        btn.onclick = async () => {
+            try {
+                const id = await handleSave(); // lagrer (eller oppdaterer) først
+                if (id) location.href = `reader.html?id=${id}`;
+            } catch (e) {
+                console.error(e);
+                alert("Could not open the reader yet. Try saving again.");
+            }
+        };
     }
 
     // ---------- Save pipeline ----------
@@ -255,9 +220,8 @@
             genres: Array.from(pickedGenres),
             moods: Array.from(pickedMoods),
             tropes: Array.from(pickedTropes),
-            // Les rating/spice fra data-attributtene hvis de er satt
-            rating: Number(ratingBar?.dataset.value || ratingValue || 0),
-            spice: Number(spiceBar?.dataset.value || spiceValue || 0),
+            rating: Number(ratingBar?.dataset.value || 0),
+            spice: Number(spiceBar?.dataset.value || 0),
             review: (reviewEl?.value || "").trim(),
             favorite: false,
             createdAt: new Date(),
@@ -265,9 +229,9 @@
         };
     }
 
-    // *** STORAGE v9 compat: bruk FB.storage.ref(...) – IKKE FB.storage() ***
+    // Storage (compat): FB.storage.ref(...)
     async function uploadToStorage(uid, bookId, file, cover) {
-        const storage = FB.storage; // compat-objekt med .ref()
+        const storage = FB.storage;
         let fileUrl = null, coverUrl = null;
 
         if (file) {
@@ -311,8 +275,8 @@
         pendingQuotes = [];
         renderQuotes();
 
-        if ((up.fileUrl || f) && createdBookId) ensureReadButton(createdBookId);
-        alert("Book saved ✓");
+        if ((up.fileUrl || f) && createdBookId) ensureReadButton();
+        return createdBookId;
     }
 
     async function updateSave(u) {
@@ -351,52 +315,58 @@
         await ref.set(patch, { merge: true });
         renderQuotes();
 
-        if ((up.fileUrl || fileMeta) && createdBookId) ensureReadButton(createdBookId);
-        alert("Changes saved ✓");
+        if ((up.fileUrl || fileMeta) && createdBookId) ensureReadButton();
+        return createdBookId;
+    }
+
+    // Robust auth
+    async function getAuthUser() {
+        const auth =
+            (FB && FB.auth) ||
+            (FB && FB.firebase && FB.firebase.auth && FB.firebase.auth()) ||
+            (firebase && firebase.auth && firebase.auth());
+        const cur = auth && auth.currentUser;
+        if (cur) return cur;
+        return await new Promise((res, rej) => {
+            const unsub = auth.onAuthStateChanged(u => { unsub(); u ? res(u) : rej(new Error("Not signed in")); });
+        });
     }
 
     async function handleSave() {
         const t = (titleEl?.value || "").trim();
         const a = (authorEl?.value || "").trim();
-        if (!t || !a) { alert("Title and Author are required."); return; }
+        if (!t || !a) { alert("Title and Author are required."); throw new Error("missing fields"); }
 
-        // lås knapp
         saveBtn && (saveBtn.disabled = true);
         try {
-            // sørg for bruker
-            const u = FB.auth?.currentUser || (await new Promise((res, rej) => {
-                const unsub = (FB.auth ? FB.auth() : FB.firebase.auth()).onAuthStateChanged((x) => { unsub(); x ? res(x) : rej(new Error("Not signed in")); });
-            }));
-
-            if (!createdBookId) await firstSave(u);
-            else await updateSave(u);
+            const u = await getAuthUser();
+            if (!createdBookId) return await firstSave(u);
+            return await updateSave(u);
         } catch (e) {
             console.error(e);
-            alert("Failed to save the book. See console for details.");
+            alert(e?.message || "Failed to save the book. See console for details.");
+            throw e;
         } finally {
             saveBtn && (saveBtn.disabled = false);
         }
     }
 
-    // ---------- Bind Save (viktig: i samme scope som handleSave) ----------
+    // ---------- Bind ----------
     function bindSave() {
         form?.addEventListener("submit", (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            handleSave();
+            e.preventDefault(); e.stopPropagation();
+            handleSave().catch(() => { });
         });
         saveBtn?.addEventListener("click", (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            handleSave();
+            e.preventDefault(); e.stopPropagation();
+            handleSave().catch(() => { });
         });
     }
 
     // ---------- Init ----------
     document.addEventListener("DOMContentLoaded", () => {
         populatePickers();
-        initRatings();   // rører ikke UI – kun leser klikk
-        bindSave();      // <— binder save trygt
+        bindSave();
         if (coverPreview) coverPreview.src = coverPreview.src || "";
     });
 })();
