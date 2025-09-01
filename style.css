@@ -1263,3 +1263,105 @@ img,
 .card {
   position: relative;
 }
+
+/* --- File input row --- */
+.form-row.file-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Prøv å style native file-knappen som chip */
+input[type="file"]::file-selector-button {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  padding: 6px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  font: inherit;
+}
+
+input[type="file"]::file-selector-button:hover {
+  background: var(--card);
+}
+
+/* Fallback-chip (hvis browser ignorerer ::file-selector-button) */
+.btn-file-chip {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  padding: 6px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  line-height: 1;
+  /* matcher «category»-looket uten å forstyrre andre */
+}
+
+.btn-file-chip:hover {
+  background: var(--card);
+}
+
+/* Valgfri liten label for filnavn */
+.file-name {
+  font-size: .9rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* File-rad – ingen visuelt bråk */
+.form-row.file-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Skjul selve inputen, men bevar tilgjengelighet */
+#bookFile {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Chip-knappen som matcher tag-stilen */
+.btn-file-chip {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.btn-file-chip:hover {
+  background: var(--card);
+}
+
+/* Filnavn som rolig tekst */
+.file-name {
+  font-size: .9rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 50%;
+}
+
+.page-subtle {
+  font-size: 0.95rem;
+  font-weight: 500;
+  /* litt tynnere */
+  color: var(--text-light);
+  /* passer til temaet ditt */
+  margin-top: 4px;
+  /* tett under PageBud */
+}

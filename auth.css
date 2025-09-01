@@ -1,103 +1,166 @@
 /* =============================
    Auth page styles (login/register)
    ============================= */
+
+:root {
+    --glass-bg: rgba(255, 255, 255, 0.12);
+    --glass-border: rgba(255, 255, 255, 0.25);
+}
+
+.auth-bg {
+    /* subtil gradient bakgrunn (holder seg innen temaet ditt) */
+    background: linear-gradient(180deg, var(--background) 0%, rgba(0, 0, 0, 0.04) 100%);
+}
+
 .auth-shell {
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 100dvh;
+    min-height: 100dvh;
     padding: 20px;
-    background: var(--background);
 }
 
 .auth-card {
+    width: 100%;
+    max-width: 420px;
+    border-radius: 24px;
+    padding: 28px;
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 24px;
-    width: 100%;
-    max-width: 400px;
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.16);
+}
+
+.glass {
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    border: 1px solid var(--glass-border);
 }
 
 .auth-title {
-    text-align: center;
     font-weight: 800;
     font-size: 1.8rem;
-    margin-bottom: 20px;
+    margin-bottom: 18px;
     color: var(--text);
 }
 
-.btn-google {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    background: #fff;
-    border: 1px solid #ddd;
-    padding: 10px 14px;
-    border-radius: 8px;
-    font-weight: 600;
-    cursor: pointer;
-    color: #000000;
-    transition: background 0.2s;
-}
-
-.btn-google:hover {
-    background: #f7f7f7;
-}
-
-.auth-sep {
-    display: flex;
-    align-items: center;
+.auth-title.center {
     text-align: center;
-    margin: 20px 0;
-    color: var(--text-light);
-}
-
-.auth-sep::before,
-.auth-sep::after {
-    content: "";
-    flex: 1;
-    border-bottom: 1px solid var(--border);
-}
-
-.auth-sep span {
-    padding: 0 10px;
-    font-size: 0.85rem;
 }
 
 .auth-form label {
     font-weight: 600;
     font-size: 0.9rem;
     display: block;
-    margin: 10px 0 4px;
+    margin: 12px 0 6px;
     color: var(--text);
 }
 
 .auth-form input {
     width: 100%;
-    padding: 10px;
-    border-radius: 8px;
+    padding: 12px;
+    border-radius: 14px;
     border: 1px solid var(--border);
     font-size: 1rem;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
     background: var(--background);
     color: var(--text);
 }
 
-.auth-form .row {
+.row {
     display: flex;
     gap: 10px;
+}
+
+.row-inline {
+    align-items: baseline;
     justify-content: space-between;
 }
 
-.btn-muted {
-    background: var(--border);
+.link-muted {
     color: var(--text-light);
+    font-size: 0.9rem;
+    text-decoration: none;
 }
 
+.link-muted:hover {
+    text-decoration: underline;
+}
+
+.chk {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 6px 0 14px;
+    color: var(--text);
+    font-size: 0.95rem;
+}
+
+.btn {
+    width: 100%;
+    padding: 12px 16px;
+    border-radius: 20px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    font-weight: 700;
+    transition: transform .04s ease, background .2s ease, border-color .2s ease;
+}
+
+.btn:active {
+    transform: translateY(1px);
+}
+
+.btn-dark {
+    background: #141414;
+    color: #fff;
+}
+
+.btn-dark:hover {
+    background: #000;
+}
+
+.btn-light-outline {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+}
+
+.btn-light-outline:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.auth-footer-single {
+    margin-top: 18px;
+}
+
+.progress-dots {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 8px;
+}
+
+.progress-dots .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--border);
+}
+
+.progress-dots .dot.active {
+    background: var(--text);
+}
+
+.signup-greeting {
+    text-align: center;
+    color: var(--text);
+    font-weight: 700;
+    margin: 4px 0 8px;
+    min-height: 24px;
+    /* reserver plass for å unngå layout-jump */
+}
+
+/* Small text reused */
 .muted.small {
     font-size: 0.8rem;
     line-height: 1.3;

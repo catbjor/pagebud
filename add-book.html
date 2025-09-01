@@ -9,6 +9,10 @@
 
   <link rel="stylesheet" href="style.css" />
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js"></script>
+  <link rel="stylesheet" href="rating.css">
+  <script src="rating-controls.js" defer></script>
+  <link rel="stylesheet" href="rating.css">
+  <link rel="stylesheet" href="file-chip.css">
 
   <!-- Firebase (compat) + app init -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -113,10 +117,13 @@
         </div>
 
         <!-- Book File -->
-        <div class="form-row">
-          <label>Book File (PDF/EPUB)</label>
+        <div class="form-row file-row">
+          <label>UPLOAD / REPLACE (PDF/EPUB)</label>
           <input id="bookFile" type="file" accept=".pdf,.epub">
+          <button type="button" id="btnPickFile" class="btn-file-chip">Velg fil</button>
+          <span id="fileName" class="file-name"></span>
         </div>
+
 
         <!-- Genres/Moods/Tropes -->
         <details class="card" id="genresBox" open>

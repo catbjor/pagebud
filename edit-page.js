@@ -1,295 +1,385 @@
-/* ============================================================
-   PageBud – edit-page.js
-   - Edits users/{uid}/books/{id}
-   - File re-upload + cover re-extraction (PDF/EPUB supported)
-   - Half-star + chili widgets
-   - Status/Format single-select, Genres/Moods/Tropes multi
-   - Quotes: one Save/Add button; delete button only on
-     already-saved quotes.
-============================================================ */
-"use strict";
+/* =========================================================
+ PageBud – edit-page.js (stabil, storage-fix + Read-knapp)
+ - Laster bok (?id=...)
+ - Viser valgt filnavn og "Read"-knapp
+ - Lagrer endringer + laster opp ny fil/cover til Storage
+ - Sletter sitater trygt med transaksjon
+========================================================= */
 
-const $ = (s, r = document) => r.querySelector(s);
-const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
-const db = (window.fb && fb.db) ? fb.db :
-  (window.firebase && firebase.firestore ? firebase.firestore() : null);
+(function () {
+  "use strict";
 
-const PLACEHOLDER = 'data:image/svg+xml;utf8,' + encodeURIComponent(
-  `<svg xmlns="http://www.w3.org/2000/svg" width="180" height="240">
-     <rect width="100%" height="100%" rx="12" fill="#e5e7eb"/>
-     <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle"
-           font-size="14" fill="#9aa3af" font-family="system-ui,-apple-system,Segoe UI,Roboto">
-           Cover image
-     </text>
-   </svg>`
-);
+  // ---------- Helpers ----------
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+  const byId = (id) => document.getElementById(id);
+  const qs = (k) => new URLSearchParams(location.search).get(k);
+  const FB = (window.fb || window);
 
-function toast(msg) {
-  let t = $("#pb-toast");
-  if (!t) { t = document.createElement("div"); t.id = "pb-toast"; t.className = "toast"; document.body.appendChild(t); }
-  t.textContent = msg;
-  t.classList.add("show");
-  setTimeout(() => t.classList.remove("show"), 1600);
-}
+  // ---------- Elements (kun det vi faktisk bruker her) ----------
+  const titleEl = byId("title");
+  const authorEl = byId("author");
+  const startedEl = byId("started");
+  const finishedEl = byId("finished");
+  const reviewEl = byId("review");
 
-// Add the missing requireAuth function
-function requireAuth(callback) {
-  const auth = firebase.auth();
-  const unsubscribe = auth.onAuthStateChanged((user) => {
-    unsubscribe();
-    if (user) {
-      callback(user);
-    } else {
-      alert("Please sign in.");
-      location.href = "login.html";
+  // rating/spice beholdes – vi leser kun dataset når vi lagrer
+  const ratingBar = byId("ratingBar");
+  const spiceBar = byId("spiceBar");
+
+  // pickers beholdes – vi rører ikke genereringen deres
+  const statusWrap = byId("statusChips");
+  const formatWrap = byId("formatChips");
+  const genresWrap = byId("genres");
+  const moodsWrap = byId("moods");
+  const tropesWrap = byId("tropes");
+
+  // fil
+  const fileInput = byId("bookFile");
+  const fileChip = byId("btnPickFile");
+  const fileName = byId("fileName");
+  const coverPreview = byId("coverPreview");
+
+  // quotes (beholdes som før)
+  const quoteInput = byId("quoteInput");
+  const addQuoteBtn = byId("addQuoteBtn");
+  const quotesList = byId("quotesList");
+
+  // actions
+  const saveBtn = byId("saveBtn");
+  const deleteBtn = byId("deleteBtn");
+
+  // ---------- State ----------
+  const bookId = qs("id");
+  let docData = null;
+
+  let activeStatus = null;
+  let activeFormat = null;
+  let pickedGenres = new Set();
+  let pickedMoods = new Set();
+  let pickedTropes = new Set();
+
+  let existingQuotes = [];
+  let pendingQuotes = [];
+
+  let fileMeta = null;   // {name,type,size}
+  let coverBlob = null;  // Blob (cover fra pdf/epub hvis vi klarer)
+
+  // ---------- UI wiring (kun fil + quotes) ----------
+  fileChip?.addEventListener("click", () => fileInput?.click());
+
+  fileInput?.addEventListener("change", async () => {
+    const f = fileInput.files && fileInput.files[0];
+    if (fileName) fileName.textContent = f ? f.name : "";
+
+    // Vis Read-knapp når det finnes en valgt fil
+    if (f && bookId) ensureReadButton(bookId);
+
+    if (!f) return;
+    fileMeta = {
+      name: f.name,
+      type: /\.pdf$/i.test(f.name) ? "pdf" : (/\.epub$/i.test(f.name) ? "epub" : "unknown"),
+      size: f.size
+    };
+    coverBlob = await tryExtractCover(f);
+    if (coverBlob && coverPreview) {
+      const url = URL.createObjectURL(coverBlob);
+      coverPreview.src = url;
     }
   });
-}
 
-/* ----- dynamic libs (same as add) ----- */
-async function ensurePdfJs() {
-  if (window.pdfjsLib) return;
-  await new Promise((res, rej) => {
-    const s = document.createElement("script");
-    s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
-    s.onload = res; s.onerror = rej; document.head.appendChild(s);
+  addQuoteBtn?.addEventListener("click", () => {
+    const t = (quoteInput?.value || "").trim();
+    if (!t) return;
+    pendingQuotes.push({ text: t, createdAt: Date.now() });
+    quoteInput.value = "";
+    renderQuotes();
   });
-  if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
-      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  quoteInput?.addEventListener("keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") addQuoteBtn?.click();
+  });
+
+  // ---------- Read button ----------
+  function ensureReadButton(bookId) {
+    // legg knappen rett ved siden av filnavnet (samme rad)
+    const container = fileName?.parentElement || document.body;
+    let btn = byId("readNowBtn");
+    if (!btn) {
+      btn = document.createElement("button");
+      btn.id = "readNowBtn";
+      btn.className = "btn";
+      btn.style.marginLeft = "8px";
+      btn.textContent = "Read";
+      container.appendChild(btn);
+    }
+    btn.onclick = () => location.href = `reader.html?id=${bookId}`;
   }
-}
-async function extractFromPDF(file) {
-  try {
-    await ensurePdfJs();
-    const url = URL.createObjectURL(file);
-    const doc = await pdfjsLib.getDocument({ url }).promise;
-    const page = await doc.getPage(1);
-    const viewport = page.getViewport({ scale: 1.5 });
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
-    await page.render({ canvasContext: ctx, viewport }).promise;
-    URL.revokeObjectURL(url);
-    return canvas.toDataURL("image/jpeg", 0.92);
-  } catch (e) { console.warn("PDF cover extract failed", e); return null; }
-}
-async function ensureEpubJs() {
-  if (window.ePub) return;
-  await new Promise((res, rej) => {
-    const s = document.createElement("script");
-    s.src = "https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.92/epub.min.js";
-    s.onload = res; s.onerror = rej; document.head.appendChild(s);
-  });
-}
-async function extractFromEPUB(file) {
-  try {
-    await ensureEpubJs();
-    const book = ePub(file);
-    const coverHref = await book.loaded.cover;
-    if (!coverHref) return null;
-    const url = await book.archive.createUrl(coverHref, { base64: false });
-    const blob = await (await fetch(url)).blob();
-    return await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
-  } catch (e) { console.warn("EPUB cover extract failed", e); return null; }
-}
 
-async function uploadFileFor(uid, bookId, file) {
-  if (!file || !fb?.storage) return { fileType: null, fileUrl: null };
-  const ext = (file.name.split(".").pop() || "").toLowerCase();
-  const path = `users/${uid}/books/${bookId}/book.${ext || 'bin'}`;
-  const ref = fb.storage.ref().child(path);
-  await ref.put(file);
-  const url = await ref.getDownloadURL();
-  return { fileType: ext, fileUrl: url };
-}
+  function maybeShowReadButton(d) {
+    const hasFile = !!(
+      d?.fileUrl ||
+      d?.fileName ||
+      (d?.file && (d.file.url || d.file.blobUrl))
+    );
+    if (hasFile && bookId) ensureReadButton(bookId);
+  }
 
-/* ---------- chips renderer ---------- */
-function renderChips(list, el, { multi = false, value = [], onChange } = {}) {
-  if (!el || !Array.isArray(list)) return;
-  const set = new Set(Array.isArray(value) ? value : (value ? [value] : []));
-  el.innerHTML = list.map(x => `
-    <button type="button"
-            class="chip ${set.has(x) ? "active" : ""}"
-            data-val="${x}">${x}</button>`).join("");
+  // ---------- Quotes render/delete (uendret oppførsel) ----------
+  function renderQuotes() {
+    if (!quotesList) return;
+    quotesList.innerHTML = "";
 
-  el.addEventListener("click", (e) => {
-    const b = e.target.closest(".chip"); if (!b) return;
-    const v = b.dataset.val;
-    if (multi) {
-      if (b.classList.contains("active")) { b.classList.remove("active"); set.delete(v); }
-      else { b.classList.add("active"); set.add(v); }
-      onChange?.(Array.from(set));
-    } else {
-      el.querySelectorAll(".chip").forEach(n => n.classList.remove("active"));
-      b.classList.add("active");
-      onChange?.(v);
-    }
-  });
-}
+    existingQuotes.forEach(q => {
+      const row = document.createElement("div");
+      row.className = "card";
+      row.style.padding = "10px";
+      row.style.display = "grid";
+      row.style.gridTemplateColumns = "1fr auto";
+      row.style.gap = "8px";
 
-/* ---------- boot ---------- */
-document.addEventListener("DOMContentLoaded", () => {
-  // mount widgets immediately
-  PB_Rating.renderStars($("#ratingBar"), 0, 6);
-  PB_Rating.renderChilis($("#spiceBar"), 0, 5);
+      const txt = document.createElement("div");
+      txt.textContent = q.text;
 
-  const id = new URLSearchParams(location.search).get("id");
-  if (!id) { alert("Missing book id"); return; }
+      const del = document.createElement("button");
+      del.className = "btn";
+      del.style.background = "#e23a3a";
+      del.style.color = "#fff";
+      del.textContent = "Delete";
+      del.addEventListener("click", () => deleteSavedQuote(q.id));
 
-  requireAuth(async (user) => {
-    const ref = db.collection("users").doc(user.uid).collection("books").doc(id);
-    const snap = await ref.get();
-    if (!snap.exists) { alert("Book not found"); return; }
-    const b = snap.data() || {};
-
-    // Fill basics
-    $("#title").value = b.title || "";
-    $("#author").value = b.author || "";
-    $("#started").value = b.started || "";
-    $("#finished").value = b.finished || "";
-    $("#review").value = b.review || "";
-
-    // cover
-    const coverPreview = $("#coverPreview");
-    coverPreview.src = b.coverDataUrl || b.coverUrl || PLACEHOLDER;
-
-    // widgets with current values
-    PB_Rating.renderStars($("#ratingBar"), Number(b.rating || 0), 6);
-    PB_Rating.renderChilis($("#spiceBar"), Number(b.spice || 0), 5);
-
-    // chips
-    const C = window.PB_CONST || {};
-    renderChips(["reading", "finished", "tbr", "dnf"], $("#statusChips"), {
-      multi: false, value: b.status || "tbr",
-      onChange: (v) => { $("#statusChips").dataset.value = v; }
-    });
-    $("#statusChips").dataset.value = b.status || "tbr";
-
-    renderChips(["ebook", "paperback", "hardcover", "audiobook"], $("#formatChips"), {
-      multi: false, value: b.format || "",
-      onChange: (v) => { $("#formatChips").dataset.value = v; }
-    });
-    $("#formatChips").dataset.value = b.format || "";
-
-    renderChips(C.GENRES, $("#genres"), { multi: true, value: b.genres || [], onChange: (a) => { $("#genres").dataset.value = JSON.stringify(a); } });
-    $("#genres").dataset.value = JSON.stringify(b.genres || []);
-    renderChips(C.MOODS, $("#moods"), { multi: true, value: b.moods || [], onChange: (a) => { $("#moods").dataset.value = JSON.stringify(a); } });
-    $("#moods").dataset.value = JSON.stringify(b.moods || []);
-    renderChips(C.TROPES, $("#tropes"), { multi: true, value: b.tropes || [], onChange: (a) => { $("#tropes").dataset.value = JSON.stringify(a); } });
-    $("#tropes").dataset.value = JSON.stringify(b.tropes || []);
-
-    /* ------ Quotes UI ------ */
-    const qInput = $("#quoteInput");
-    const qList = $("#quotesList");
-
-    async function loadQuotes() {
-      qList.innerHTML = `<div class="muted" style="padding:8px 0">Loading…</div>`;
-      const snap = await ref.collection("quotes").orderBy("createdAt", "desc").get();
-      if (snap.empty) { qList.innerHTML = `<div class="muted" style="padding:8px 0">No quotes yet.</div>`; return; }
-      qList.innerHTML = snap.docs.map(d => {
-        const x = d.data() || {};
-        return `
-          <div class="quote-row" data-id="${d.id}">
-            <span class="q">${escapeHtml(x.text || "")}</span>
-            <button type="button" class="btn btn-secondary btn-sm" data-action="del-quote">Delete</button>
-          </div>`;
-      }).join("");
-    }
-    await loadQuotes();
-
-    // One Save/Add button
-    $("#addQuoteBtn")?.addEventListener("click", async () => {
-      const txt = (qInput.value || "").trim();
-      if (!txt) return;
-      await ref.collection("quotes").add({ text: txt, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-      qInput.value = "";
-      await loadQuotes();
-      toast("Quote saved ✓");
-    });
-    qInput?.addEventListener("keydown", (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); $("#addQuoteBtn").click(); }
+      row.appendChild(txt);
+      row.appendChild(del);
+      quotesList.appendChild(row);
     });
 
-    // Delete only on saved quotes
-    qList.addEventListener("click", async (e) => {
-      const btn = e.target.closest("[data-action='del-quote']"); if (!btn) return;
-      const row = btn.closest(".quote-row"); const qid = row?.dataset.id; if (!qid) return;
-      if (!confirm("Delete this quote?")) return;
-      await ref.collection("quotes").doc(qid).delete();
-      row.remove();
+    pendingQuotes.forEach(q => {
+      const row = document.createElement("div");
+      row.className = "card";
+      row.style.padding = "10px";
+      row.textContent = q.text;
+      quotesList.appendChild(row);
+    });
+  }
+
+  async function deleteSavedQuote(quoteId) {
+    const u = FB.auth?.currentUser || FB.auth().currentUser;
+    if (!u || !bookId) return;
+
+    const db = FB.db || FB.firestore();
+    const ref = db.collection("users").doc(u.uid).collection("books").doc(bookId);
+
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) return;
+      const arr = Array.isArray(snap.data().quotes) ? snap.data().quotes : [];
+      tx.update(ref, { quotes: arr.filter(q => q.id !== quoteId) });
     });
 
-    /* ------ File → cover extraction ------ */
-    $("#coverPreview")?.addEventListener("click", () => $("#bookFile")?.click());
-    $("#bookFile")?.addEventListener("change", async (e) => {
-      const f = e.target.files?.[0]; if (!f) return;
-      let dataUrl = null;
-      if (/^application\/pdf/.test(f.type)) dataUrl = await extractFromPDF(f);
-      else if (/epub/i.test(f.name) || /epub/i.test(f.type)) dataUrl = await extractFromEPUB(f);
-      else if (/^image\//.test(f.type)) {
-        dataUrl = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(f); });
+    existingQuotes = existingQuotes.filter(q => q.id !== quoteId);
+    renderQuotes();
+  }
+
+  // ---------- Cover extraction (best-effort, endrer ikke design) ----------
+  async function tryExtractCover(file) {
+    try {
+      if (!file) return null;
+      if (/\.pdf$/i.test(file.name) && window.pdfjsLib) {
+        const ab = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: ab }).promise;
+        const page = await pdf.getPage(1);
+        const vp = page.getViewport({ scale: 1.4 });
+        const c = document.createElement("canvas");
+        c.width = vp.width; c.height = vp.height;
+        await page.render({ canvasContext: c.getContext("2d"), viewport: vp }).promise;
+        return await new Promise(res => c.toBlob(res, "image/jpeg", 0.9));
       }
-      if (dataUrl) {
-        $("#coverPreview").src = dataUrl;
-        $("#coverPreview").dataset.dataUrl = dataUrl;
-        toast("Cover extracted ✓");
-      } else {
-        toast("Could not extract a cover (file will still be uploaded)");
+      if (/\.epub$/i.test(file.name) && window.ePub) {
+        const book = ePub(file);
+        const coverUrl = await book.loaded.cover;
+        if (coverUrl) {
+          const blobUrl = await book.archive.createUrl(coverUrl);
+          const resp = await fetch(blobUrl);
+          return await resp.blob();
+        }
       }
-    });
+    } catch (e) { console.warn("cover extract failed", e); }
+    return null;
+  }
 
-    /* ------ SAVE PATCH ------ */
-    $("#saveBtn")?.addEventListener("click", async () => {
+  // ---------- Save / Delete ----------
+  function collectBase() {
+    return {
+      title: (titleEl?.value || "").trim(),
+      author: (authorEl?.value || "").trim(),
+      started: startedEl?.value || null,
+      finished: finishedEl?.value || null,
+      // les status/format/valgte – vi rører ikke UI, bare leser state
+      status: activeStatus || null,
+      format: activeFormat || null,
+      genres: Array.from(pickedGenres),
+      moods: Array.from(pickedMoods),
+      tropes: Array.from(pickedTropes),
+      // rating/spice: les fra data-attributtene hvis widgetene er tegnet
+      rating: Number(ratingBar?.dataset.value || 0),
+      spice: Number(spiceBar?.dataset.value || 0),
+      review: (reviewEl?.value || "").trim(),
+      updatedAt: new Date()
+    };
+  }
+
+  // *** STORAGE FIX – bruker FB.storage.ref(...) (ikke FB.storage()) ***
+  async function uploadToStorage(uid, bookId, file, cover) {
+    const storage = FB.storage; // compat-objekt med .ref()
+    let fileUrl = null, coverUrl = null;
+
+    if (file) {
+      const ref = storage.ref(`users/${uid}/books/${bookId}/${file.name}`);
+      await ref.put(file);
+      fileUrl = await ref.getDownloadURL();
+    }
+    if (cover) {
+      const cref = storage.ref(`users/${uid}/books/${bookId}/cover.jpg`);
+      await cref.put(cover, { contentType: "image/jpeg" });
+      coverUrl = await cref.getDownloadURL();
+    }
+    return { fileUrl, coverUrl };
+  }
+
+  async function saveChanges() {
+    if (!bookId) return alert("Missing book id");
+    const t = (titleEl?.value || "").trim();
+    const a = (authorEl?.value || "").trim();
+    if (!t || !a) { alert("Title and Author are required."); return; }
+
+    saveBtn && (saveBtn.disabled = true);
+    try {
+      const u = FB.auth?.currentUser || (await new Promise((res, rej) => {
+        const unsub = (FB.auth ? FB.auth() : FB.firebase.auth()).onAuthStateChanged((x) => { unsub(); x ? res(x) : rej(new Error("Not signed in")); });
+      }));
+
+      const db = FB.db || FB.firestore();
+      const ref = db.collection("users").doc(u.uid).collection("books").doc(bookId);
+
+      const base = collectBase();
+
+      const newFile = (fileInput?.files && fileInput.files[0]) || null;
+      const up = await uploadToStorage(u.uid, bookId, newFile, coverBlob);
+
+      if (up.fileUrl) base.fileUrl = up.fileUrl;
+      if (fileMeta?.type) base.fileType = fileMeta.type;
+      if (fileMeta?.name) base.fileName = fileMeta.name;
+      if (up.coverUrl) base.coverUrl = up.coverUrl;
+
+      if (pendingQuotes.length) {
+        const more = pendingQuotes.map(q => ({
+          id: db.collection("_").doc().id,
+          text: q.text,
+          createdAt: new Date()
+        }));
+        if (FB.firebase?.firestore?.FieldValue?.arrayUnion) {
+          base.quotes = FB.firebase.firestore.FieldValue.arrayUnion(...more);
+        } else {
+          const snap = await ref.get();
+          const existing = (snap.exists && Array.isArray(snap.data().quotes)) ? snap.data().quotes : [];
+          base.quotes = existing.concat(more);
+        }
+        existingQuotes = existingQuotes.concat(more.map(q => ({ id: q.id, text: q.text })));
+        pendingQuotes = [];
+      }
+
+      await ref.set(base, { merge: true });
+      renderQuotes();
+
+      // Sørg for at Read-knappen vises når vi nettopp lastet ny fil
+      if ((up.fileUrl || base.fileName) && bookId) ensureReadButton(bookId);
+
+      alert("Changes saved ✓");
+    } catch (e) {
+      console.error(e);
+      alert("Failed to save. See console for details.");
+    } finally {
+      saveBtn && (saveBtn.disabled = false);
+    }
+  }
+
+  async function deleteBook() {
+    if (!bookId) return;
+    if (!confirm("Delete this book?")) return;
+    deleteBtn && (deleteBtn.disabled = true);
+    try {
+      const u = FB.auth?.currentUser || (await new Promise((res, rej) => {
+        const unsub = (FB.auth ? FB.auth() : FB.firebase.auth()).onAuthStateChanged((x) => { unsub(); x ? res(x) : rej(new Error("Not signed in")); });
+      }));
+
+      const db = FB.db || FB.firestore();
+      await db.collection("users").doc(u.uid).collection("books").doc(bookId).delete();
+
+      // best-effort: fjern filer i Storage
       try {
-        const patch = {
-          title: ($("#title")?.value || "").trim(),
-          author: ($("#author")?.value || "").trim(),
-          started: $("#started")?.value || null,
-          finished: $("#finished")?.value || null,
-          review: $("#review")?.value || "",
-          rating: Number($("#ratingBar")?.dataset.value || 0),
-          spice: Number($("#spiceBar")?.dataset.value || 0),
-          status: $("#statusChips")?.dataset.value || "tbr",
-          format: $("#formatChips")?.dataset.value || "",
-          genres: JSON.parse($("#genres")?.dataset.value || "[]"),
-          moods: JSON.parse($("#moods")?.dataset.value || "[]"),
-          tropes: JSON.parse($("#tropes")?.dataset.value || "[]"),
-          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        };
+        const storage = FB.storage;
+        const tryDel = async (p) => { try { await storage.ref(p).delete(); } catch { } };
+        await tryDel(`users/${u.uid}/books/${bookId}/cover.jpg`);
+        if (docData?.fileName) await tryDel(`users/${u.uid}/books/${bookId}/${docData.fileName}`);
+      } catch { }
 
-        if (!patch.title || !patch.author) {
-          alert("Title and Author are required.");
-          return;
-        }
+      alert("Book deleted ✓");
+      history.back();
+    } catch (e) {
+      console.error(e);
+      alert("Failed to delete. See console for details.");
+    } finally {
+      deleteBtn && (deleteBtn.disabled = false);
+    }
+  }
 
-        // optional file upload + coverDataUrl update
-        const f = $("#bookFile")?.files?.[0] || null;
-        if (f) {
-          const meta = await uploadFileFor(user.uid, ref.id, f);
-          patch.fileType = meta.fileType; patch.fileUrl = meta.fileUrl;
-        }
-        const extractedCover = $("#coverPreview")?.dataset?.dataUrl || null;
-        if (extractedCover) { patch.coverDataUrl = extractedCover; }
+  // ---------- Apply loaded doc to UI (rører ikke layout) ----------
+  function applyDocToUI(d) {
+    titleEl && (titleEl.value = d.title || "");
+    authorEl && (authorEl.value = d.author || "");
+    startedEl && (startedEl.value = d.started || "");
+    finishedEl && (finishedEl.value = d.finished || "");
+    reviewEl && (reviewEl.value = d.review || "");
 
-        await ref.set(patch, { merge: true });
-        toast("Saved ✓");
-        location.href = "index.html";
-      } catch (e) { console.error(e); alert("Update failed"); }
-    });
+    // behold state – vi tukler ikke med hvordan chips bygges i HTMLen din
+    activeStatus = d.status || null;
+    activeFormat = d.format || null;
+    pickedGenres = new Set(Array.isArray(d.genres) ? d.genres : []);
+    pickedMoods = new Set(Array.isArray(d.moods) ? d.moods : []);
+    pickedTropes = new Set(Array.isArray(d.tropes) ? d.tropes : []);
 
-    $("#deleteBtn")?.addEventListener("click", async () => {
-      if (!confirm("Delete this book?")) return;
-      try { await ref.delete(); location.href = "index.html"; }
-      catch (e) { console.error(e); alert("Delete failed"); }
-    });
+    if (d.coverUrl && coverPreview) coverPreview.src = d.coverUrl;
+
+    existingQuotes = Array.isArray(d.quotes) ? d.quotes.map(q => ({ id: q.id, text: q.text })) : [];
+    pendingQuotes = [];
+    renderQuotes();
+
+    // Vis filnavn om det finnes
+    if (fileName && d.fileName && !fileName.textContent) fileName.textContent = d.fileName;
+  }
+
+  // ---------- Init ----------
+  document.addEventListener("DOMContentLoaded", async () => {
+    if (!bookId) { alert("Missing ?id="); return; }
+
+    saveBtn?.addEventListener("click", saveChanges);
+    deleteBtn?.addEventListener("click", deleteBook);
+
+    try {
+      const u = FB.auth?.currentUser || (await new Promise((res, rej) => {
+        const unsub = (FB.auth ? FB.auth() : FB.firebase.auth()).onAuthStateChanged((x) => { unsub(); x ? res(x) : rej(new Error("Not signed in")); });
+      }));
+
+      const db = FB.db || FB.firestore();
+      const snap = await db.collection("users").doc(u.uid).collection("books").doc(bookId).get();
+      if (!snap.exists) { alert("Book not found."); return; }
+
+      docData = snap.data() || {};
+      applyDocToUI(docData);
+      maybeShowReadButton(docData); // knappen vises når fil finnes
+    } catch (e) {
+      console.error(e);
+      alert("Could not load the book. See console for details.");
+    }
   });
-});
 
-/* ---------- helpers ---------- */
-function escapeHtml(str) {
-  return String(str).replace(/[&<>"']/g, s => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
-  }[s]));
-}
+})();

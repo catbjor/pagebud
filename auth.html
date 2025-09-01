@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="en">
 
 <head>
@@ -7,14 +6,11 @@
     <meta charset="utf-8" />
     <meta content="width=device-width, initial-scale=1" name="viewport" />
     <title>Sign in – PageBud</title>
-    <!-- Put this inline snippet in the <head> of EVERY page BEFORE style.css -->
 
-    <!-- Base styles -->
     <link href="style.css" rel="stylesheet" />
     <link href="auth.css" rel="stylesheet" />
-    <!-- Apply saved theme -->
 
-    <!-- 1) Firebase compat SDKs -->
+    <!-- Firebase compat -->
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -22,9 +18,8 @@
     <script src="firebase-config.js"></script>
     <script src="firebase-init.js?v=dev-1"></script>
     <script src="profiles.js"></script>
-    <!-- 2) 🔧 Inline config -->
-    <script>
 
+    <script>
         window.__PB_FIREBASE = {
             apiKey: "AIzaSyCEV-dncbQSnP7q9AvF2_Re93l-VHN-2cg",
             authDomain: "pagebud-cb6d9.firebaseapp.com",
@@ -35,74 +30,201 @@
             measurementId: "G-TK4VCBT1V9"
         };
     </script>
-
 </head>
 
-<body style="background: var(--background)">
+<body class="auth-bg">
     <div class="auth-shell">
-        <div class="auth-card">
-            <h1 class="auth-title">PageBud</h1>
-            <!-- Google sign in -->
-            <button class="btn btn-google" id="googleBtn">
-                <i class="fab fa-google"></i> Sign in with Google
-            </button>
-            <div class="auth-sep"><span>or</span></div>
-            <!-- Email/password form -->
+        <!-- LOGIN -->
+        <div class="auth-card glass" id="view-login" aria-hidden="false">
+            <h1 class="auth-title">Log into your account</h1>
+
             <form class="auth-form" id="emailForm">
-                <label>Email</label>
-                <input id="email" placeholder="you@example.com" required="" type="email" />
-                <label>Password</label>
-                <input id="password" minlength="6" placeholder="••••••••" required="" type="password" />
-                <div class="row">
-                    <button class="btn btn-primary" type="submit">Sign in</button>
-                    <button class="btn btn-muted" id="createBtn" type="button">Create account</button>
+                <label>Username/Email</label>
+                <input id="email" placeholder="you@example.com" required type="email" autocomplete="email" />
+
+                <div class="row row-inline">
+                    <label>Password</label>
+                    <a id="forgotLink" class="link-muted" href="#" aria-label="Forgot password">Forgot?</a>
                 </div>
+                <input id="password" minlength="6" placeholder="••••••••" required type="password"
+                    autocomplete="current-password" />
+
+                <label class="chk">
+                    <input id="remember" type="checkbox" />
+                    <span>Remember me</span>
+                </label>
+
+                <button class="btn btn-dark" type="submit">Log In</button>
             </form>
-            <p class="muted small" style="margin-top:10px">
-                Trouble signing in? Make sure your domain is whitelisted in Firebase Auth → Settings → Authorized
-                domains.
-            </p>
+
+            <div class="auth-footer-single">
+                <button id="toSignup" class="btn btn-light-outline">Create account</button>
+            </div>
+        </div>
+
+        <!-- SIGNUP -->
+        <div class="auth-card glass" id="view-signup" aria-hidden="true" style="display:none">
+            <div class="progress-dots" aria-hidden="true">
+                <span class="dot active"></span><span class="dot"></span><span class="dot"></span><span
+                    class="dot"></span>
+            </div>
+            <h1 class="auth-title center">Create account</h1>
+            <div id="greeting" class="signup-greeting" aria-live="polite"></div>
+
+            <form class="auth-form" id="createForm">
+                <label>Name</label>
+                <input id="firstName" placeholder="First name" required type="text" autocomplete="given-name" />
+
+                <label>Email</label>
+                <input id="emailCreate" placeholder="you@example.com" required type="email" autocomplete="email" />
+
+                <label>Password</label>
+                <input id="passwordCreate" minlength="6" placeholder="At least 6 characters" required type="password"
+                    autocomplete="new-password" />
+
+                <button class="btn btn-dark" type="submit">Continue</button>
+            </form>
+
+            <div class="auth-footer-single">
+                <button id="toLogin" class="btn btn-light-outline">Back to Log In</button>
+            </div>
         </div>
     </div>
+
     <script>
-        // --- Auth handlers (runs AFTER firebase-init.js, so fb is defined) ---
+        // View switch
+        const viewLogin = document.getElementById('view-login');
+        const viewSignup = document.getElementById('view-signup');
+        const toSignupBtn = document.getElementById('toSignup');
+        const toLoginBtn = document.getElementById('toLogin');
+        function showSignup() { viewLogin.style.display = 'none'; viewLogin.setAttribute('aria-hidden', 'true'); viewSignup.style.display = ''; viewSignup.setAttribute('aria-hidden', 'false'); }
+        function showLogin() { viewSignup.style.display = 'none'; viewSignup.setAttribute('aria-hidden', 'true'); viewLogin.style.display = ''; viewLogin.setAttribute('aria-hidden', 'false'); }
+        toSignupBtn.addEventListener('click', showSignup);
+        toLoginBtn.addEventListener('click', showLogin);
+    </script>
+
+    <script>
+        // Helpers
         const emailEl = document.getElementById("email");
         const passEl = document.getElementById("password");
+        const remember = document.getElementById("remember");
+        const emailForm = document.getElementById("emailForm");
 
-        // Google sign in
-        document.getElementById("googleBtn").addEventListener("click", async () => {
-            try {
-                const provider = new firebase.auth.GoogleAuthProvider();
-                await fb.auth.signInWithPopup(provider);
-                location.href = "index.html";
-            } catch (e) {
-                alert(e.message || "Google sign-in failed");
+        const firstNameEl = document.getElementById('firstName');
+        const emailCreateEl = document.getElementById('emailCreate');
+        const passCreateEl = document.getElementById('passwordCreate');
+        const createForm = document.getElementById('createForm');
+        const greetingEl = document.getElementById('greeting');
+        const forgotLink = document.getElementById('forgotLink');
+
+        function browserLang() {
+            const l = (navigator.language || "en").toLowerCase();
+            if (l.startsWith("no") || l.startsWith("nb") || l.startsWith("nn")) return "no";
+            return "en";
+        }
+
+        async function ensureProfile(user, desiredName) {
+            const db = fb.db || firebase.firestore();
+
+            let name = (desiredName || user.displayName || "").trim();
+
+            if (!name) {
+                try {
+                    const snap = await db.collection('users').doc(user.uid).get();
+                    if (snap.exists && snap.data()?.displayName) {
+                        name = String(snap.data().displayName).trim();
+                    }
+                } catch { }
             }
-        });
+            if (!name) {
+                const prefix = (user.email || "").split("@")[0] || "Reader";
+                name = prefix.charAt(0).toUpperCase() + prefix.slice(1);
+            }
 
-        // Email sign in
-        document.getElementById("emailForm").addEventListener("submit", async (e) => {
+            if (!user.displayName || user.displayName !== name) {
+                try { await user.updateProfile({ displayName: name }); } catch { }
+            }
+
+            const initialLang = browserLang(); // default ut fra nettleser
+            try {
+                await db.collection('users').doc(user.uid).set({
+                    displayName: name,
+                    lang: initialLang,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    lastLoginAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+            } catch { }
+
+            try { localStorage.setItem("pb_lang", initialLang); } catch { }
+            return name;
+        }
+
+        // Signup greeting live
+        function randomGreeting(name) {
+            const hour = new Date().getHours();
+            const buckets = hour < 12 ? 'morning' : (hour < 18 ? 'afternoon' : 'evening');
+            const phrases = {
+                morning: ["Good morning, {name}!", "Morning, {name} — ready to read?", "Rise and shine, {name}!"],
+                afternoon: ["Good afternoon, {name}!", "Nice to see you, {name}. Time to read?", "A perfect time for a chapter, {name}."],
+                evening: ["Good evening, {name}!", "Cozy reading time, {name}?", "Unwind with a book, {name}."]
+            };
+            const list = phrases[buckets];
+            return list[Math.floor(Math.random() * list.length)].replace("{name}", name);
+        }
+        function updateGreeting() {
+            const n = (firstNameEl.value || "").trim();
+            greetingEl.textContent = n ? randomGreeting(n) : "";
+        }
+        firstNameEl.addEventListener('input', updateGreeting);
+
+        // Sign in
+        emailForm.addEventListener("submit", async (e) => {
             e.preventDefault();
             try {
-                await fb.auth.signInWithEmailAndPassword(emailEl.value.trim(), passEl.value);
+                await fb.auth.setPersistence(
+                    (remember?.checked) ? firebase.auth.Auth.Persistence.LOCAL
+                        : firebase.auth.Auth.Persistence.SESSION
+                );
+                const cred = await fb.auth.signInWithEmailAndPassword(emailEl.value.trim(), passEl.value);
+                await ensureProfile(cred.user);
                 location.href = "index.html";
             } catch (e) {
                 alert(e.message || "Sign in failed");
             }
         });
 
+        // Forgot password
+        forgotLink.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const email = (emailEl.value || '').trim();
+            if (!email) return alert('Enter your email first.');
+            try { await fb.auth.sendPasswordResetEmail(email); alert('Password reset email sent.'); }
+            catch (err) { alert(err.message || 'Could not send reset email.'); }
+        });
+
         // Create account
-        document.getElementById("createBtn").addEventListener("click", async () => {
+        createForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = (firstNameEl.value || '').trim();
+            const email = (emailCreateEl.value || '').trim();
+            const pass = passCreateEl.value;
+            if (!name) return alert("Please enter your first name.");
             try {
-                await fb.auth.createUserWithEmailAndPassword(emailEl.value.trim(), passEl.value);
+                const cred = await fb.auth.createUserWithEmailAndPassword(email, pass);
+                await ensureProfile(cred.user, name);
                 location.href = "index.html";
-            } catch (e) {
-                alert(e.message || "Create account failed");
+            } catch (err) {
+                alert(err.message || "Create account failed");
             }
         });
+
+        // Backfill hvis allerede logget inn
+        firebase.auth().onAuthStateChanged(async (user) => {
+            if (user) { try { await ensureProfile(user); } catch { } }
+        });
     </script>
-    <!-- Icons -->
-    <script defer="" src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js"></script>
+
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js"></script>
 </body>
 
 </html>
