@@ -9,6 +9,14 @@
     <script src="theme-init.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet" />
     <link href="style.css" rel="stylesheet" />
+
+    <!-- Firebase (må være med for logout/språk) -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+    <script src="firebase-config.js"></script>
+    <script src="firebase-init.js?v=dev-1"></script>
 </head>
 
 <body>
@@ -117,18 +125,18 @@
         </nav>
     </div>
 
-    <!-- Scripts -->
+    <!-- Dine eksisterende scripts -->
     <script src="toast.js" defer></script>
     <script src="push.js" defer></script>
     <script src="timer.js" defer></script>
     <script src="settings.js" defer></script>
     <script src="settings-fix.js" defer></script>
 
-    <!-- i18n (språk) -->
+    <!-- i18n og språkstyring -->
     <script src="i18n.js"></script>
     <script src="settings-lang.js"></script>
 
-    <!-- Log out handler (liten, påvirker ikke annet) -->
+    <!-- Log out handler -->
     <script>
         (function () {
             const btn = document.getElementById('btnLogout');
@@ -137,7 +145,6 @@
                 try {
                     const auth = (window.fb?.auth) || firebase.auth();
                     await auth.signOut();
-                    // Tøm språk-cache kun for sikkerhets skyld
                     try { localStorage.removeItem('pb_lang'); sessionStorage.clear(); } catch { }
                     location.href = 'auth.html';
                 } catch (e) {
