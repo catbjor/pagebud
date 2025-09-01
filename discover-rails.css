@@ -362,3 +362,248 @@ section.card[data-rail] {
 .rail-list .cover {
     max-width: 100%;
 }
+
+/* Actionbar under søk (for Genres-knappen) */
+.disc-actionbar {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin: 8px 0 12px;
+}
+
+.disc-actionbar {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin: 8px 0 12px;
+}
+
+.rail-list {
+    cursor: grab;
+}
+
+.rail-list.dragging {
+    cursor: grabbing;
+}
+
+/* Rail skal se “drabar” ut på desktop */
+.rail-list {
+    cursor: grab;
+}
+
+.rail-list.dragging {
+    cursor: grabbing;
+}
+
+/* Seksjonsboks eier scrollen; ikke la hele siden lekke bredde */
+html,
+body {
+    overflow-x: hidden;
+    max-width: 100%;
+    touch-action: pan-y;
+}
+
+section.card[data-rail] {
+    overflow: hidden;
+}
+
+.rail-list {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x;
+    scroll-snap-type: x mandatory;
+}
+
+/* ----- Drawer (genres) ----- */
+.disc-drawer {
+    position: fixed;
+    inset: 0;
+    display: none;
+    z-index: 3000;
+}
+
+.disc-drawer.show {
+    display: block;
+}
+
+.disc-drawer__scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, .35);
+}
+
+.disc-drawer__panel {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: min(320px, 86vw);
+    height: 100%;
+    background: var(--card);
+    border-right: 1px solid var(--border);
+    padding: 16px;
+    overflow: auto;
+}
+
+.disc-drawer__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+/* ----- Fjern sidebar-kolonnen helt i “drawer”-modus ----- */
+.disc-shell--drawer {
+    display: block;
+}
+
+/* dropp grid */
+.disc-shell--drawer .disc-side {
+    display: none !important;
+}
+
+.disc-shell--drawer .disc-main {
+    max-width: var(--content-max);
+    margin: 0 auto;
+    padding: 0 var(--page-pad);
+}
+
+/* Host for rails – sentrer og gi samme side-”kanter” som ellers */
+#railsHost {
+    max-width: var(--content-max);
+    margin: 0 auto;
+    padding: 0 var(--page-pad);
+}
+
+/* Hver seksjon er allerede .card – sørg for at rails ikke “lekker” ut */
+section.card[data-rail] {
+    overflow: hidden;
+}
+
+/* ----- Rail scroll (horisontal, men isolert per seksjon) ----- */
+.rail-list {
+    display: flex;
+    gap: 12px;
+    padding: 10px 6px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    cursor: grab;
+}
+
+.rail-list.dragging {
+    cursor: grabbing;
+}
+
+/* Actionbar under søk (der Genres-knappen ligger) */
+.card.disc-actionbar {
+    padding: 8px 12px;
+    margin: 10px 0;
+    display: flex;
+    justify-content: flex-end;
+}
+
+/* Ikke la hele siden side-scrolle pga gamle grid-spor */
+html,
+body {
+    overflow-x: hidden;
+}
+
+.disc-shell--drawer {
+    display: block;
+}
+
+.disc-shell--drawer .disc-side {
+    display: none !important;
+}
+
+.disc-shell--drawer .disc-main {
+    max-width: var(--content-max);
+    margin: 0 auto;
+    padding: 0 var(--page-pad);
+}
+
+#railsHost {
+    max-width: var(--content-max);
+    margin: 0 auto;
+    padding: 0 var(--page-pad);
+}
+
+.rail-list {
+    display: flex;
+    gap: 12px;
+    padding: 10px 6px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    cursor: grab;
+}
+
+.rail-list.dragging {
+    cursor: grabbing;
+}
+
+.card.disc-actionbar {
+    padding: 8px 12px;
+    margin: 10px 0;
+    display: flex;
+    justify-content: flex-end;
+}
+
+html,
+body {
+    overflow-x: hidden;
+}
+
+/* ---- Book detail sheet ---- */
+.sheet {
+    position: fixed;
+    inset: 0;
+    display: none;
+    z-index: 3500;
+}
+
+.sheet.show {
+    display: block;
+}
+
+.sheet__scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, .35);
+}
+
+.sheet__panel {
+    position: absolute;
+    left: 50%;
+    top: 8vh;
+    transform: translateX(-50%);
+    width: min(720px, calc(100vw - 24px));
+    max-height: 84vh;
+    overflow: auto;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+}
+
+@media (max-width:560px) {
+    .sheet__panel {
+        top: auto;
+        bottom: 0;
+        transform: translateX(-50%);
+        max-height: 92vh;
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 0;
+    }
+}
+
+/* Klikk-vennlig rail: ikke dra bilder, ikke marker */
+.rail-list .tile img {
+    -webkit-user-drag: none;
+    user-select: none;
+}
+
+.rail-list.dragging,
+.rail-list .tile {
+    user-select: none;
+}

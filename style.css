@@ -121,6 +121,7 @@ input[type="text"] {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
+
 /* ---------- Layout helpers for Settings ---------- */
 .container {
   max-width: var(--content-max);
@@ -274,13 +275,13 @@ input[type="text"] {
 
 .header {
   position: sticky;
-  top: 0;
+  top: 1;
   z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 26px;
+  padding: 40px;
   background: var(--card);
   border-bottom: 1px solid var(--border);
   box-shadow: 0 2px 10px rgba(0, 0, 0, .06)
@@ -305,7 +306,7 @@ input[type="text"] {
 /* ---------- Chips ---------- */
 .categories {
   display: flex;
-  gap: 10px;
+  gap: 5px;
   padding: 12px 16px;
   margin: 10px 0;
   overflow: auto;
@@ -316,7 +317,7 @@ input[type="text"] {
 .category {
   display: inline-flex;
   align-items: center;
-  padding: 10px 14px;
+  padding: 70px 40px;
   border-radius: 14px;
   border: 1px solid var(--border);
   background: var(--surface);
@@ -665,7 +666,7 @@ input[type="text"] {
 /* ---------- Timer dock (high-contrast, centered) ---------- */
 .timer-dock {
   position: fixed;
-  bottom: calc(var(--bottom-nav-h) + 12px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--bottom-nav-h) + 200px + env(safe-area-inset-bottom, 0px));
   left: 18px;
   z-index: 2100;
   display: grid;
@@ -1053,4 +1054,212 @@ input[type="text"] {
   border: 1px solid #e74a3b;
   background: #e74a3b;
   color: #fff
+}
+
+/* ==== Add/Edit: wrap chips i bokser (Genres / Moods / Tropes) ==== */
+/* Overstyr den horisontale scrolleren slik at chips bryter til flere rader
+   og holder seg inne i kortet. Gjelder kun disse tre boksene. */
+#genresBox .categories,
+#moodsBox .categories,
+#tropesBox .categories {
+  /* overstyrer base .categories */
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px 10px;
+  padding: 8px 10px;
+  margin: 8px 0;
+  white-space: normal;
+  /* bryt linjer */
+  overflow: visible;
+  /* ikke horisontal scroll i disse kortene */
+  scroll-snap-type: none;
+  /* slå av snap her */
+}
+
+/* Litt tettere look i skjemaene uten å endre “chip”-stilen globalt */
+#genresBox .category,
+#moodsBox .category,
+#tropesBox .category {
+  justify-content: flex-start;
+  font-weight: 700;
+}
+
+/* Mindre kolonner på veldig smale skjermer */
+@media (max-width: 680px) {
+
+  #genresBox .categories,
+  #moodsBox .categories,
+  #tropesBox .categories {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  }
+}
+
+/* Add/Edit: sørg for at fixed action bar ikke overlapper innholdet */
+.content-wrapper {
+  padding-bottom: 120px;
+  /* nok klaring for .form-actions-fixed */
+}
+
+/* (fra forrige runde) Chips i Genres/Moods/Tropes ligger pent i grid */
+#genresBox .categories,
+#moodsBox .categories,
+#tropesBox .categories {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px 10px;
+  padding: 8px 10px;
+  margin: 8px 0;
+  white-space: normal;
+  overflow: visible;
+  scroll-snap-type: none;
+}
+
+@media (max-width: 680px) {
+
+  #genresBox .categories,
+  #moodsBox .categories,
+  #tropesBox .categories {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  }
+}
+
+<style>.content-wrapper {
+  padding-bottom: 120px;
+}
+
+@media (max-width: 640px) {
+  #quotesControls {
+    flex-direction: column;
+  }
+
+  #saveQuoteBtn {
+    width: 100%;
+  }
+}
+
+/* Make the Review textarea fill its card like the quotes box */
+.form-row textarea {
+  width: 100%;
+  min-height: 120px;
+  /* adjust if you want it taller/shorter */
+}
+
+/* ===== Add/Edit – mobile friendly layout & no overflow ===== */
+
+/* Kill accidental horizontal scroll everywhere */
+html,
+body,
+.app-container {
+  overflow-x: hidden;
+}
+
+/* Page padding + keep space for the sticky action bar */
+.content-wrapper.form-page {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: 16px;
+  padding-bottom: 140px;
+  /* room for bottom buttons */
+}
+
+/* 2-column rows that collapse on small screens */
+.form-row.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+@media (max-width: 720px) {
+  .form-row.two-col {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Make long chip sets wrap inside their card (no sideways scroll) */
+.categories.picker-grid {
+  /* replaces the horizontal chip scroller just on these forms */
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+  overflow: visible;
+}
+
+.categories.picker-grid .category {
+  white-space: normal;
+  text-align: center;
+  padding: 10px 12px;
+}
+
+/* Details sections look like boxes but never overflow */
+details.card {
+  overflow: hidden;
+}
+
+/* Bigger writing areas */
+textarea.big {
+  width: 100%;
+  min-height: 140px;
+  resize: vertical;
+}
+
+/* Sticky action bar that never covers fields and stays centered */
+.form-actions-fixed {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--bottom-nav-h) + 10px);
+  max-width: var(--content-max);
+  margin: 0 auto;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  background: color-mix(in oklab, var(--card) 92%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  z-index: 2050;
+  /* above page content, below add-fab (which is 2050+) */
+}
+
+/* Images never burst out of their boxes */
+img,
+.cover,
+.thumb {
+  max-width: 100%;
+}
+
+/* --- Fix: Save/Cancel bar must be clickable and above content/timer/bottom-nav --- */
+.form-actions-fixed {
+  position: sticky;
+  bottom: calc(var(--bottom-nav-h) + 12px);
+  background: color-mix(in oklab, var(--card) 96%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  z-index: 2200;
+  /* timer-dock is 2100; bottom-nav is 2000 */
+  pointer-events: auto;
+  isolation: isolate;
+  /* prevents underlying elements from catching clicks */
+}
+
+/* Make the quotes editor never spill over the buttons */
+.quotes-box {
+  position: relative;
+  overflow: hidden;
+}
+
+.quotes-box textarea {
+  display: block;
+  width: 100%;
+  min-height: 120px;
+}
+
+/* Ensure no random overlay blocks clicks */
+.content-wrapper,
+.card {
+  position: relative;
 }

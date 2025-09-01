@@ -1,302 +1,256 @@
-/* ============================================================
-PageBud • timer.js (dock + offline queue + goal events)
-- Live mål-sjekk mens timeren går
-- Engangs "goal reached" pr. dag
-============================================================ */
+/* timer.js — reading timer dock + Firestore sessions logger
+   - users/{uid}/sessions docs: {type:"timer", startAt, endAt, minutes, day, bookId?, createdAt}
+   - Respekterer Settings (pb:timer:goalMin/side/collapsed/visible)
+   - Collapse/expand via knapp, dbl-klik på dock, eller "c"-tast
+*/
 (function () {
   "use strict";
 
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+
+  // Keys
+  const K = {
+    goal: "pb:timer:goalMin",
+    side: "pb:timer:side",
+    coll: "pb:timer:collapsed",
+    vis: "pb:timer:visible",
+    active: "pb:timer:active" // JSON {startAt, accumMs, pausedAt, bookId?}
+  };
+
+  // Utils
   const now = () => Date.now();
-  const fmt = (ms) => {
-    const s = Math.floor(ms / 1000);
-    const hh = String(Math.floor(s / 3600)).padStart(2, "0");
-    const mm = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
-    const ss = String(s % 60).padStart(2, "0");
-    return `${hh}:${mm}:${ss}`;
-  };
+  const pad = n => String(n).padStart(2, "0");
+  const fmt = s => `${pad(Math.floor(s / 60))}:${pad(Math.floor(s % 60))}`;
+  function toDayStr(d) { const x = new Date(d); return `${x.getFullYear()}-${pad(x.getMonth() + 1)}-${pad(x.getDate())}`; }
 
-  const LS_PREFIX = "pb:timer";
-  const LS_ACTIVE = `${LS_PREFIX}:active`;
-  const LS_QUEUE = `${LS_PREFIX}:queue`;
-  const LS_SIDE = "pb:timer:side";
-  const LS_COLL = "pb:timer:collapsed";
-  const LS_VIS = "pb:timer:visible";
+  function loadState() { try { return JSON.parse(localStorage.getItem(K.active) || "null"); } catch { return null; } }
+  function saveState(s) { localStorage.setItem(K.active, JSON.stringify(s || null)); }
+  function clearState() { localStorage.removeItem(K.active); }
 
-  /* ==== DAGLIG AKKUMULATOR + GOAL-EVENTS ================================== */
-  const LS_ACCUM_PREFIX = "pb:timer:accum:";  // per-dag minutter
-  const LS_GOAL_HIT_PREFIX = "pb:timer:hit:";    // per-dag engangsflagg
+  // Firestore & auth (kompatibel med fb.* og compat SDK)
+  const getDB = () => (window.fb?.db) || (window.firebase?.firestore?.() || null);
+  const getUser = () => window.fb?.auth?.currentUser || window.firebase?.auth?.().currentUser || null;
 
-  function todayKey() {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  }
-  const accumKey = () => LS_ACCUM_PREFIX + todayKey();
-  const goalHitKey = () => LS_GOAL_HIT_PREFIX + todayKey();
-
-  function getAccum() {
-    try { return Math.max(0, Number(localStorage.getItem(accumKey()) || "0")); } catch { return 0; }
-  }
-  function setAccum(mins) {
-    try { localStorage.setItem(accumKey(), String(Math.max(0, Math.round(mins || 0)))); } catch { }
-  }
-  function addAccum(mins) { const next = getAccum() + Math.max(0, Math.round(mins || 0)); setAccum(next); return next; }
-
-  function maybeFireGoal(totalMinutes) {
-    try {
-      const goal = Math.max(0, Number(localStorage.getItem("pb:timer:goalMin") || "20"));
-      const hitKey = goalHitKey();
-      const already = localStorage.getItem(hitKey) === "1";
-      const hit = goal > 0 && totalMinutes >= goal;
-      if (hit && !already) {
-        localStorage.setItem(hitKey, "1");
-        window.dispatchEvent(new CustomEvent("pb:timer:goalReached", { detail: { minutes: totalMinutes, goal } }));
-      }
-      if (!hit && already) localStorage.removeItem(hitKey);
-    } catch { }
+  // Toast
+  function toast(msg) {
+    let t = $("#pb-toast");
+    if (!t) { t = document.createElement("div"); t.id = "pb-toast"; t.className = "toast"; document.body.appendChild(t); }
+    t.textContent = msg;
+    t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), 1600);
   }
 
-  // Re-sjekk når mål endres (i Settings) eller i annen fane
-  window.addEventListener("pb:timer:goalChanged", () => maybeFireGoal(getAccum()));
-  window.addEventListener("storage", (e) => { if (e.key === "pb:timer:goalMin") maybeFireGoal(getAccum()); });
-  /* ======================================================================= */
-
-  let tickHandle = null;
-  let active = null;
-  let dock;
-
-  const hasFirebase = () => { try { return !!window.firebase; } catch { return false; } };
-  const firebaseApps = () => { try { return (firebase?.apps || []).length; } catch { return 0; } };
-  const hasFirestore = () => { try { return !!firebase.firestore; } catch { return false; } };
-  const hasAuth = () => { try { return hasFirebase() && typeof firebase.auth === "function"; } catch { return false; } };
-  const currentUser = () => { try { return hasAuth() ? firebase.auth().currentUser : null; } catch { return null; } };
-
-  async function waitForFirebaseReady({ requireAuth = false, maxWaitMs = 20000 } = {}) {
-    const t0 = now(); let backoff = 200;
-    while (now() - t0 < maxWaitMs) {
-      if (firebaseApps() > 0 && hasFirestore() && (!requireAuth || currentUser())) return true;
-      await new Promise(r => setTimeout(r, backoff));
-      backoff = Math.min(backoff * 1.7, 60000);
-    }
-    return false;
+  // FAB-avoid (flytt dock lenger opp når pluss-knappen finnes på høyre side)
+  function pbUpdateFabAvoid() {
+    const hasFab = !!document.querySelector(".add-book");
+    document.body.classList.toggle("has-add-fab", hasFab);
   }
 
-  const loadJSON = (k, f) => { try { const x = localStorage.getItem(k); return x ? JSON.parse(x) : f; } catch { return f; } };
-  const saveJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { } };
-  const pushQueue = (s) => { const q = loadJSON(LS_QUEUE, []); q.push(s); saveJSON(LS_QUEUE, q); };
-  const popQueue = () => { const q = loadJSON(LS_QUEUE, []); const it = q.shift(); saveJSON(LS_QUEUE, q); return it; };
-  const queueLen = () => (loadJSON(LS_QUEUE, []) || []).length;
-
-  const saveActive = () => saveJSON(LS_ACTIVE, active);
-  const loadActive = () => { active = loadJSON(LS_ACTIVE, null); };
-  const clearActive = () => { active = null; try { localStorage.removeItem(LS_ACTIVE); } catch { } };
-
-  function updateDisplay() {
-    const el = document.getElementById("timerDisplay");
-    let elapsed = 0;
-    if (active) {
-      elapsed = active.pausedMs || 0;
-      if (active.lastTickAt) elapsed += now() - active.lastTickAt;
-    }
-    if (el) el.textContent = fmt(elapsed);
-
-    // Live mål-sjekk mens timeren går (akkumulert i dag + pågående økt)
-    try {
-      const acc = getAccum();
-      const runMin = Math.floor(elapsed / 60000);
-      maybeFireGoal(acc + runMin);
-    } catch { }
-  }
-  function startTicking() { stopTicking(); tickHandle = setInterval(updateDisplay, 1000); }
-  function stopTicking() { if (tickHandle) { clearInterval(tickHandle); tickHandle = null; } }
-
-  function startTimer({ bookId = "unknown", notes = "" } = {}) {
-    if (active) return;
-    const t = now();
-    active = { bookId, startedAt: t, pausedMs: 0, lastTickAt: t, segments: [], notes };
-    saveActive(); startTicking(); updateDisplay(); pulse();
-  }
-  function pauseTimer() {
-    if (!active || !active.lastTickAt) return;
-    const t = now();
-    active.segments.push({ from: active.lastTickAt, to: t });
-    active.pausedMs += (t - active.lastTickAt);
-    active.lastTickAt = null;
-    saveActive(); updateDisplay();
-  }
-  function resumeTimer() {
-    if (!active || active.lastTickAt) return;
-    active.lastTickAt = now();
-    saveActive(); startTicking(); updateDisplay(); pulse();
-  }
-  function stopTimerAndBuildSession() {
-    if (!active) return null;
-    const t = now();
-    if (active.lastTickAt) {
-      active.segments.push({ from: active.lastTickAt, to: t });
-      active.pausedMs += (t - active.lastTickAt);
-    }
-    const session = {
-      bookId: active.bookId, startedAt: active.startedAt, endedAt: t,
-      durationMs: active.pausedMs, segments: active.segments, notes: active.notes || "",
-      device: navigator.userAgent, createdAt: new Date().toISOString(), source: "pagebud.timer.v1"
-    };
-    clearActive(); stopTicking(); updateDisplay(); pulse();
-    return session;
-  }
-
-  async function persistSession(session) {
-    // Oppdater lokal akkumulering umiddelbart (før cloud), så mål kan trigges selv offline
-    try {
-      const addMin = Math.round((session?.durationMs || 0) / 60000);
-      const total = addAccum(addMin);
-      maybeFireGoal(total);
-      session.__accumAdded = 1;
-    } catch { }
-
-    const ready = await waitForFirebaseReady({ requireAuth: true, maxWaitMs: 8000 });
-    if (!ready || !currentUser()) {
-      pushQueue(session);
-      dispatchSaved("queued", session);
-      return { stored: "queued" };
-    }
-    try {
-      const db = firebase.firestore();
-      await db.collection("readingSessions").doc(currentUser().uid).collection("sessions").add(session);
-      dispatchSaved("cloud", session);
-      return { stored: "cloud" };
-    } catch (err) {
-      pushQueue(session);
-      dispatchSaved("queued", session, String(err));
-      return { stored: "queued", error: String(err) };
-    }
-  }
-  function dispatchSaved(where, session, error) {
-    try { document.dispatchEvent(new CustomEvent("pb:timer-session-saved", { detail: { where, session, error } })) } catch { }
-  }
-
-  let flushTimer = null;
-  async function tryFlushQueueOnce() {
-    if (queueLen() === 0) return;
-    const ready = await waitForFirebaseReady({ requireAuth: true, maxWaitMs: 5000 });
-    if (!ready) return;
-    let safety = 25;
-    while (queueLen() > 0 && safety-- > 0) {
-      const sess = popQueue(); if (!sess) break;
-      const res = await persistSession(sess);
-      if (res.stored === "queued") { pushQueue(sess); break; } // gi opp nå
-    }
-  }
-  function startFlushLoop() { if (!flushTimer) flushTimer = setInterval(tryFlushQueueOnce, 15000); }
-
+  // Dock
   function ensureDock() {
-    if (dock && document.body.contains(dock)) return dock;
-    dock = document.createElement("div");
-    dock.className = "timer-dock";
-    dock.innerHTML = `
-      <button class="timer-btn timer-toggle" data-role="collapse" title="Toggle timer" aria-label="Toggle timer">
-        <span class="btn-inner">
-          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-            <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm1 11H7v-2h4V6h2z" fill="currentColor"/>
-          </svg>
-          <span class="btn-label">Timer</span>
-        </span>
+    let d = $("#pb-timer-dock");
+    if (d) return d;
+    d = document.createElement("div");
+    d.id = "pb-timer-dock";
+    d.className = "timer-dock right"; // side settes nedenfor
+
+    d.innerHTML = `
+      <div class="timer-time" id="pb-timer-time">00:00</div>
+
+      <button class="timer-btn" id="pb-timer-start"  data-role="start"  title="Start">
+        <div class="btn-inner"><i class="fa-solid fa-play"></i><span class="btn-label">Start</span></div>
       </button>
-      <div class="timer-readout"><span id="timerDisplay">00:00:00</span></div>
-      <div class="timer-controls">
-        <button class="timer-btn" data-role="start"  title="Start"><span class="btn-inner">▶</span></button>
-        <button class="timer-btn" data-role="pause"  title="Pause"><span class="btn-inner">⏸</span></button>
-        <button class="timer-btn" data-role="resume" title="Resume"><span class="btn-inner">⏵</span></button>
-        <button class="timer-btn" data-role="stop"   title="Stop & save"><span class="btn-inner">⏹</span></button>
-      </div>`;
-    document.body.appendChild(dock);
+      <button class="timer-btn" id="pb-timer-pause"  data-role="pause"  title="Pause" disabled>
+        <div class="btn-inner"><i class="fa-solid fa-pause"></i><span class="btn-label">Pause</span></div>
+      </button>
+      <button class="timer-btn" id="pb-timer-resume" data-role="resume" title="Resume" disabled>
+        <div class="btn-inner"><i class="fa-solid fa-play"></i><span class="btn-label">Resume</span></div>
+      </button>
+      <button class="timer-btn primary" id="pb-timer-stop" data-role="stop" title="Stop" disabled>
+        <div class="btn-inner"><i class="fa-solid fa-stop"></i><span class="btn-label">Stop</span></div>
+      </button>
 
-    function refreshEnabled() {
-      const hasA = !!active, ticking = !!(active && active.lastTickAt);
-      dock.querySelector('[data-role="start"]')?.toggleAttribute("disabled", hasA);
-      dock.querySelector('[data-role="pause"]')?.toggleAttribute("disabled", !ticking);
-      dock.querySelector('[data-role="resume"]')?.toggleAttribute("disabled", !hasA || ticking);
-      dock.querySelector('[data-role="stop"]')?.toggleAttribute("disabled", !hasA);
-    }
+      <button class="timer-btn" id="pb-timer-toggle" data-role="toggle" title="Collapse / Expand">
+        <div class="btn-inner"><i class="fa-regular fa-clock"></i></div>
+      </button>
+    `;
+    document.body.appendChild(d);
+    pbUpdateFabAvoid();
+    return d;
+  }
 
-    const readSide = () => localStorage.getItem(LS_SIDE) || "left";
-    const readCollapsed = () => localStorage.getItem(LS_COLL) === "1";
-    const readVisible = () => localStorage.getItem(LS_VIS) !== "0";
+  // UI helpers
+  let tick = null;
+  function setButtons({ running, paused }) {
+    $("#pb-timer-start").disabled = running;
+    $("#pb-timer-pause").disabled = !running || paused;
+    $("#pb-timer-resume").disabled = !paused;
+    $("#pb-timer-stop").disabled = !running && !paused;
+  }
+  function drawTime(ms) { $("#pb-timer-time").textContent = fmt(ms / 1000); }
+  function currentElapsedMs(s) {
+    if (!s) return 0;
+    const base = Number(s.accumMs || 0);
+    return s.pausedAt ? base : base + Math.max(0, now() - Number(s.startAt || now()));
+  }
+  function loop() { const s = loadState(); drawTime(currentElapsedMs(s)); if (!s || s.pausedAt) stopLoop(); }
+  function startLoop() { stopLoop(); tick = setInterval(loop, 250); }
+  function stopLoop() { if (tick) { clearInterval(tick); tick = null; } }
+  function pulse() { const d = ensureDock(); d.classList.remove("pulse"); void d.offsetWidth; d.classList.add("pulse"); }
 
-    function applySide(s) { dock.classList.toggle("right", s === "right"); dock.classList.toggle("left", s !== "right"); }
-    function applyCollapsed(c) { dock.classList.toggle("collapsed", !!c); }
-    function applyVisible(v) { dock.style.display = v ? "" : "none"; }
+  // Side / visible / collapsed
+  function setSide(side) { ensureDock().classList.toggle("right", side === "right"); pbUpdateFabAvoid(); }
+  function setVisible(flag) { ensureDock().classList.toggle("hidden", !flag); }
+  function updateToggleIcon(collapsed) {
+    const btn = $("#pb-timer-toggle");
+    if (!btn) return;
+    btn.innerHTML = collapsed
+      ? `<div class="btn-inner"><i class="fa-regular fa-clock"></i></div>`
+      : `<div class="btn-inner"><i class="fa-solid fa-chevron-down"></i></div>`;
+  }
+  function setCollapsed(flag) {
+    ensureDock().classList.toggle("collapsed", !!flag);
+    localStorage.setItem(K.coll, flag ? "1" : "0");
+    updateToggleIcon(!!flag);
+  }
+  function toggleCollapsed(force) {
+    const dock = ensureDock();
+    const target = (typeof force === "boolean") ? force : !dock.classList.contains("collapsed");
+    setCollapsed(target);
+  }
 
-    applySide(readSide()); applyCollapsed(readCollapsed()); applyVisible(readVisible()); refreshEnabled();
+  // Firestore write
+  async function writeTimerSession({ startAt, endAt, minutes, bookId }) {
+    const u = getUser(), _db = getDB(); if (!u || !_db) return;
+    const day = toDayStr(startAt);
+    const doc = {
+      type: "timer",
+      startAt: new Date(startAt),
+      endAt: new Date(endAt),
+      minutes: Number(minutes) || 0,
+      day, bookId: bookId || null,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    await _db.collection("users").doc(u.uid).collection("sessions").add(doc);
+    try { window.dispatchEvent(new CustomEvent("pb:sessions:updated")); } catch { }
+  }
 
-    dock.addEventListener("click", async (e) => {
-      const btn = e.target.closest(".timer-btn"); if (!btn) return;
-      const role = btn.getAttribute("data-role");
-      if (role === "collapse") { const c = !dock.classList.contains("collapsed"); applyCollapsed(c); localStorage.setItem(LS_COLL, c ? "1" : "0"); return; }
-      if (role === "start") { startTimer({ bookId: currentContextBookId() }); refreshEnabled(); return; }
-      if (role === "pause") { pauseTimer(); refreshEnabled(); return; }
-      if (role === "resume") { resumeTimer(); refreshEnabled(); return; }
-      if (role === "stop") { const s = stopTimerAndBuildSession(); if (s) await persistSession(s); refreshEnabled(); return; }
-    });
-
-    // Hard reset ved langtrykk på klokke
-    let pressT = 0;
-    dock.querySelector(".timer-toggle")?.addEventListener("mousedown", () => pressT = Date.now());
-    window.addEventListener("mouseup", () => {
-      if (pressT && Date.now() - pressT > 2000) {
-        try { localStorage.removeItem(LS_ACTIVE); } catch { }
-        clearActive(); stopTicking(); updateDisplay(); refreshEnabled();
-      }
-      pressT = 0;
-    });
-
-    // Små kontroll-events uten UI-endring
-    window.addEventListener("pb:timer:apply", (ev) => {
-      const side = ev?.detail?.side || readSide();
-      const coll = (typeof ev?.detail?.collapsed === "boolean") ? ev.detail.collapsed : readCollapsed();
-      applySide(side); applyCollapsed(coll);
-    });
-    window.addEventListener("pb:timer:toggleVisible", () => {
-      const v = !(localStorage.getItem(LS_VIS) === "1");
-      localStorage.setItem(LS_VIS, v ? "1" : "0"); applyVisible(v);
-    });
-
-    return dock;
-
-    function currentContextBookId() {
-      const el = document.querySelector("[data-current-book]");
-      return el?.getAttribute("data-current-book") || "unknown";
+  // Lokal dagsteller for mål-toast
+  function bumpLocalDay(minutes) {
+    const dKey = "pb:timer:_localDay", vKey = "pb:timer:_localMin";
+    const today = toDayStr(new Date());
+    if (localStorage.getItem(dKey) !== today) { localStorage.setItem(dKey, today); localStorage.setItem(vKey, "0"); }
+    const next = Number(localStorage.getItem(vKey) || "0") + Number(minutes || 0);
+    localStorage.setItem(vKey, String(next));
+    return next;
+  }
+  function checkGoalCongrats() {
+    const goal = Number(localStorage.getItem(K.goal) || "20");
+    const v = Number(localStorage.getItem("pb:timer:_localMin") || "0");
+    const hitKey = "pb:timer:_congrats:" + toDayStr(new Date());
+    if (goal > 0 && v >= goal && !localStorage.getItem(hitKey)) {
+      toast(`Gratulerer! Dagens mål nådd (${v} m) 🎉`);
+      localStorage.setItem(hitKey, "1");
     }
   }
 
-  // Public liten API for Settings
-  function applyTimerSettingsNow({ goalMin, side, collapsed }) {
-    if (typeof goalMin === "number") {
-      try { localStorage.setItem("pb:timer:goalMin", String(goalMin)); } catch { }
-      window.dispatchEvent(new CustomEvent("pb:timer:goalChanged", { detail: { minutes: goalMin } }));
+  // Actions
+  function start() {
+    let s = loadState();
+    if (s && !s.pausedAt) return;
+    if (!s) s = { startAt: now(), accumMs: 0, pausedAt: null, bookId: null };
+    else { s.startAt = now(); s.pausedAt = null; }
+    saveState(s);
+    startLoop();
+    setButtons({ running: true, paused: false });
+    pulse();
+  }
+  function pause() {
+    const s = loadState(); if (!s || s.pausedAt) return;
+    s.accumMs = currentElapsedMs(s);
+    s.pausedAt = now();
+    saveState(s);
+    setButtons({ running: true, paused: true });
+    drawTime(s.accumMs);
+  }
+  async function stopAndPersist() {
+    const s = loadState(); if (!s) return;
+    const endAt = now();
+    const totalMs = s.pausedAt ? s.accumMs : currentElapsedMs(s);
+    clearState();
+    stopLoop();
+    setButtons({ running: false, paused: false });
+    drawTime(0);
+
+    const min = Math.max(0, Math.round(totalMs / 60000));
+    if (min >= 1) {
+      await writeTimerSession({ startAt: s.startAt || endAt, endAt, minutes: min, bookId: s.bookId || null });
+      bumpLocalDay(min);
+      checkGoalCongrats();
     }
-    try {
-      if (side) localStorage.setItem(LS_SIDE, side);
-      if (typeof collapsed === "boolean") localStorage.setItem(LS_COLL, collapsed ? "1" : "0");
-    } catch { }
-    window.dispatchEvent(new Event("pb:timer:apply"));
+  }
+  function resume() {
+    const s = loadState(); if (!s || !s.pausedAt) return;
+    s.startAt = now(); s.pausedAt = null;
+    saveState(s);
+    startLoop();
+    setButtons({ running: true, paused: false });
+    pulse();
   }
 
-  // Boot
-  function pulse() { /* left empty on purpose; CSS handles transitions */ }
-  loadActive(); ensureDock();
-  if (active) { if (active.lastTickAt) startTicking(); updateDisplay(); }
-  window.addEventListener("online", tryFlushQueueOnce);
-  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") tryFlushQueueOnce(); });
-  if (hasAuth()) try { firebase.auth().onAuthStateChanged(() => setTimeout(tryFlushQueueOnce, 500)); } catch { }
-  let flushTimer = null; function startFlushLoop() { if (!flushTimer) flushTimer = setInterval(tryFlushQueueOnce, 15000); } startFlushLoop();
+  // Bind
+  function bind() {
+    const dock = ensureDock();
 
-  // Live sync når mål endres
-  window.addEventListener("pb:timer:goalChanged", () => updateDisplay());
-  window.addEventListener("storage", (e) => { if (e.key === "pb:timer:goalMin") updateDisplay(); });
+    $("#pb-timer-start").addEventListener("click", start);
+    $("#pb-timer-pause").addEventListener("click", pause);
+    $("#pb-timer-resume").addEventListener("click", resume);
+    $("#pb-timer-stop").addEventListener("click", stopAndPersist);
 
-  window.PageBudTimer = {
-    start: startTimer, pause: pauseTimer, resume: resumeTimer,
-    stopAndSave: async () => { const s = stopTimerAndBuildSession(); if (s) return persistSession(s); return null; },
-    applySettings: applyTimerSettingsNow
-  };
+    // Collapse/expand
+    $("#pb-timer-toggle").addEventListener("click", () => toggleCollapsed());
+    dock.addEventListener("dblclick", (e) => {
+      const isCtrl = e.target.closest(".timer-btn");
+      if (isCtrl && isCtrl.id !== "pb-timer-toggle") return;
+      e.preventDefault();
+      toggleCollapsed();
+    });
+    document.addEventListener("keydown", (e) => {
+      if ((e.key || "").toLowerCase() !== "c") return;
+      const tag = (e.target.tagName || "").toLowerCase();
+      if (["input", "textarea", "select"].includes(tag)) return;
+      toggleCollapsed();
+    });
+
+    // Settings broadcasts
+    window.addEventListener("pb:settings:update", (ev) => {
+      const d = ev.detail || {};
+      if (d.timer?.side) setSide(d.timer.side);
+      if (typeof d.timer?.collapsed === "boolean") setCollapsed(d.timer.collapsed);
+      if (d.timer?.toggleVisible) setVisible(ensureDock().classList.contains("hidden")); // toggle
+      if (d.timer?.resetState) { clearState(); drawTime(0); setButtons({ running: false, paused: false }); }
+    });
+
+    // Init fra localStorage
+    setSide(localStorage.getItem(K.side) || "right");
+    setVisible(localStorage.getItem(K.vis) !== "0");
+    setCollapsed(localStorage.getItem(K.coll) === "1");
+
+    const s = loadState();
+    if (s) {
+      if (s.pausedAt) { drawTime(s.accumMs || 0); setButtons({ running: true, paused: true }); }
+      else { startLoop(); setButtons({ running: true, paused: false }); }
+    } else {
+      setButtons({ running: false, paused: false });
+    }
+
+    // Observer for FAB-tilstedeværelse
+    const obs = new MutationObserver(pbUpdateFabAvoid);
+    obs.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener("resize", pbUpdateFabAvoid);
+    pbUpdateFabAvoid();
+  }
+
+  document.addEventListener("DOMContentLoaded", bind);
 })();

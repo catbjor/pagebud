@@ -128,24 +128,21 @@
 <body>
     <header class="header">
         <h1>Discover</h1>
-        <div class="header-actions">
-            <!-- Fast, synlig knapp for sjanger-drawer -->
-            <button class="btn btn-secondary small" id="openGenres">
-                <i class="fa-solid fa-bars"></i> Genres
-            </button>
-        </div>
+        <div class="header-actions"><!-- (tom) --></div>
     </header>
 
-    <div class="disc-shell">
-        <aside class="disc-side">
-            <div class="side-title">Browse popular genres</div>
-            <div id="genreList"></div>
-        </aside>
         <main class="disc-main">
             <div class="search-row">
                 <input class="form-control" id="q" placeholder="Search by keyword…" />
                 <button class="btn" id="qBtn" style="width:auto">Search</button>
             </div>
+            <div class="card disc-actionbar">
+                <button class="btn btn-secondary small" id="discMenuBtn">
+                    <i class="fa-solid fa-bars"></i> Genres
+                </button>
+            </div>
+
+
             <div style="display:flex;gap:8px;margin:6px 2px 12px;">
                 <span class="pill" id="sortPopular">Popular</span>
                 <span class="pill" id="sortNew">New this year</span>

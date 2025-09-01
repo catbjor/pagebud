@@ -18,7 +18,6 @@ window.PB_Rating = (function () {
       btn.innerHTML = `
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <defs>
-            <!-- one gradient is enough for all stars -->
             <linearGradient id="pb-half-grad" x1="0" x2="1" y1="0" y2="0">
               <stop offset="50%" stop-color="#f2c200"></stop>
               <stop offset="50%" stop-color="transparent"></stop>
@@ -102,16 +101,6 @@ window.PB_Rating = (function () {
 
     paint(initial);
   }
-
-  // Optional auto-init (only if you add data-attrs somewhere)
-  document.addEventListener("DOMContentLoaded", () => {
-    document.querySelectorAll("[data-rating-init]").forEach(el => {
-      renderStars(el, Number(el.dataset.ratingInit || 0), 6);
-    });
-    document.querySelectorAll("[data-spice-init]").forEach(el => {
-      renderChilis(el, Number(el.dataset.spiceInit || 0), 5);
-    });
-  });
 
   return { renderStars, renderChilis };
 })();

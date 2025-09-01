@@ -1,82 +1,295 @@
 /* ============================================================
-   PageBud – edit-page.js (user/{uid}/books) with half-star widgets
+   PageBud – edit-page.js
+   - Edits users/{uid}/books/{id}
+   - File re-upload + cover re-extraction (PDF/EPUB supported)
+   - Half-star + chili widgets
+   - Status/Format single-select, Genres/Moods/Tropes multi
+   - Quotes: one Save/Add button; delete button only on
+     already-saved quotes.
 ============================================================ */
+"use strict";
+
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
-const db = firebase.firestore();
+const db = (window.fb && fb.db) ? fb.db :
+  (window.firebase && firebase.firestore ? firebase.firestore() : null);
 
-function renderChips(list, el, selected = []) {
+const PLACEHOLDER = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="180" height="240">
+     <rect width="100%" height="100%" rx="12" fill="#e5e7eb"/>
+     <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle"
+           font-size="14" fill="#9aa3af" font-family="system-ui,-apple-system,Segoe UI,Roboto">
+           Cover image
+     </text>
+   </svg>`
+);
+
+function toast(msg) {
+  let t = $("#pb-toast");
+  if (!t) { t = document.createElement("div"); t.id = "pb-toast"; t.className = "toast"; document.body.appendChild(t); }
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 1600);
+}
+
+// Add the missing requireAuth function
+function requireAuth(callback) {
+  const auth = firebase.auth();
+  const unsubscribe = auth.onAuthStateChanged((user) => {
+    unsubscribe();
+    if (user) {
+      callback(user);
+    } else {
+      alert("Please sign in.");
+      location.href = "login.html";
+    }
+  });
+}
+
+/* ----- dynamic libs (same as add) ----- */
+async function ensurePdfJs() {
+  if (window.pdfjsLib) return;
+  await new Promise((res, rej) => {
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+    s.onload = res; s.onerror = rej; document.head.appendChild(s);
+  });
+  if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  }
+}
+async function extractFromPDF(file) {
+  try {
+    await ensurePdfJs();
+    const url = URL.createObjectURL(file);
+    const doc = await pdfjsLib.getDocument({ url }).promise;
+    const page = await doc.getPage(1);
+    const viewport = page.getViewport({ scale: 1.5 });
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    URL.revokeObjectURL(url);
+    return canvas.toDataURL("image/jpeg", 0.92);
+  } catch (e) { console.warn("PDF cover extract failed", e); return null; }
+}
+async function ensureEpubJs() {
+  if (window.ePub) return;
+  await new Promise((res, rej) => {
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.92/epub.min.js";
+    s.onload = res; s.onerror = rej; document.head.appendChild(s);
+  });
+}
+async function extractFromEPUB(file) {
+  try {
+    await ensureEpubJs();
+    const book = ePub(file);
+    const coverHref = await book.loaded.cover;
+    if (!coverHref) return null;
+    const url = await book.archive.createUrl(coverHref, { base64: false });
+    const blob = await (await fetch(url)).blob();
+    return await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
+  } catch (e) { console.warn("EPUB cover extract failed", e); return null; }
+}
+
+async function uploadFileFor(uid, bookId, file) {
+  if (!file || !fb?.storage) return { fileType: null, fileUrl: null };
+  const ext = (file.name.split(".").pop() || "").toLowerCase();
+  const path = `users/${uid}/books/${bookId}/book.${ext || 'bin'}`;
+  const ref = fb.storage.ref().child(path);
+  await ref.put(file);
+  const url = await ref.getDownloadURL();
+  return { fileType: ext, fileUrl: url };
+}
+
+/* ---------- chips renderer ---------- */
+function renderChips(list, el, { multi = false, value = [], onChange } = {}) {
   if (!el || !Array.isArray(list)) return;
-  el.innerHTML = list
-    .map(x => `<span class="category ${selected.includes(x) ? "active" : ""}" data-val="${x}">${x}</span>`)
-    .join("");
+  const set = new Set(Array.isArray(value) ? value : (value ? [value] : []));
+  el.innerHTML = list.map(x => `
+    <button type="button"
+            class="chip ${set.has(x) ? "active" : ""}"
+            data-val="${x}">${x}</button>`).join("");
+
+  el.addEventListener("click", (e) => {
+    const b = e.target.closest(".chip"); if (!b) return;
+    const v = b.dataset.val;
+    if (multi) {
+      if (b.classList.contains("active")) { b.classList.remove("active"); set.delete(v); }
+      else { b.classList.add("active"); set.add(v); }
+      onChange?.(Array.from(set));
+    } else {
+      el.querySelectorAll(".chip").forEach(n => n.classList.remove("active"));
+      b.classList.add("active");
+      onChange?.(v);
+    }
+  });
 }
 
-async function loadBook(uid, id) {
-  const ref = db.collection("users").doc(uid).collection("books").doc(id);
-  const snap = await ref.get();
-  if (!snap.exists) return null;
-
-  const b = snap.data() || {};
-  $("#title").value = b.title || "";
-  $("#author").value = b.author || "";
-  $("#started").value = b.started || "";
-  $("#finished").value = b.finished || "";
-  $("#review").value = b.review || "";
-
-  // Hydrate rating widgets with saved values (half-stars supported)
-  PB_Rating.renderStars($("#ratingBar"), Number(b.rating ?? 0), 6);
-  PB_Rating.renderChilis($("#spiceBar"), Number(b.spice ?? 0), 5);
-
-  const C = window.PB_CONST || {};
-  renderChips(C.GENRES, $("#genres"), b.genres || []);
-  renderChips(C.MOODS, $("#moods"), b.moods || []);
-  renderChips(C.TROPES, $("#tropes"), b.tropes || []);
-
-  return { ref };
-}
-
+/* ---------- boot ---------- */
 document.addEventListener("DOMContentLoaded", () => {
-  // Render widgets immediately so UI is visible before data loads
+  // mount widgets immediately
   PB_Rating.renderStars($("#ratingBar"), 0, 6);
   PB_Rating.renderChilis($("#spiceBar"), 0, 5);
 
+  const id = new URLSearchParams(location.search).get("id");
+  if (!id) { alert("Missing book id"); return; }
+
   requireAuth(async (user) => {
-    const id = new URLSearchParams(location.search).get("id");
-    if (!id) { alert("Missing book id"); return; }
+    const ref = db.collection("users").doc(user.uid).collection("books").doc(id);
+    const snap = await ref.get();
+    if (!snap.exists) { alert("Book not found"); return; }
+    const b = snap.data() || {};
 
-    const ctx = await loadBook(user.uid, id);
-    if (!ctx) { alert("Book not found"); return; }
+    // Fill basics
+    $("#title").value = b.title || "";
+    $("#author").value = b.author || "";
+    $("#started").value = b.started || "";
+    $("#finished").value = b.finished || "";
+    $("#review").value = b.review || "";
 
+    // cover
+    const coverPreview = $("#coverPreview");
+    coverPreview.src = b.coverDataUrl || b.coverUrl || PLACEHOLDER;
+
+    // widgets with current values
+    PB_Rating.renderStars($("#ratingBar"), Number(b.rating || 0), 6);
+    PB_Rating.renderChilis($("#spiceBar"), Number(b.spice || 0), 5);
+
+    // chips
+    const C = window.PB_CONST || {};
+    renderChips(["reading", "finished", "tbr", "dnf"], $("#statusChips"), {
+      multi: false, value: b.status || "tbr",
+      onChange: (v) => { $("#statusChips").dataset.value = v; }
+    });
+    $("#statusChips").dataset.value = b.status || "tbr";
+
+    renderChips(["ebook", "paperback", "hardcover", "audiobook"], $("#formatChips"), {
+      multi: false, value: b.format || "",
+      onChange: (v) => { $("#formatChips").dataset.value = v; }
+    });
+    $("#formatChips").dataset.value = b.format || "";
+
+    renderChips(C.GENRES, $("#genres"), { multi: true, value: b.genres || [], onChange: (a) => { $("#genres").dataset.value = JSON.stringify(a); } });
+    $("#genres").dataset.value = JSON.stringify(b.genres || []);
+    renderChips(C.MOODS, $("#moods"), { multi: true, value: b.moods || [], onChange: (a) => { $("#moods").dataset.value = JSON.stringify(a); } });
+    $("#moods").dataset.value = JSON.stringify(b.moods || []);
+    renderChips(C.TROPES, $("#tropes"), { multi: true, value: b.tropes || [], onChange: (a) => { $("#tropes").dataset.value = JSON.stringify(a); } });
+    $("#tropes").dataset.value = JSON.stringify(b.tropes || []);
+
+    /* ------ Quotes UI ------ */
+    const qInput = $("#quoteInput");
+    const qList = $("#quotesList");
+
+    async function loadQuotes() {
+      qList.innerHTML = `<div class="muted" style="padding:8px 0">Loading…</div>`;
+      const snap = await ref.collection("quotes").orderBy("createdAt", "desc").get();
+      if (snap.empty) { qList.innerHTML = `<div class="muted" style="padding:8px 0">No quotes yet.</div>`; return; }
+      qList.innerHTML = snap.docs.map(d => {
+        const x = d.data() || {};
+        return `
+          <div class="quote-row" data-id="${d.id}">
+            <span class="q">${escapeHtml(x.text || "")}</span>
+            <button type="button" class="btn btn-secondary btn-sm" data-action="del-quote">Delete</button>
+          </div>`;
+      }).join("");
+    }
+    await loadQuotes();
+
+    // One Save/Add button
+    $("#addQuoteBtn")?.addEventListener("click", async () => {
+      const txt = (qInput.value || "").trim();
+      if (!txt) return;
+      await ref.collection("quotes").add({ text: txt, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+      qInput.value = "";
+      await loadQuotes();
+      toast("Quote saved ✓");
+    });
+    qInput?.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); $("#addQuoteBtn").click(); }
+    });
+
+    // Delete only on saved quotes
+    qList.addEventListener("click", async (e) => {
+      const btn = e.target.closest("[data-action='del-quote']"); if (!btn) return;
+      const row = btn.closest(".quote-row"); const qid = row?.dataset.id; if (!qid) return;
+      if (!confirm("Delete this quote?")) return;
+      await ref.collection("quotes").doc(qid).delete();
+      row.remove();
+    });
+
+    /* ------ File → cover extraction ------ */
+    $("#coverPreview")?.addEventListener("click", () => $("#bookFile")?.click());
+    $("#bookFile")?.addEventListener("change", async (e) => {
+      const f = e.target.files?.[0]; if (!f) return;
+      let dataUrl = null;
+      if (/^application\/pdf/.test(f.type)) dataUrl = await extractFromPDF(f);
+      else if (/epub/i.test(f.name) || /epub/i.test(f.type)) dataUrl = await extractFromEPUB(f);
+      else if (/^image\//.test(f.type)) {
+        dataUrl = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(f); });
+      }
+      if (dataUrl) {
+        $("#coverPreview").src = dataUrl;
+        $("#coverPreview").dataset.dataUrl = dataUrl;
+        toast("Cover extracted ✓");
+      } else {
+        toast("Could not extract a cover (file will still be uploaded)");
+      }
+    });
+
+    /* ------ SAVE PATCH ------ */
     $("#saveBtn")?.addEventListener("click", async () => {
       try {
         const patch = {
-          title: $("#title")?.value.trim(),
-          author: $("#author")?.value.trim(),
+          title: ($("#title")?.value || "").trim(),
+          author: ($("#author")?.value || "").trim(),
           started: $("#started")?.value || null,
           finished: $("#finished")?.value || null,
           review: $("#review")?.value || "",
-          rating: Number($("#ratingBar")?.dataset.value || 0), // includes halves
+          rating: Number($("#ratingBar")?.dataset.value || 0),
           spice: Number($("#spiceBar")?.dataset.value || 0),
+          status: $("#statusChips")?.dataset.value || "tbr",
+          format: $("#formatChips")?.dataset.value || "",
+          genres: JSON.parse($("#genres")?.dataset.value || "[]"),
+          moods: JSON.parse($("#moods")?.dataset.value || "[]"),
+          tropes: JSON.parse($("#tropes")?.dataset.value || "[]"),
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
-        await ctx.ref.set(patch, { merge: true });
+
+        if (!patch.title || !patch.author) {
+          alert("Title and Author are required.");
+          return;
+        }
+
+        // optional file upload + coverDataUrl update
+        const f = $("#bookFile")?.files?.[0] || null;
+        if (f) {
+          const meta = await uploadFileFor(user.uid, ref.id, f);
+          patch.fileType = meta.fileType; patch.fileUrl = meta.fileUrl;
+        }
+        const extractedCover = $("#coverPreview")?.dataset?.dataUrl || null;
+        if (extractedCover) { patch.coverDataUrl = extractedCover; }
+
+        await ref.set(patch, { merge: true });
+        toast("Saved ✓");
         location.href = "index.html";
-      } catch (e) {
-        console.error(e);
-        alert("Update failed");
-      }
+      } catch (e) { console.error(e); alert("Update failed"); }
     });
 
     $("#deleteBtn")?.addEventListener("click", async () => {
       if (!confirm("Delete this book?")) return;
-      try {
-        await ctx.ref.delete();
-        location.href = "index.html";
-      } catch (e) {
-        console.error(e);
-        alert("Delete failed");
-      }
+      try { await ref.delete(); location.href = "index.html"; }
+      catch (e) { console.error(e); alert("Delete failed"); }
     });
   });
 });
+
+/* ---------- helpers ---------- */
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, s => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[s]));
+}

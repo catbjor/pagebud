@@ -1,19 +1,19 @@
 <!DOCTYPE html>
-
 <html lang="en">
 
 <head>
   <script src="theme-init.js"></script>
   <meta charset="utf-8" />
-  <meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Stats – PageBud</title>
-  <!-- Apply saved theme early -->
 
   <!-- Icons & CSS -->
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet" />
-  <link href="style.css?v=6" rel="stylesheet" />
-  <!-- Chart.js -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link rel="stylesheet" href="style.css?v=6" />
+
+  <!-- Chart.js (beholder referansen din selv om den ikke er nødvendig akkurat nå) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
   <!-- Firebase compat + init -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -21,7 +21,9 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
   <script src="firebase-config.js"></script>
   <script src="firebase-init.js"></script>
-  <script defer="" src="nav.js"></script>
+
+  <!-- Bottom-nav / header actions osv -->
+  <script defer src="nav.js"></script>
 </head>
 
 <body>
@@ -29,9 +31,12 @@
     <header class="header">
       <h1>Stats</h1>
       <div class="header-actions">
-        <button class="back-fab" id="btnQuickReset" title="Reset caches"><i class="fa-solid fa-rotate"></i></button>
+        <button class="back-fab" id="btnQuickReset" title="Reset caches">
+          <i class="fa-solid fa-rotate"></i>
+        </button>
       </div>
     </header>
+
     <!-- Calendar + streak -->
     <section class="calendar-card">
       <div class="cal-head">
@@ -51,6 +56,7 @@
           <button class="month-btn" id="nextMonth">›</button>
         </div>
       </div>
+
       <div class="calendar-controls">
         <div>
           <label style="font-weight:700; font-size:.9rem; margin-right:6px;">Metric:</label>
@@ -73,9 +79,11 @@
           </div>
         </div>
       </div>
+
       <div class="calendar-labels" id="calendarLabels"></div>
       <div class="calendar-grid" id="calendarGrid"></div>
     </section>
+
     <!-- Range filters -->
     <div class="page-header">
       <div class="time-filters">
@@ -85,6 +93,7 @@
         <button class="time-filter-btn active" data-range="yearly">Yearly</button>
       </div>
     </div>
+
     <!-- Stat cards -->
     <section class="stats-grid">
       <div class="stat-card">
@@ -103,15 +112,16 @@
         <div class="stat-title">Pages Read</div>
         <div class="stat-value" id="pagesRead">0</div>
       </div>
+
       <!-- Today progress ring -->
       <div class="stat-card">
         <div class="stat-title">Today</div>
         <div class="today-ring">
           <div class="ring-wrap" title="Today's reading">
-            <svg height="56" viewbox="0 0 56 56" width="56">
-              <circle cx="28" cy="28" fill="none" r="24" stroke="var(--border)" stroke-width="6"></circle>
-              <circle cx="28" cy="28" fill="none" id="todayRing" r="24" stroke="var(--primary)" stroke-dasharray="0 999"
-                stroke-linecap="round" stroke-width="6"></circle>
+            <svg width="56" height="56" viewBox="0 0 56 56">
+              <circle cx="28" cy="28" r="24" stroke="var(--border)" stroke-width="6" fill="none"></circle>
+              <circle cx="28" cy="28" r="24" id="todayRing" stroke="var(--primary)" stroke-width="6"
+                stroke-linecap="round" stroke-dasharray="0 999" fill="none"></circle>
             </svg>
             <div class="ring-center" id="todayPct">0%</div>
           </div>
@@ -122,7 +132,8 @@
         </div>
       </div>
     </section>
-    <!-- Charts -->
+
+    <!-- Charts (placeholder-beholdere; styres senere av egne scripts hvis ønsket) -->
     <section class="charts-container">
       <div class="chart-card">
         <h3>Genres</h3>
@@ -147,6 +158,7 @@
         <div style="height:240px"><canvas id="languagesChart"></canvas></div>
       </div>
     </section>
+
     <!-- Top lists -->
     <section class="top-lists">
       <div class="stat-card">
@@ -168,25 +180,27 @@
         </ul>
       </div>
     </section>
+
     <div class="action-bar">
-      <button class="reset-btn" id="resetStatsBtn"><i class="fa-solid fa-trash"></i> Reset All Data</button>
+      <button class="reset-btn" id="resetStatsBtn">
+        <i class="fa-solid fa-trash"></i> Reset All Data
+      </button>
     </div>
   </div>
+
   <!-- Scripts -->
   <script src="reset-utils.js"></script>
   <script src="stats.js"></script>
-  <script defer="" src="timer.js"></script>
+  <script defer src="timer.js"></script>
   <script>
-    // Quick reset button
+    // Quick reset button (samme som du hadde)
     document.getElementById("btnQuickReset")?.addEventListener("click", async () => {
       if (!confirm("Reset caches (keep login)?")) return;
       try { await pbResetCaches?.({ full: false }); location.reload(); } catch { }
     });
 
-    // Do not redirect if signed-out; stats.js will show a message and wait for auth.
-    try {
-      requireAuth?.(() => { }); // no-op; keeps auth ready listener behavior consistent
-    } catch { }
+    // Ikke redirect ved sign-out; stats.js håndterer auth-ready
+    try { requireAuth?.(() => { }); } catch { }
   </script>
 </body>
 

@@ -1,674 +1,857 @@
-// discover.js — rails + søk + chips + drawer + sort + daily rotation + filter-chips + preview + see-all page
+/* discover.js — Discover rails + genres drawer + search + BOOK SHEET
+   - Drawer for sjangre (Genres)
+   - Rails: Because you read, New this week, Popular on BookTok + curated (inkl. nye rails)
+   - Klikk på bok → detalj-sheet (blurb, rating, subjects, +Add)
+   - Desktopvennlig horisontal scroll per seksjon (drag/wheel), uten å stjele klikk
+*/
 (() => {
     "use strict";
+
+    /* ----------------- Utils ----------------- */
     const $ = (s, r = document) => r.querySelector(s);
     const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
-    const esc = (s) => String(s || "").replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' }[m]));
-    const short = (s, max = 18) => (s || "").length > max ? (s.slice(0, max - 1) + "…") : (s || "");
-    const nk = (t, a) => `${(t || "").toLowerCase().trim()}::${(a || "").toLowerCase().trim()}`;
-
-    /* --- Skjul legacy sidepanel + 1-kol grid --- */
-    (function removeLegacySidebar() {
-        const shell = document.querySelector(".disc-shell");
-        const oldAside = document.querySelector("aside.disc-side");
-        if (shell) shell.classList.add("disc-shell--drawer");
-        if (oldAside) oldAside.remove();
-    })();
-
-    /* --- Stor sjangerliste (alfabetisk) --- */
-    const ALL_GENRES = {
-        "Action & Adventure": "action_and_adventure",
-        "Apocalyptic & Dystopian": "dystopian",
-        "Art & Photography": "art",
-        "Biography": "biography",
-        "Booker & Prize Winners": "booker_prize",
-        "Business & Finance": "business",
-        "Christian Fiction": "christian_fiction",
-        "Classics": "classics",
-        "Comedy & Humor": "humor",
-        "Comics & Graphic Novels": "graphic_novels",
-        "Contemporary Romance": "contemporary_romance",
-        "Cookbooks": "cookbooks",
-        "Cozy Mystery": "cozy_mystery",
-        "Crime": "crime",
-        "Dark Academia": "dark_academia",
-        "Dark Romance": "dark_romance",
-        "Detective": "detective_and_mystery_stories",
-        "Drama": "drama",
-        "Essays": "essays",
-        "Epic / High Fantasy": "high_fantasy",
-        "Fairy Tales & Retellings": "retellings",
-        "Fantasy": "fantasy",
-        "Feel-Good": "feel_good",
-        "Gothic": "gothic_fiction",
-        "Health & Fitness": "health",
-        "Historical Fiction": "historical_fiction",
-        "History": "history",
-        "Horror": "horror",
-        "LGBTQ+": "lgbtq",
-        "Literary Fiction": "literary_fiction",
-        "Manga": "manga",
-        "Mathematics": "mathematics",
-        "Memoir": "memoir",
-        "Middle Grade": "juvenile_fiction",
-        "Mythology": "mythology",
-        "New Adult": "new_adult",
-        "Non-fiction": "nonfiction",
-        "Paranormal Romance": "paranormal_romance",
-        "Philosophy": "philosophy",
-        "Poetry": "poetry",
-        "Productivity & Self-help": "self-help",
-        "Psychology": "psychology",
-        "Religion & Spirituality": "religion",
-        "Retellings": "retellings",
-        "Romance": "romance",
-        "Science": "science",
-        "Science Fiction": "science_fiction",
-        "Short Stories": "short_stories",
-        "Space Opera": "space_opera",
-        "Sports": "sports",
-        "Thriller": "thriller",
-        "True Crime": "true_crime",
-        "Urban Fantasy": "urban_fantasy",
-        "War & Military": "war_stories",
-        "Women’s Fiction": "women_fiction",
-        "Young Adult": "young_adult_fiction"
+    const esc = (s) => String(s || "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+    const yearOf = (d) => (d && (d.first_publish_year || d.publish_year?.[0] || d.first_publish_date?.slice?.(0, 4))) || "";
+    const uniq = (arr) => Array.from(new Set(arr));
+    const take = (arr, n) => (Array.isArray(arr) ? arr.slice(0, n) : []);
+    const nowYear = (new Date()).getFullYear();
+    const cap = (s) => String(s || "").replace(/\b\w/g, m => m.toUpperCase());
+    function randomId() { return Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10); }
+    const fmtInt = (n) => {
+        n = Number(n || 0);
+        if (n >= 1000) return (n / 1000).toFixed(n % 1000 === 0 ? 0 : 1) + "k";
+        return String(n);
     };
 
-    /* --- Kolleksjoner/rails --- */
-    const RAILS = [
-        { id: "because", title: "Because you read …", kind: "because", size: 20, sortable: false },
+    /* ----------------- Subjects (alfabetisk) ----------------- */
+    const ALL_SUBJECTS = [
+        "action", "adventure", "african literature", "american literature", "animals", "anthologies", "art",
+        "autobiography", "banned books", "biology", "book club", "booktok", "business", "classics",
+        "cozy mystery", "cozy fantasy", "contemporary", "crime", "dark academia", "dark romance", "dystopia",
+        "economics", "epic fantasy", "essays", "fairy tales", "fantasy", "feminism", "folklore", "food",
+        "graphic novels", "health", "historical fiction", "history", "horror", "humor", "inspirational",
+        "lgbt", "literary fiction", "manga", "memoir", "mystery", "mythology", "new adult", "nonfiction",
+        "norwegian", "philosophy", "poetry", "psychology", "religion", "retellings", "romance", "romantasy",
+        "science", "science fiction", "self help", "short stories", "spirituality", "sports", "thriller",
+        "time travel", "true crime", "urban fantasy", "war", "western", "women", "ya", "young adult", "zombies"
+    ].sort((a, b) => a.localeCompare(b));
 
-        { id: "new_week", title: "New this week", kind: "trending", period: "weekly", filterNew: true, size: 20, sortable: true, fallback: "new" },
-        { id: "booktok", title: "Popular on BookTok", kind: "trending", period: "weekly", size: 20, sortable: true, fallback: "booktok" },
+    /* ----------------- Firebase helpers (robust) ----------------- */
+    const hasFB = () => !!(window.fb && window.fb.db && window.fb.auth);
+    const me = () => hasFB() ? window.fb.auth.currentUser : null;
+    let LIB_CACHE = null; // fylles ved boot
 
-        { id: "romance", title: "Romance Reads", kind: "subject", subject: "romance", sortable: true },
-        { id: "new_adult", title: "New Adult Romance", kind: "subjectLike", q: 'subject:"new adult" OR subject:"college romance"', sortable: true },
-        { id: "ya_fav", title: "Young Adult Favorites", kind: "subject", subject: "young_adult_fiction", sortable: true },
-        { id: "dark_romance", title: "Dark Romance", kind: "subjectLike", q: 'subject:"dark romance" OR subject:"erotic romance"', sortable: true },
-        { id: "retellings", title: "Retellings & Mythology", kind: "subjectLike", q: 'subject:retellings OR subject:mythology', sortable: true },
-        { id: "dark_acad", title: "Dark Academia", kind: "subjectLike", q: 'subject:"dark academia" OR subject:"campus fiction"', sortable: true },
-        { id: "thrillers", title: "Twisty Mysteries & Thrillers", kind: "subjectLike", q: 'subject:thriller OR subject:"mystery fiction"', sortable: true },
-
-        { id: "classics_modern", title: "Modern Classics (1980–)", kind: "subjectLike", q: 'subject:classics', modernOnly: true, sortable: true },
-        { id: "banned", title: "Banned & Forbidden Books", kind: "subject", subject: "banned_books", sortable: true },
-
-        { id: "short_sweet", title: "Books under 300 pages", kind: "pages", op: "<", pages: 300, sortable: false },
-        { id: "chonkers", title: "Chunky But Worth It", kind: "pages", op: ">=", pages: 500, sortable: false },
-
-        { id: "nonfic", title: "Non-fiction highlights", kind: "subject", subject: "nonfiction", sortable: true },
-        { id: "nor", title: "Norwegian picks", kind: "subjectLike", q: 'language:nor OR subject:norway', sortable: true }
-    ];
-
-    /* --- Library snapshot --- */
-    let libByKey = new Map(), libByWork = new Map();
-    async function loadLibrarySnapshot() {
-        libByKey = new Map(); libByWork = new Map();
+    async function myLibraryMap() {
+        const out = { work: new Set(), title: new Set(), subjects: [] };
+        if (!hasFB() || !me()) return out;
         try {
-            const u = fb?.auth?.currentUser;
-            if (u && fb?.db) {
-                const snap = await fb.db.collection("users").doc(u.uid).collection("books").limit(600).get();
-                snap.forEach(d => {
-                    const b = d.data() || {};
-                    const rec = { id: d.id, rating: b.rating || 0, spice: b.spice || 0, workKey: b.workKey || "" };
-                    libByKey.set(nk(b.title, b.author), rec);
-                    if (b.workKey) libByWork.set(b.workKey, rec);
-                });
-                return;
-            }
-        } catch { }
-        try {
-            const arr = JSON.parse(localStorage.getItem("pb:books") || "[]");
-            arr.forEach(b => {
-                const rec = { id: b.id, rating: b.rating || 0, spice: b.spice || 0, workKey: b.workKey || "" };
-                libByKey.set(nk(b.title, b.author), rec);
-                if (b.workKey) libByWork.set(b.workKey, rec);
+            const col = window.fb.db.collection("users").doc(me().uid).collection("books");
+            const snap = await col.limit(500).get();
+            snap.forEach(d => {
+                const x = d.data() || {};
+                if (x.workKey) out.work.add(String(x.workKey).toLowerCase());
+                if (x.title) out.title.add(String(x.title).toLowerCase());
+                if (Array.isArray(x.subjects)) out.subjects.push(...x.subjects.map(s => String(s).toLowerCase()));
             });
         } catch { }
-    }
-
-    /* --- Open Library helpers --- */
-    const coverURLFrom = (doc) => {
-        if (!doc) return "";
-        const id = doc.cover_i || doc.cover_id || (doc.cover_edition_key ? doc.cover_edition_key : null);
-        if (!id) return "";
-        if (doc.cover_i || doc.cover_id) return `https://covers.openlibrary.org/b/id/${id}-M.jpg`;
-        if (doc.cover_edition_key) return `https://covers.openlibrary.org/b/olid/${doc.cover_edition_key}-M.jpg`;
-        return "";
-    };
-    const normFromSearch = (doc) => ({
-        workKey: doc.key || doc.work_key || (Array.isArray(doc.key) ? doc.key[0] : null),
-        title: doc.title || "Untitled",
-        author: Array.isArray(doc.author_name) ? doc.author_name[0] :
-            (doc.author_name || (Array.isArray(doc.authors) ? doc.authors[0]?.name : doc.author) || "Unknown"),
-        year: doc.first_publish_year || doc.first_publish_date || doc.publish_year?.[0] || "",
-        cover: coverURLFrom(doc),
-        pages: doc.number_of_pages_median || null,
-        subjects: doc.subject ? (Array.isArray(doc.subject) ? doc.subject.slice(0, 8) : [doc.subject]) : []
-    });
-    const normFromSubject = (work) => ({
-        workKey: work.key || null,
-        title: work.title || "Untitled",
-        author: Array.isArray(work.authors) ? (work.authors[0]?.name || "Unknown") : (work.author_name || "Unknown"),
-        year: work.first_publish_year || work.first_publish_date || "",
-        cover: work.cover_id ? `https://covers.openlibrary.org/b/id/${work.cover_id}-M.jpg` :
-            (work.cover_edition_key ? `https://covers.openlibrary.org/b/olid/${work.cover_edition_key}-M.jpg` : ""),
-        pages: work.number_of_pages_median || null,
-        subjects: Array.isArray(work.subject) ? work.subject.slice(0, 8) : []
-    });
-    const normFromTrending = (work) => ({
-        workKey: work.key || null,
-        title: work.title || "Untitled",
-        author: Array.isArray(work.authors) ? (work.authors[0]?.name || "Unknown") : (work.author_name || "Unknown"),
-        year: work.first_publish_year || "",
-        cover: work.cover_i ? `https://covers.openlibrary.org/b/id/${work.cover_i}-M.jpg` : "",
-        pages: work.number_of_pages_median || null,
-        subjects: Array.isArray(work.subject) ? work.subject.slice(0, 8) : []
-    });
-
-    async function olJSON(url) { const r = await fetch(url); if (!r.ok) throw new Error(url); return r.json(); }
-    const fetchTrending = async (period = "daily", limit = 20) => {
-        const data = await olJSON(`https://openlibrary.org/trending/${period}.json?limit=${limit}`);
-        return (Array.isArray(data?.works) ? data.works : []).map(normFromTrending);
-    };
-    async function fetchSubject(slug, limit = 20) {
-        try {
-            const data = await olJSON(`https://openlibrary.org/subjects/${encodeURIComponent(slug)}.json?limit=${limit}`);
-            const w = Array.isArray(data?.works) ? data.works : [];
-            if (w.length) return w.map(normFromSubject);
-        } catch { }
-        return fetchSearch(`subject:${slug.replace(/\s+/g, "_")}`, 1, limit).then(x => x.items);
-    }
-    const fetchSubjectLike = async (q, limit = 20) => fetchSearch(q, 1, limit).then(x => x.items);
-    async function fetchSearch(q, page = 1, limit = 40) {
-        const url = new URL("https://openlibrary.org/search.json");
-        url.searchParams.set("q", q || ""); url.searchParams.set("page", String(page));
-        url.searchParams.set("limit", String(limit));
-        const data = await olJSON(url.toString());
-        const docs = Array.isArray(data.docs) ? data.docs : [];
-        return { items: docs.map(normFromSearch), total: data.numFound || 0 };
-    }
-
-    /* --- Detaljer (cache) --- */
-    const detailCache = new Map();
-    async function fetchWorkDetail(workKey) {
-        if (!workKey) return { description: "", average: 0, count: 0, subjects: [] };
-        if (detailCache.has(workKey)) return detailCache.get(workKey);
-        const base = `https://openlibrary.org${workKey}.json`;
-        const rate = `https://openlibrary.org${workKey}/ratings.json`;
-        const [meta, ratings] = await Promise.allSettled([olJSON(base), olJSON(rate)]);
-        const desc = meta.status === "fulfilled"
-            ? (typeof meta.value?.description === "string" ? meta.value.description : (meta.value?.description?.value || "")) : "";
-        const subj = meta.status === "fulfilled" ? (Array.isArray(meta.value?.subjects) ? meta.value.subjects.slice(0, 10) : []) : [];
-        const avg = ratings.status === "fulfilled" ? (ratings.value?.summary?.average || 0) : 0;
-        const cnt = ratings.status === "fulfilled" ? (ratings.value?.summary?.count || 0) : 0;
-        const out = { description: desc, subjects: subj, average: avg, count: cnt };
-        detailCache.set(workKey, out);
         return out;
     }
 
-    /* --- Because you read (subjects) --- */
-    let becauseSubjectsToday = [];
-    async function loadLibraryBooks() {
-        try {
-            const u = fb?.auth?.currentUser;
-            if (u && fb?.db) {
-                const snap = await fb.db.collection("users").doc(u.uid).collection("books").limit(300).get();
-                const out = []; snap.forEach(d => out.push(d.data())); return out;
-            }
-        } catch { }
-        try { return JSON.parse(localStorage.getItem("pb:books") || "[]"); } catch { return []; }
-    }
-    function topSubjectsFromLibrary(books = [], max = 6) {
-        const counts = new Map();
-        for (const b of books) {
-            const arr = Array.isArray(b.subjects) ? b.subjects : [];
-            for (const s of arr.slice(0, 6)) {
-                const key = String(s).toLowerCase();
-                counts.set(key, (counts.get(key) || 0) + 1);
-            }
+    async function addToLibrary(normal) {
+        if (!hasFB() || !me()) throw new Error("Not signed in");
+        const payload = {
+            id: normal.id || randomId(),
+            title: normal.title || "Untitled",
+            author: normal.author || "",
+            coverUrl: normal.cover || "",
+            status: "want",
+            rating: 0,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            workKey: normal.workKey || null,
+            subjects: take(normal.subjects || [], 6)
+        };
+        if (window.PBSync?.saveBook) {
+            await PBSync.saveBook(payload);
+        } else {
+            await window.fb.db.collection("users").doc(me().uid).collection("books")
+                .doc(payload.id).set(payload, { merge: true });
         }
-        const blacklist = new Set(["fiction", "nonfiction", "novels", "literature", "history", "biography"]);
-        return [...counts.entries()].filter(([s]) => s && !blacklist.has(s))
-            .sort((a, b) => b[1] - a[1]).slice(0, max).map(([s]) => s);
+        // hold LIB_CACHE ajour lokalt
+        LIB_CACHE?.title?.add(String(payload.title).toLowerCase());
+        if (payload.workKey) LIB_CACHE?.work?.add(String(payload.workKey).toLowerCase());
+        return payload.id;
     }
-    const daySeed = () => Math.floor(Date.now() / 86400000);
-    function pickDailySubset(arr, k) {
-        if (!arr.length) return [];
-        const start = daySeed() % arr.length;
-        const out = []; for (let i = 0; i < Math.min(k, arr.length); i++) { out.push(arr[(start + i) % arr.length]); }
-        return out;
-    }
-    async function fetchBecauseYouRead(limit = 20) {
-        const lib = await loadLibraryBooks(); if (!lib.length) { becauseSubjectsToday = []; return []; }
-        const subjectsAll = topSubjectsFromLibrary(lib, 6);
-        const subjects = pickDailySubset(subjectsAll, Math.min(4, subjectsAll.length || 0));
-        becauseSubjectsToday = subjects;
-        if (!subjects.length) {
-            const authors = []; for (const b of lib.slice(-30).reverse()) {
-                const a = (b.author || "").trim(); if (a && !authors.includes(a)) authors.push(a);
-                if (authors.length >= 4) break;
-            }
-            const all = []; for (const a of authors) {
-                try {
-                    const { items } = await fetchSearch(`author:"${a}"`, 1, Math.ceil(limit / authors.length) + 6);
-                    const have = new Set(lib.map(x => nk(x.title, x.author)));
-                    items.forEach(it => { if (!have.has(nk(it.title, it.author))) all.push(it); });
-                } catch { }
-            }
-            return all.slice(0, limit);
-        }
-        const all = []; for (const s of subjects) {
+
+    /* ----------------- Open Library ----------------- */
+    const OL = {
+        coverURL(doc) {
+            const id = doc.cover_i || doc.cover_edition_key || null;
+            if (!id) return "";
+            return doc.cover_i
+                ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg`
+                : `https://covers.openlibrary.org/b/olid/${doc.cover_edition_key}-M.jpg`;
+        },
+        normalize(doc) {
+            const subs =
+                (Array.isArray(doc.subject) ? doc.subject :
+                    Array.isArray(doc.subject_key) ? doc.subject_key : [])
+                    .map(x => String(x).toLowerCase().replace(/_/g, " "));
+            return {
+                id: undefined,
+                title: doc.title || "Untitled",
+                author: Array.isArray(doc.author_name) ? doc.author_name[0] : (doc.author_name || "Unknown"),
+                year: yearOf(doc) || "",
+                cover: OL.coverURL(doc),
+                workKey: doc.key || doc.work_key?.[0] || null, // "/works/OLxxxxxW"
+                subjects: take(uniq(subs), 6),
+                pages: doc.number_of_pages_median || null,
+                editionCount: doc.edition_count || 0
+            };
+        },
+        async search(q, page = 1, limit = 24) {
+            const url = new URL("https://openlibrary.org/search.json");
+            url.searchParams.set("q", q);
+            url.searchParams.set("page", String(page));
+            url.searchParams.set("limit", String(limit));
+            const r = await fetch(url); if (!r.ok) throw new Error("search failed");
+            return await r.json();
+        },
+        async trendingWeekly(limit = 24) {
+            const url = new URL("https://openlibrary.org/trending/weekly.json");
+            url.searchParams.set("limit", String(limit));
+            const r = await fetch(url); if (!r.ok) throw new Error("weekly failed");
+            return await r.json();
+        },
+        async workExtras(workKey) {
+            if (!workKey) return {};
+            const key = workKey.startsWith("/works/") ? workKey : `/works/${String(workKey).replace(/^\/?works\//, '')}`;
+            let description = "", avg = null, count = null, subjects = [];
             try {
-                const { items } = await fetchSearch(`subject:"${s}"`, 1, Math.ceil(limit / subjects.length) + 8);
-                const have = new Set(lib.map(x => nk(x.title, x.author)));
-                items.forEach(it => { if (!have.has(nk(it.title, it.author))) all.push(it); });
+                const r = await fetch(`https://openlibrary.org${key}.json`);
+                if (r.ok) {
+                    const w = await r.json();
+                    if (w.description) description = typeof w.description === "string" ? w.description : (w.description.value || "");
+                    if (Array.isArray(w.subjects)) subjects = w.subjects.map(s => String(s).toLowerCase());
+                }
             } catch { }
+            try {
+                const rr = await fetch(`https://openlibrary.org${key}/ratings.json`);
+                if (rr.ok) {
+                    const j = await rr.json();
+                    avg = j?.summary?.average ?? null;
+                    count = j?.summary?.count ?? null;
+                }
+            } catch { }
+            return { description, avg, count, subjects };
         }
-        const seen = new Set();
-        return all.filter(b => { const k = nk(b.title, b.author); if (seen.has(k)) return false; seen.add(k); return true; })
-            .slice(0, limit);
-    }
+    };
 
-    /* --- UI utilities --- */
-    function skeletonTiles(n = 6) {
-        return Array.from({ length: n }).map(() => `
-    <div class="tile skel">
-      <div class="ph cover"></div>
-      <div class="ph t"></div>
-      <div class="ph a"></div>
-    </div>`).join("");
-    }
-    function tileHTML(b) {
-        const byWork = b.workKey ? libByWork.get(b.workKey) : null;
-        const byKey = libByKey.get(nk(b.title, b.author)) || null;
-        const hit = byWork || byKey;
-        const r = hit?.rating || 0, sp = hit?.spice || 0;
-
-        const badges = [
-            r > 0 ? `<span class="badge">★ ${r}</span>` : ``,
-            sp > 0 ? `<span class="badge">🌶️ ${sp}</span>` : ``
-        ].filter(Boolean).join("");
-
-        const subj = Array.isArray(b.subjects) ? b.subjects.slice(0, 2) : [];
-        const chips = subj.length ? `<div class="chips" style="margin-top:4px">${subj.map(s => `<span class="chip">${esc(short(s, 16))}</span>`).join("")}</div>` : ``;
-
-        const actions = hit
-            ? `<span class="inlib">✓ In library</span> <a class="btn btn-primary small" href="reader.html?id=${encodeURIComponent(hit.id)}">Open</a>`
-            : `<button class="btn btn-secondary small" data-add='${encodeURIComponent(JSON.stringify({
-                title: b.title, author: b.author, cover: b.cover, year: b.year, subjects: b.subjects || [], workKey: b.workKey || ""
-            }))}'>+ Add</button>`;
-
-        return `
-      <div class="tile card" data-work="${b.workKey || ""}">
-        ${b.cover ? `<img class="cover" src="${b.cover}" alt="" onerror="this.style.background='#eee';this.src='';">` : `<div class="cover"></div>`}
-        <div>
-          <div class="t">${esc(b.title)}</div>
-          <div class="a">${esc(b.author || "")}</div>
-          <div class="meta">${b.year ? esc(String(b.year)) : ""}</div>
-          ${chips}
-          <div class="actions">${actions} ${badges}</div>
-        </div>
-      </div>`;
-    }
-    function headerHTML(r) {
-        const pills = r.sortable ? `
-      <div class="seg" role="tablist" aria-label="Sort">
-        <button class="seg-btn active" data-sort="popular" role="tab" aria-selected="true">Popular</button>
-        <button class="seg-btn" data-sort="new" role="tab" aria-selected="false">New</button>
-      </div>` : ``;
-        const becauseChips = r.id === "because" ? `<div class="chips" data-because-chips style="margin-top:4px"></div>` : ``;
-        const railChips = `<div class="chips" data-rail-chips="${r.id}" style="margin-top:${r.id === "because" ? "6px" : "0"}"></div>`;
-        return `
-      <div class="rail-head">
-        <div>
-          <h2 style="margin:0;font-size:1.1rem">${esc(r.title)}</h2>
-          ${becauseChips}
-          ${railChips}
-        </div>
-        <div class="rail-actions">
-          ${pills}
-          <button class="btn btn-secondary small" data-more="${r.id}">See all</button>
-        </div>
-      </div>`;
-    }
-    function sectionHTML(r) {
-        return `<section class="card" data-rail="${r.id}" style="margin-bottom:12px">${headerHTML(r)}<div class="rail-list">${skeletonTiles(6)}</div></section>`;
-    }
-
-    /* --- Drawer (hamburger) med søk --- */
+    /* ----------------- Drawer (Genres) ----------------- */
     function ensureDrawer() {
-        let dd = $("#disc-drawer");
-        if (dd) return dd;
-        dd = document.createElement("div");
-        dd.id = "disc-drawer";
-        dd.className = "drawer-backdrop";
-        dd.innerHTML = `
-      <div class="drawer-panel">
-        <div class="drawer-head">
-          <b>Browse genres</b>
-          <button class="btn" id="disc-drawer-close">Close</button>
+        let drawer = $("#discDrawer");
+        if (drawer) return drawer;
+
+        drawer = document.createElement("div");
+        drawer.id = "discDrawer";
+        drawer.className = "disc-drawer";
+        drawer.innerHTML = `
+      <div class="disc-drawer__scrim" data-close></div>
+      <aside class="disc-drawer__panel">
+        <div class="disc-drawer__head">
+          <b>Genres</b>
+          <button class="btn btn-secondary small" data-close>Close</button>
         </div>
-        <div class="drawer-search">
+        <div class="disc-drawer__search row" style="margin:8px 0 12px">
           <input class="form-control" id="drawerFilter" placeholder="Filter genres…" />
         </div>
-        <div class="drawer-list" id="drawerGenreList"></div>
-      </div>`;
-        document.body.appendChild(dd);
-        dd.addEventListener("click", (e) => { if (e.target === dd) dd.classList.remove("show"); });
-        $("#disc-drawer-close", dd)?.addEventListener("click", () => dd.classList.remove("show"));
+        <div class="disc-drawer__list" id="drawerList"></div>
+      </aside>
+    `;
+        document.body.appendChild(drawer);
 
-        const list = $("#drawerGenreList", dd);
-        const entries = Object.entries(ALL_GENRES).sort((a, b) => a[0].localeCompare(b[0]));
-        function render(filter = "") {
-            const f = filter.trim().toLowerCase();
-            const rows = f ? entries.filter(([label]) => label.toLowerCase().includes(f)) : entries;
-            list.innerHTML = rows.map(([label, slug]) => `<div class="side-link" data-subj="${slug}">${label}</div>`).join("");
-        }
-        render();
-        $("#drawerFilter", dd)?.addEventListener("input", (e) => render(e.target.value || ""));
+        const list = $("#drawerList", drawer);
+        list.innerHTML = ALL_SUBJECTS.map(sub =>
+            `<div class="side-link" data-sub="${esc(sub)}">${esc(cap(sub))}</div>`
+        ).join("");
+
+        $("#drawerFilter", drawer)?.addEventListener("input", (e) => {
+            const q = (e.target.value || "").toLowerCase().trim();
+            $$(".side-link", list).forEach(el => {
+                const hit = el.textContent.toLowerCase().includes(q);
+                el.style.display = hit ? "" : "none";
+            });
+        });
 
         list.addEventListener("click", (e) => {
-            const node = e.target.closest(".side-link"); if (!node) return;
-            const subj = node.getAttribute("data-subj"); if (!subj) return;
-            dd.classList.remove("show");
-            (async () => {
-                await loadLibrarySnapshot();
-                const h = $("#results"); if (!h) return;
-                h.innerHTML = `<div class="muted">Loading…</div>`;
-                try {
-                    const items = await fetchSubject(subj, 60);
-                    h.innerHTML = items.map(tileHTML).join("");
-                    h.querySelectorAll(".tile").forEach((n, i) => n.__bookBasic = items[i]);
-                    bindTiles(h);
-                } catch { h.innerHTML = `<div class="muted">Could not load this category.</div>`; }
-            })();
+            const link = e.target.closest(".side-link");
+            if (!link) return;
+            drawer.classList.remove("show");
+            showSubjectSeeAll(link.getAttribute("data-sub"));
         });
-        return dd;
+
+        drawer.addEventListener("click", (e) => { if (e.target.hasAttribute("data-close")) drawer.classList.remove("show"); });
+
+        return drawer;
     }
-    function insertHamburger() {
+
+    function ensureActionbarButton() {
         if ($("#discMenuBtn")) return;
-        const bar = document.createElement("div");
-        bar.className = "card";
-        bar.style.display = "flex";
-        bar.style.justifyContent = "flex-end";
-        bar.style.marginBottom = "8px";
-        bar.innerHTML = `<button class="btn btn-secondary small" id="discMenuBtn">☰ Genres</button>`;
-        const results = $("#results");
-        if (results) results.parentNode.insertBefore(bar, results);
-        $("#discMenuBtn")?.addEventListener("click", () => ensureDrawer().classList.add("show"));
-    }
-
-    /* --- Toast & addToLibrary --- */
-    function toast(msg = "Done") {
-        let el = $("#pb-toast");
-        if (!el) {
-            el = document.createElement("div"); el.id = "pb-toast";
-            el.style.position = "fixed"; el.style.left = "50%"; el.style.bottom = "16px"; el.style.transform = "translateX(-50%)";
-            el.style.background = "var(--text)"; el.style.color = "var(--card)";
-            el.style.padding = "10px 14px"; el.style.borderRadius = "10px"; el.style.zIndex = "9999"; document.body.appendChild(el);
-        }
-        el.textContent = msg; el.classList.add("show"); setTimeout(() => el.classList.remove("show"), 1600);
-    }
-    async function addToLibrary(basic, originBtn) {
-        try {
-            if (originBtn) { originBtn.disabled = true; originBtn.textContent = "Adding…"; }
-            const book = {
-                title: basic.title || "Untitled",
-                author: basic.author || "",
-                coverUrl: basic.cover || "",
-                status: "want",
-                rating: 0, spice: 0,
-                year: basic.year || "",
-                workKey: basic.workKey || "",
-                subjects: Array.isArray(basic.subjects) ? basic.subjects.slice(0, 8) : [],
-                createdAt: new Date().toISOString(),
-                source: "discover"
-            };
-            if (window.PBSync?.saveBook) {
-                await PBSync.saveBook(book);
-            } else if (window.fb?.db && window.fb?.auth?.currentUser) {
-                const u = fb.auth.currentUser;
-                const id = fb.db.collection("_").doc().id;
-                await fb.db.collection("users").doc(u.uid).collection("books").doc(id).set({ id, ...book }, { merge: true });
-            } else {
-                const id = "disc_" + Math.random().toString(36).slice(2);
-                const all = JSON.parse(localStorage.getItem("pb:books") || "[]"); all.push({ id, ...book });
-                localStorage.setItem("pb:books", JSON.stringify(all));
-            }
-            await loadLibrarySnapshot();
-            if (originBtn) { originBtn.textContent = "Added ✓"; }
-            document.querySelectorAll(`[data-add]`).forEach(btn => {
-                try {
-                    const data = JSON.parse(decodeURIComponent(btn.getAttribute("data-add")));
-                    const libRec = (data.workKey && libByWork.get(data.workKey)) || libByKey.get(nk(data.title, data.author));
-                    if (libRec) {
-                        const wrap = btn.closest(".actions");
-                        if (wrap) wrap.innerHTML = `<span class="inlib">✓ In library</span> <a class="btn btn-primary small" href="reader.html?id=${encodeURIComponent(libRec.id)}">Open</a>`;
-                    }
-                } catch { }
-            });
-            toast("Added to your library ✓");
-        } catch (e) {
-            console.warn(e);
-            if (originBtn) { originBtn.disabled = false; originBtn.textContent = "+ Add"; }
-            alert("Could not add this book.");
+        const searchRow = $(".search-row");
+        const card = document.createElement("div");
+        card.className = "card disc-actionbar";
+        card.innerHTML = `
+      <button class="btn btn-secondary small" id="discMenuBtn">
+        <i class="fa-solid fa-bars"></i> Genres
+      </button>`;
+        if (searchRow && searchRow.parentNode) {
+            searchRow.parentNode.insertBefore(card, searchRow.nextSibling);
+        } else {
+            const main = $(".disc-main") || document.body;
+            main.prepend(card);
         }
     }
 
-    /* --- Sort/filtrering per rail --- */
-    function sortItems(items, mode) {
-        if (mode === "new") return [...items].sort((a, b) => (Number(b.year) || 0) - (Number(a.year) || 0));
-        return items;
-    }
-    function topSubjectsFromItems(items, max = 6) {
-        const counts = new Map();
-        for (const it of items) {
-            for (const s of (it.subjects || []).slice(0, 6)) {
-                const k = String(s).toLowerCase(); if (!k) continue;
-                counts.set(k, (counts.get(k) || 0) + 1);
-            }
-        }
-        const ban = new Set(["fiction", "nonfiction", "novels", "literature", "history", "biography"]);
-        return [...counts.entries()].filter(([s]) => !ban.has(s))
-            .sort((a, b) => b[1] - a[1]).slice(0, max).map(([s]) => s);
-    }
-
-    /* --- Render --- */
-    function skeletonTiles(n = 6) {
-        return Array.from({ length: n }).map(() => `
-    <div class="tile skel">
-      <div class="ph cover"></div>
-      <div class="ph t"></div>
-      <div class="ph a"></div>
-    </div>`).join("");
-    }
-    function renderRail(section, items) {
-        const list = section.querySelector(".rail-list");
-        if (!list) return;
-        list.innerHTML = items.map(tileHTML).join("");
-        list.querySelectorAll(".tile").forEach((node, i) => node.__bookBasic = items[i]);
-        bindTiles(list);
-    }
-
-    function bindTiles(scope = document) {
-        scope.addEventListener("click", async (e) => {
-            const addBtn = e.target.closest("[data-add]");
-            if (addBtn) { const data = JSON.parse(decodeURIComponent(addBtn.getAttribute("data-add"))); await addToLibrary(data, addBtn); return; }
-        });
-    }
-
-    /* --- Preview (hover/long-press) --- */
-    function ensurePreview() {
-        let el = $("#disc-prev");
-        if (!el) { el = document.createElement("div"); el.id = "disc-prev"; el.className = "preview-pop"; document.body.appendChild(el); }
+    /* ----------------- Sheet (Book details) ----------------- */
+    function ensureSheet() {
+        let el = $("#bookSheet");
+        if (el) return el;
+        el = document.createElement("div");
+        el.id = "bookSheet";
+        el.className = "sheet";
+        el.innerHTML = `
+      <div class="sheet__scrim" data-close></div>
+      <div class="sheet__panel">
+        <div id="sheetBody">Loading…</div>
+      </div>
+    `;
+        document.body.appendChild(el);
+        el.addEventListener("click", (e) => { if (e.target.hasAttribute("data-close")) el.classList.remove("show"); });
         return el;
     }
-    function hidePreview() { const el = $("#disc-prev"); if (el) el.classList.remove("show"); }
-    function placePreview(el, nearRect) {
-        const pad = 8, w = el.offsetWidth || 320, vw = window.innerWidth, vh = window.innerHeight;
-        let x = nearRect.right + window.scrollX + pad;
-        let y = nearRect.top + window.scrollY;
-        if (x + w + 8 > window.scrollX + vw) x = nearRect.left + window.scrollX - w - pad;
-        if (x < window.scrollX + 8) x = window.scrollX + 8;
-        if (y + el.offsetHeight > window.scrollY + vh - 8) y = window.scrollY + vh - el.offsetHeight - 8;
-        el.style.left = `${x}px`; el.style.top = `${y}px`;
+
+    function renderSheetHTML(basic, extras, inLib) {
+        const subs = uniq([...(basic.subjects || []), ...(extras.subjects || [])]).slice(0, 8);
+        const desc = String(extras.description || "").trim();
+        const hasDesc = !!desc;
+        const ratingLine = (extras.avg != null)
+            ? `<div class="muted-small">★ ${Number(extras.avg).toFixed(1)} (${fmtInt(extras.count)} ratings)</div>`
+            : ``;
+
+        return `
+      <div class="card" style="margin:0">
+        <div class="row">
+          <img src="${esc(basic.cover || "")}" alt="" style="width:110px;height:150px;object-fit:cover;border-radius:10px;border:1px solid var(--border);background:#eee" onerror="this.src='';this.style.background='#eee'" draggable="false"/>
+          <div class="row-grow">
+            <h2 style="margin:0 0 4px 0">${esc(basic.title)}</h2>
+            <div class="muted">${esc(basic.author)} ${basic.year ? "· " + esc(basic.year) : ""}</div>
+            <div class="row" style="margin:8px 0 0">
+              ${ratingLine}
+            </div>
+          </div>
+        </div>
+
+        ${subs.length ? `<div class="chips" style="margin:12px 0 6px">
+          ${subs.map(g => `<span class="chip muted-small" data-subj="${esc(g)}">${esc(cap(g))}</span>`).join("")}
+        </div>`: ``}
+
+        ${hasDesc ? `
+          <div class="muted" id="sheetDesc" style="margin-top:8px; max-height: 10.5em; overflow: hidden;">
+            ${esc(desc)}
+          </div>
+          <div class="row" style="justify-content:flex-end;margin-top:6px">
+            <button class="btn btn-secondary small" id="descToggle">Show more</button>
+          </div>
+        ` : `<div class="muted-small" style="margin-top:8px">No description available.</div>`}
+
+        <div class="row" style="justify-content:flex-end;margin-top:12px">
+          ${inLib
+                ? `<span class="muted-small" aria-label="In library">Already in your library ✓</span>`
+                : `<button class="btn btn-secondary" id="sheetAdd">+ Add to Library</button>`}
+          <button class="btn" data-close>Close</button>
+        </div>
+      </div>
+    `;
     }
-    async function showPreview(tile, basic) {
-        const el = ensurePreview();
-        el.innerHTML = `<div class="muted">Loading…</div>`;
-        el.classList.add("show");
-        const rect = tile.getBoundingClientRect();
-        placePreview(el, rect);
-        try {
-            const det = await fetchWorkDetail(basic.workKey);
-            const chips = (det.subjects || []).slice(0, 6).map(s => `<span class="chip">${esc(short(s, 16))}</span>`).join("");
-            const txt = (det.description || "").toString();
-            const blurb = txt.length > 260 ? txt.slice(0, 257) + "…" : txt || "No description.";
-            el.innerHTML = `
-        <div class="ttl">${esc(basic.title)}</div>
-        <div class="muted" style="margin-bottom:4px">${esc(basic.author || "")}${basic.year ? " • " + esc(String(basic.year)) : ""}</div>
-        <div class="chips" style="margin-bottom:6px">${chips}</div>
-        <div style="line-height:1.35">${esc(blurb)}</div>
-        <div class="muted" style="margin-top:6px">${det.average ? `${det.average.toFixed(1)}★ (${det.count})` : "No rating"}</div>`;
-            placePreview(el, rect);
-        } catch {
-            el.innerHTML = `<div class="ttl">${esc(basic.title)}</div><div class="muted">Preview unavailable.</div>`;
-            placePreview(el, rect);
-        }
-    }
-    window.addEventListener("scroll", hidePreview, { passive: true, capture: true });
 
-    /* --- Bygg rails --- */
-    async function buildHomeRails() {
-        insertHamburger();
-        await loadLibrarySnapshot();
-        const h = $("#results"); if (!h) return;
-        h.innerHTML = RAILS.map(r => `<section class="card" data-rail="${r.id}" style="margin-bottom:12px">${headerHTML(r)}<div class="rail-list">${skeletonTiles(6)}</div></section>`).join("");
+    async function openBookSheet(basic) {
+        const sheet = ensureSheet();
+        const body = $("#sheetBody", sheet);
+        body.innerHTML = `<div class="muted">Loading details…</div>`;
+        sheet.classList.add("show");
 
-        for (const rail of RAILS) {
-            const sec = $(`[data-rail="${rail.id}"]`); if (!sec) continue;
-            const list = sec.querySelector(".rail-list");
+        let extras = {};
+        try { extras = await OL.workExtras(basic.workKey); } catch { }
+        const inLib = markInLib(basic, LIB_CACHE);
 
-            let sortMode = "popular";
-            let items = [];
-            let activeChip = "";
+        body.innerHTML = renderSheetHTML(basic, extras, inLib);
 
-            const applyFilterAndSort = () => {
-                const pool = activeChip
-                    ? items.filter(it => (it.subjects || []).map(s => String(s).toLowerCase()).includes(activeChip))
-                    : items;
-                return sortItems(pool, sortMode);
-            };
-            const renderRailChips = () => {
-                const host = sec.querySelector(`[data-rail-chips="${rail.id}"]`);
-                if (!host) return;
-                const top = topSubjectsFromItems(items, 6);
-                if (!top.length) { host.innerHTML = ""; return; }
-                host.innerHTML = top.map(s => `<button class="chip ${activeChip === s ? 'active' : ''}" data-chip="${s}">${esc(short(s, 16))}</button>`).join("") +
-                    (activeChip ? ` <button class="chip" data-chip="">Clear</button>` : "");
-                host.addEventListener("click", (e) => {
-                    const c = e.target.closest("[data-chip]"); if (!c) return;
-                    activeChip = (c.getAttribute("data-chip") || "").toLowerCase();
-                    renderRailChips();
-                    renderRail(sec, applyFilterAndSort());
-                }, { once: true });
-            };
+        body.onclick = async (e) => {
+            const t = e.target;
 
-            async function loadAndRender() {
+            if (t.id === "sheetAdd") {
+                t.disabled = true;
                 try {
-                    if (rail.kind === "because") {
-                        items = await fetchBecauseYouRead(rail.size || 20);
-                        const chipHost = sec.querySelector("[data-because-chips]");
-                        if (chipHost && becauseSubjectsToday?.length) {
-                            chipHost.innerHTML = becauseSubjectsToday.slice(0, 4).map(s => `<span class="chip">${esc(short(s, 18))}</span>`).join("");
-                        }
-                    } else if (rail.kind === "trending") {
-                        items = await fetchTrending(rail.period || "daily", rail.size || 20);
-                        if (rail.filterNew) {
-                            const y = new Date().getFullYear();
-                            let filtered = items.filter(b => Number(b.year) >= (y - 1));
-                            if (!filtered.length) filtered = items.filter(b => Number(b.year) >= (y - 2));
-                            items = filtered.length ? filtered : items;
-                        }
-                        if (!items.length && rail.fallback === "new") {
-                            const { items: docs } = await fetchSearch("", 1, 200);
-                            items = docs.filter(d => {
-                                const y = Number(d.year || d.first_publish_year || 0);
-                                const now = new Date().getFullYear();
-                                return y >= now - 1;
-                            }).slice(0, rail.size || 20);
-                        }
-                        if (!items.length && rail.fallback === "booktok") {
-                            const { items: docs } = await fetchSearch('subject:"booktok" OR "tiktok made me buy it"', 1, 120);
-                            items = docs.slice(0, rail.size || 20);
-                        }
-                    } else if (rail.kind === "subject") {
-                        items = await fetchSubject(rail.subject, rail.size || 20);
-                    } else if (rail.kind === "subjectLike") {
-                        items = await fetchSubjectLike(rail.q, rail.size || 20);
-                        if (rail.modernOnly) items = items.filter(b => Number(b.year) >= 1980);
-                    } else if (rail.kind === "pages") {
-                        const { items: docs } = await fetchSearch("", 1, 220);
-                        items = docs.filter(d => {
-                            const p = Number(d.pages || d.number_of_pages_median || 0);
-                            return rail.op === "<" ? p > 0 && p < (rail.pages || 300) : p >= (rail.pages || 500);
-                        }).slice(0, rail.size || 20);
-                    }
-                    const seen = new Set();
-                    items = items.filter(b => { const k = nk(b.title, b.author); if (seen.has(k)) return false; seen.add(k); return true; });
+                    await addToLibrary(basic);
+                    t.replaceWith(document.createRange().createContextualFragment(`<span class="muted-small">Already in your library ✓</span>`));
+                    toast("Added to your library ✓");
+                } catch { t.disabled = false; alert("Could not add this book."); }
+            }
 
-                    renderRailChips();
-                    renderRail(sec, applyFilterAndSort());
-                } catch (e) {
-                    console.warn("Rail failed:", rail.id, e);
-                    list.insertAdjacentHTML("beforeend", `<div class="muted small">Could not load "${rail.title}"</div>`);
+            if (t.id === "descToggle") {
+                const d = $("#sheetDesc", body);
+                const expanded = d?.dataset?.x === "1";
+                if (d) {
+                    d.style.maxHeight = expanded ? "10.5em" : "100vh";
+                    d.dataset.x = expanded ? "0" : "1";
                 }
+                t.textContent = expanded ? "Show more" : "Show less";
             }
 
-            await loadAndRender();
-
-            if (rail.sortable) {
-                const pills = sec.querySelectorAll('.seg .seg-btn');
-                pills.forEach(btn => btn.addEventListener('click', async () => {
-                    pills.forEach(p => p.classList.remove('active'));
-                    btn.classList.add('active');
-                    sortMode = btn.getAttribute('data-sort') || "popular";
-                    renderRail(sec, applyFilterAndSort());
-                }));
+            const chip = t.closest("[data-subj]");
+            if (chip) {
+                sheet.classList.remove("show");
+                showSubjectSeeAll(chip.getAttribute("data-subj"));
             }
+        };
+    }
 
-            // “See all” → egen side
-            const btn = sec.querySelector('[data-more]');
-            btn?.addEventListener("click", () => {
-                location.href = `discover-list.html?rail=${encodeURIComponent(rail.id)}`;
-            });
+    /* ----------------- Rendering helpers ----------------- */
+    function railSkeleton(n = 10) {
+        return `<div class="rail-list">
+      ${Array.from({ length: n }).map(() => `
+        <div class="tile is-skel" style="width:160px">
+          <div class="cover" style="background:#e9e9ef"></div>
+          <div class="muted" style="height:14px;background:#eee;border-radius:6px;margin:6px 0"></div>
+          <div class="muted" style="height:12px;background:#eee;border-radius:6px;width:60%"></div>
+        </div>`).join("")}
+    </div>`;
+    }
+
+    function railsHost() {
+        let host = $("#railsHost");
+        if (!host) {
+            host = document.createElement("div");
+            host.id = "railsHost";
+            const main = $(".disc-main") || document.body;
+            main.appendChild(host);
+        }
+        return host;
+    }
+
+    function makeSection(id, title, tags = []) {
+        const host = railsHost();
+        const sec = document.createElement("section");
+        sec.className = "card";
+        sec.dataset.rail = id;
+        sec.innerHTML = `
+      <div class="card-head">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <h3 style="margin:0">${esc(title)}</h3>
+          <div class="chips muted-small" data-tags>
+            ${tags.map(t => `<span class="chip muted-small">${esc(t)}</span>`).join("")}
+          </div>
+        </div>
+        <div><a class="btn btn-secondary small" data-seeall>See all</a></div>
+      </div>
+      ${railSkeleton(8)}
+    `;
+        host.appendChild(sec);
+        sec.querySelector("[data-seeall]")?.addEventListener("click", () => openSeeAllFor(id));
+        return sec;
+    }
+
+    function tileHTML(b, inLib = false) {
+        const genres = (b.subjects || []).slice(0, 3);
+        return `
+      <div class="tile" data-book='${encodeURIComponent(JSON.stringify(b))}' style="width:160px;scroll-snap-align:start">
+        <img class="cover" src="${esc(b.cover || "")}" alt="" onerror="this.src='';this.style.background='#eee'" draggable="false"/>
+        <div class="t">${esc(b.title)}</div>
+        <div class="a">${esc(b.author)} ${b.year ? "· " + esc(b.year) : ""}</div>
+        ${genres.length ? `<div class="chips" style="margin-top:6px">
+          ${genres.map(g => `<span class="chip muted-small">${esc(cap(g))}</span>`).join("")}
+        </div>`: ``}
+        <div class="row" style="justify-content:flex-end;margin-top:8px">
+          ${inLib
+                ? `<span class="muted-small" aria-label="In library">Already in ✓</span>`
+                : `<button class="btn btn-secondary small" data-add='${encodeURIComponent(JSON.stringify(b))}'>+ Add</button>`}
+        </div>
+      </div>
+    `;
+    }
+
+    function toast(msg = "Done") {
+        let el = $("#pb-toast"); if (!el) { el = document.createElement("div"); el.id = "pb-toast"; el.className = "toast"; document.body.appendChild(el); }
+        el.textContent = msg;
+        el.classList.add("show");
+        setTimeout(() => el.classList.remove("show"), 1600);
+    }
+
+    // Desktop-vennlig rail-scroll – men la klikk slippe gjennom ved små bevegelser.
+    function enhanceRailScroll(root) {
+        if (!root || root.__pbEnhanced) return;
+        root.__pbEnhanced = true;
+
+        // Wheel → horisontal
+        root.addEventListener("wheel", (e) => {
+            if (root.scrollWidth > root.clientWidth && !e.shiftKey) {
+                root.scrollLeft += (e.deltaY || 0) + (e.deltaX || 0);
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        // Pointer-drag (med terskel). Svelger kun klikk hvis vi faktisk dro.
+        let down = false, startX = 0, startLeft = 0, dragged = false;
+        root.addEventListener("pointerdown", (e) => {
+            if (e.button !== 0) return; // kun venstre
+            down = true; dragged = false;
+            startX = e.clientX; startLeft = root.scrollLeft;
+            root.classList.add("dragging");
+        });
+        root.addEventListener("pointermove", (e) => {
+            if (!down) return;
+            const dx = e.clientX - startX;
+            if (Math.abs(dx) > 4) dragged = true;
+            root.scrollLeft = startLeft - dx;
+        });
+        const end = (e) => {
+            if (!down) return;
+            down = false;
+            if (dragged) {
+                const kill = (ev) => { ev.stopPropagation(); ev.preventDefault(); root.removeEventListener("click", kill, true); };
+                root.addEventListener("click", kill, true);
+            }
+            root.classList.remove("dragging");
+        };
+        root.addEventListener("pointerup", end);
+        root.addEventListener("pointercancel", end);
+    }
+
+    function markInLib(b, map) {
+        if (!map) return false;
+        if (b.workKey && map.work.has(String(b.workKey).toLowerCase())) return true;
+        if (b.title && map.title.has(String(b.title).toLowerCase())) return true;
+        return false;
+    }
+
+    function bindSectionClicks(sec) {
+        sec.addEventListener("click", async (e) => {
+            // Add-knapp?
+            const add = e.target.closest("[data-add]");
+            if (add) {
+                add.disabled = true;
+                try {
+                    const book = JSON.parse(decodeURIComponent(add.getAttribute("data-add")));
+                    await addToLibrary(book);
+                    const wrap = add.closest(".row");
+                    if (wrap) wrap.innerHTML = `<span class="muted-small">Already in ✓</span>`;
+                    toast("Added to your library ✓");
+                } catch (err) {
+                    console.warn(err);
+                    add.disabled = false;
+                    alert("Could not add this book.");
+                }
+                return;
+            }
+            // Klikk på tile for sheet (unngå chip/add)
+            const tile = e.target.closest(".tile");
+            if (!tile || e.target.closest(".chip,[data-add]")) return;
+            try {
+                const book = JSON.parse(decodeURIComponent(tile.getAttribute("data-book")));
+                openBookSheet(book);
+            } catch { }
+        });
+    }
+
+    /* ----------------- Rails: data builders ----------------- */
+    async function buildBecauseYouRead(libMap) {
+        const sec = makeSection("because", "Because you read …", []);
+        bindSectionClicks(sec);
+
+        const counts = {};
+        (libMap.subjects || []).forEach(s => {
+            const k = String(s || "").toLowerCase();
+            if (!k) return;
+            counts[k] = (counts[k] || 0) + 1;
+        });
+        const top = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k]) => k);
+        if (!top.length) top.push("romance", "fantasy", "mystery");
+
+        const tagsHost = sec.querySelector("[data-tags]");
+        if (tagsHost) tagsHost.innerHTML = top.map(t => `<span class="chip muted-small">${esc(cap(t))}</span>`).join("");
+
+        let docs = [];
+        for (const s of top) {
+            try {
+                const { docs: part } = await OL.search(`subject:${JSON.stringify(s)}`, 1, 24);
+                docs = docs.concat(part || []);
+            } catch { }
+            await sleep(80);
+        }
+        const items = docs.map(OL.normalize);
+        const html = items.map(b => tileHTML(b, markInLib(b, libMap))).join("");
+        const rail = document.createElement("div");
+        rail.className = "rail-list";
+        rail.innerHTML = html;
+        sec.querySelector(".rail-list")?.replaceWith(rail);
+        enhanceRailScroll(rail);
+    }
+
+    async function buildNewThisWeek(libMap) {
+        const sec = makeSection("newweek", "Trending this week", []);
+        bindSectionClicks(sec);
+        let docs = [];
+        try {
+            const w = await OL.trendingWeekly(32);
+            docs = Array.isArray(w?.works) ? w.works : [];
+        } catch { }
+        if (!docs.length) {
+            try {
+                const res = await OL.search(`first_publish_year:[${nowYear - 1} TO ${nowYear}]`, 1, 40);
+                docs = res.docs || [];
+                docs.sort((a, b) => (yearOf(b) || 0) - (yearOf(a) || 0));
+            } catch { }
+        }
+        const items = (docs || []).map(OL.normalize).slice(0, 24);
+        const html = items.map(b => tileHTML(b, markInLib(b, libMap))).join("");
+        const rail = document.createElement("div");
+        rail.className = "rail-list";
+        rail.innerHTML = html || `<div class="muted">Could not load “New this week”.</div>`;
+        sec.querySelector(".rail-list")?.replaceWith(rail);
+        enhanceRailScroll(rail);
+    }
+
+    async function buildBookTok(libMap) {
+        const sec = makeSection("booktok", "Popular on BookTok", []);
+        bindSectionClicks(sec);
+        let docs = [];
+        try {
+            const r1 = await OL.search(`subject:booktok`, 1, 40);
+            docs = r1.docs || [];
+        } catch { }
+        if (!docs.length) {
+            try {
+                const r2 = await OL.search(`"tiktok made me buy it"`, 1, 40);
+                docs = r2.docs || [];
+            } catch { }
+        }
+        const items = (docs || []).map(OL.normalize).slice(0, 24);
+        const html = items.map(b => tileHTML(b, markInLib(b, libMap))).join("");
+        const rail = document.createElement("div");
+        rail.className = "rail-list";
+        rail.innerHTML = html || `<div class="muted">Could not load “Popular on BookTok”.</div>`;
+        sec.querySelector(".rail-list")?.replaceWith(rail);
+        enhanceRailScroll(rail);
+    }
+
+    async function buildCuratedRail(id, title, query, libMap, { filter = null, tags = [] } = {}) {
+        const sec = makeSection(id, title, tags);
+        bindSectionClicks(sec);
+        try {
+            const res = await OL.search(query, 1, 50);
+            let docs = res.docs || [];
+            if (typeof filter === "function") docs = docs.filter(filter);
+            docs.sort((a, b) => (b.edition_count || 0) - (a.edition_count || 0));
+            const items = docs.map(OL.normalize).slice(0, 24);
+            const rail = document.createElement("div");
+            rail.className = "rail-list";
+            rail.innerHTML = items.map(b => tileHTML(b, markInLib(b, libMap))).join("");
+            sec.querySelector(".rail-list")?.replaceWith(rail);
+            enhanceRailScroll(rail);
+        } catch (e) {
+            console.warn(id, e);
+            sec.querySelector(".rail-list").innerHTML = `<div class="muted">Could not load “${esc(title)}”.</div>`;
         }
     }
 
-    /* --- Search mode --- */
-    async function runSearch(q) {
-        await loadLibrarySnapshot();
-        if (!q) { await buildHomeRails(); return; }
-        const h = $("#results"); if (!h) return;
-        h.innerHTML = `<div class="muted">Searching…</div>`;
-        try {
-            const { items } = await fetchSearch(q, 1, 60);
-            if (!items.length) { h.innerHTML = `<div class="muted">No results</div>`; return; }
-            h.innerHTML = items.map(tileHTML).join("");
-            h.querySelectorAll(".tile").forEach((node, i) => node.__bookBasic = items[i]);
-            bindTiles(h);
-        } catch { h.innerHTML = `<div class="muted">Could not load results.</div>`; }
-    }
-
-    /* --- Wire UI + boot --- */
+    /* ----------------- Search / See all ----------------- */
     function wireUI() {
-        const qEl = $("#q");
-        $("#qBtn")?.addEventListener("click", () => runSearch((qEl?.value || "").trim()));
-        qEl?.addEventListener("keydown", (e) => { if (e.key === "Enter") runSearch((qEl.value || "").trim()); });
+        ensureActionbarButton();
+        $("#discMenuBtn")?.addEventListener("click", () => ensureDrawer().classList.add("show"));
+        $("#qBtn")?.addEventListener("click", () => doSearch());
+        $("#q")?.addEventListener("keydown", (e) => { if (e.key === "Enter") doSearch(); });
     }
-    function boot() { wireUI(); insertHamburger(); buildHomeRails(); }
-    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot, { once: true });
-    else boot();
 
+    async function doSearch() {
+        const q = ($("#q")?.value || "").trim();
+        const host = $("#results");
+        if (!host) return;
+        if (!q) { host.innerHTML = ""; return; }
+
+        host.innerHTML = `<div class="muted" style="padding:10px">Searching…</div>`;
+        try {
+            const res = await OL.search(q, 1, 40);
+            const items = (res.docs || []).map(OL.normalize);
+            host.innerHTML = `
+        <div class="list">
+          ${items.map(b => `
+            <div class="tile" data-book='${encodeURIComponent(JSON.stringify(b))}' style="grid-template-columns:92px 1fr auto">
+              <img class="cover" src="${esc(b.cover || "")}" alt="" onerror="this.src='';this.style.background='#eee'" draggable="false"/>
+              <div>
+                <div class="t">${esc(b.title)}</div>
+                <div class="a">${esc(b.author)} ${b.year ? "· " + esc(b.year) : ""}</div>
+                ${(b.subjects || []).slice(0, 4).map(g => `<span class="chip muted-small">${esc(cap(g))}</span>`).join(" ")}
+              </div>
+              <div class="row" style="justify-content:flex-end">
+                ${(markInLib(b, LIB_CACHE) ? `<span class="muted-small">Already in ✓</span>`
+                    : `<button class="btn btn-secondary small" data-add='${encodeURIComponent(JSON.stringify(b))}'>+ Add</button>`)}
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      `;
+            host.onclick = async (e) => {
+                const add = e.target.closest("[data-add]");
+                if (add) {
+                    add.disabled = true;
+                    try {
+                        const book = JSON.parse(decodeURIComponent(add.getAttribute("data-add")));
+                        await addToLibrary(book);
+                        add.parentElement.innerHTML = `<span class="muted-small">Already in ✓</span>`;
+                        toast("Added to your library ✓");
+                    } catch { add.disabled = false; alert("Could not add this book."); }
+                    return;
+                }
+                const tile = e.target.closest(".tile");
+                if (tile && !e.target.closest(".chip")) {
+                    try { openBookSheet(JSON.parse(decodeURIComponent(tile.getAttribute("data-book")))); } catch { }
+                }
+            };
+        } catch (e) {
+            console.warn(e);
+            host.innerHTML = `<div class="muted" style="padding:10px">Search failed.</div>`;
+        }
+    }
+
+    async function showSubjectSeeAll(subject) {
+        const host = $("#results");
+        if (!host) return;
+        host.innerHTML = `<div class="muted" style="padding:10px">Loading “${esc(cap(subject))}”…</div>`;
+        try {
+            const res = await OL.search(`subject:${JSON.stringify(subject)}`, 1, 60);
+            const items = (res.docs || []).map(OL.normalize);
+            host.innerHTML = `
+        <div class="card">
+          <div class="card-head"><h3 style="margin:0">${esc(cap(subject))}</h3></div>
+          <div class="list">
+          ${items.map(b => `
+            <div class="tile" data-book='${encodeURIComponent(JSON.stringify(b))}' style="grid-template-columns:92px 1fr auto">
+              <img class="cover" src="${esc(b.cover || "")}" alt="" onerror="this.src='';this.style.background='#eee'" draggable="false"/>
+              <div>
+                <div class="t">${esc(b.title)}</div>
+                <div class="a">${esc(b.author)} ${b.year ? "· " + esc(b.year) : ""}</div>
+                ${(b.subjects || []).slice(0, 6).map(g => `<span class="chip muted-small">${esc(cap(g))}</span>`).join(" ")}
+              </div>
+              <div class="row" style="justify-content:flex-end">
+                ${markInLib(b, LIB_CACHE) ? `<span class="muted-small">Already in ✓</span>`
+                    : `<button class="btn btn-secondary small" data-add='${encodeURIComponent(JSON.stringify(b))}'>+ Add</button>`}
+              </div>
+            </div>
+          `).join("")}
+          </div>
+        </div>
+      `;
+            host.onclick = async (e) => {
+                const add = e.target.closest("[data-add]");
+                if (add) {
+                    add.disabled = true;
+                    try {
+                        const book = JSON.parse(decodeURIComponent(add.getAttribute("data-add")));
+                        await addToLibrary(book);
+                        add.parentElement.innerHTML = `<span class="muted-small">Already in ✓</span>`;
+                        toast("Added to your library ✓");
+                    } catch { add.disabled = false; alert("Could not add this book."); }
+                    return;
+                }
+                const tile = e.target.closest(".tile");
+                if (tile && !e.target.closest(".chip")) {
+                    try { openBookSheet(JSON.parse(decodeURIComponent(tile.getAttribute("data-book")))); } catch { }
+                }
+            };
+            host.scrollIntoView({ behavior: "smooth", block: "start" });
+        } catch (e) {
+            console.warn(e);
+            host.innerHTML = `<div class="muted" style="padding:10px">Could not load “${esc(cap(subject))}”.</div>`;
+        }
+    }
+
+    function openSeeAllFor(railId) {
+        const map = {
+            because: () => showSubjectSeeAll("romance"),
+            booktok: () => showSubjectSeeAll("booktok"),
+            newweek: () => showSubjectSeeAll(String(nowYear)),
+            romance: () => showSubjectSeeAll("romance"),
+            modern: () => doSearchSeeAll(`first_publish_year:[1980 TO ${nowYear}]`),
+            banned: () => doSearchSeeAll(`subject:"banned books" OR subject:censorship OR "challenged books"`),
+            ya: () => showSubjectSeeAll("young adult fiction"),
+            newadult: () => showSubjectSeeAll("new adult fiction"),
+            darkacad: () => doSearchSeeAll(`"dark academia" OR subject:"dark academia"`),
+            cozyaut: () => doSearchSeeAll(`subject:"cozy mystery" OR subject:autumn`),
+            beach: () => doSearchSeeAll(`"beach read" OR subject:summer`),
+            twisty: () => doSearchSeeAll(`subject:mystery OR subject:thriller`),
+            norsk: () => doSearchSeeAll(`language:nor OR subject:norway`),
+            movies: () => doSearchSeeAll(`subject:"film adaptations" OR subject:"motion pictures" OR subject:"television adaptations"`),
+            holiday: () => doSearchSeeAll(`subject:christmas AND subject:romance`),
+            short: () => doSearchSeeAll(`number_of_pages_median:[1 TO 300]`),
+            debut: () => showSubjectSeeAll("debut"),
+            // --- nye:
+            darkrom: () => doSearchSeeAll(`"dark romance" OR subject:"dark romance" OR subject:"adult romance" OR subject:romantasy OR subject:romance`),
+            smut: () => doSearchSeeAll(`subject:erotica OR "spicy romance" OR subject:"adult romance" OR subject:"erotic fiction"`),
+            splatter: () => doSearchSeeAll(`"splatterpunk" OR subject:"splatterpunk" OR subject:"extreme horror" OR subject:gore OR subject:"body horror" OR subject:horror`),
+            xmas: () => doSearchSeeAll(`subject:christmas OR subject:"christmas stories" OR subject:"holiday fiction" OR "christmas romance"`),
+            forb: () => doSearchSeeAll(`subject:"banned books" OR subject:censorship OR "challenged books"`),
+            found: () => doSearchSeeAll(`"found family" OR subject:"friendship" OR subject:"families"`),
+            enemies: () => doSearchSeeAll(`"enemies to lovers" OR subject:rivals OR (subject:romance AND "enemies")`)
+        };
+        (map[railId] || (() => { }))();
+    }
+
+    async function doSearchSeeAll(query) {
+        const host = $("#results");
+        if (!host) return;
+        host.innerHTML = `<div class="muted" style="padding:10px">Loading…</div>`;
+        try {
+            const res = await OL.search(query, 1, 60);
+            const items = (res.docs || []).map(OL.normalize);
+            host.innerHTML = `
+        <div class="card">
+          <div class="card-head"><h3 style="margin:0">Results</h3></div>
+          <div class="list">
+            ${items.map(b => `
+              <div class="tile" data-book='${encodeURIComponent(JSON.stringify(b))}' style="grid-template-columns:92px 1fr auto">
+                <img class="cover" src="${esc(b.cover || "")}" alt="" onerror="this.src='';this.style.background='#eee'" draggable="false"/>
+                <div>
+                  <div class="t">${esc(b.title)}</div>
+                  <div class="a">${esc(b.author)} ${b.year ? "· " + esc(b.year) : ""}</div>
+                  ${(b.subjects || []).slice(0, 6).map(g => `<span class="chip muted-small">${esc(cap(g))}</span>`).join(" ")}
+                </div>
+                <div class="row" style="justify-content:flex-end">
+                  ${markInLib(b, LIB_CACHE) ? `<span class="muted-small">Already in ✓</span>`
+                    : `<button class="btn btn-secondary small" data-add='${encodeURIComponent(JSON.stringify(b))}'>+ Add</button>`}
+                </div>
+              </div>
+            `).join("")}
+          </div>
+        </div>`;
+            host.onclick = async (e) => {
+                const add = e.target.closest("[data-add]");
+                if (add) {
+                    add.disabled = true;
+                    try {
+                        const book = JSON.parse(decodeURIComponent(add.getAttribute("data-add")));
+                        await addToLibrary(book);
+                        add.parentElement.innerHTML = `<span class="muted-small">Already in ✓</span>`;
+                        toast("Added to your library ✓");
+                    } catch { add.disabled = false; alert("Could not add this book."); }
+                    return;
+                }
+                const tile = e.target.closest(".tile");
+                if (tile && !e.target.closest(".chip")) {
+                    try { openBookSheet(JSON.parse(decodeURIComponent(tile.getAttribute("data-book")))); } catch { }
+                }
+            };
+            host.scrollIntoView({ behavior: "smooth", block: "start" });
+        } catch (e) {
+            console.warn(e);
+            host.innerHTML = `<div class="muted" style="padding:10px">Could not load.</div>`;
+        }
+    }
+
+    /* ----------------- Home rails boot ----------------- */
+    async function buildHomeRails() {
+        try { LIB_CACHE = await myLibraryMap(); } catch { LIB_CACHE = { work: new Set(), title: new Set(), subjects: [] }; }
+
+        await buildBecauseYouRead(LIB_CACHE);
+        await buildNewThisWeek(LIB_CACHE);
+        await buildBookTok(LIB_CACHE);
+
+        const defs = [
+            { id: "romance", title: "Romance Reads", query: `subject:romance`, tags: ["HEA", "Spice varies"] },
+            { id: "modern", title: "Modern Classics (1980–now)", query: `first_publish_year:[1980 TO ${nowYear}]`, tags: ["Popular", "Iconic"] },
+            { id: "banned", title: "Banned & Forbidden Books", query: `subject:"banned books" OR subject:censorship OR "challenged books"`, tags: ["Controversial"] },
+            { id: "ya", title: "Young Adult Favorites", query: `subject:"young adult fiction"`, tags: ["YA"] },
+            { id: "newadult", title: "New Adult Romance", query: `subject:"new adult" OR subject:"new adult fiction"`, tags: ["Romance"] },
+            { id: "darkacad", title: "Dark Academia", query: `"dark academia" OR subject:"dark academia"`, tags: ["Aesthetic"] },
+            { id: "cozyaut", title: "Cozy Autumn Reads", query: `subject:"cozy mystery" OR subject:autumn`, tags: ["Cozy"] },
+            { id: "beach", title: "Beach & Summer Vibes", query: `"beach read" OR subject:summer`, tags: ["Light"] },
+            { id: "twisty", title: "Twisty Mysteries & Thrillers", query: `subject:mystery OR subject:thriller`, tags: ["Plot twists"] },
+            { id: "norsk", title: "Norwegian picks", query: `language:nor OR subject:norway`, tags: ["NO"] },
+            { id: "movies", title: "Books → Movies/Series", query: `subject:"film adaptations" OR subject:"motion pictures" OR subject:"television adaptations"`, tags: ["Adapted"] },
+            { id: "holiday", title: "Holiday Romance", query: `subject:christmas AND subject:romance`, tags: ["Seasonal"] },
+            {
+                id: "short", title: "Books under 300 pages", query: `number_of_pages_median:[1 TO 300]`, tags: ["Short"],
+                filter: (d) => (d.number_of_pages_median || 999) <= 300
+            },
+            { id: "debut", title: "Debut Authors to Watch", query: `subject:debut`, tags: ["Debut"] },
+
+            // --- NYE RAILS ---
+            {
+                id: "darkrom",
+                title: "Dark Romance",
+                query: `"dark romance" OR subject:"dark romance" OR subject:"adult romance" OR subject:romantasy OR subject:romance`,
+                tags: ["18+", "Angst"],
+                filter: (d) => !((d.subject || []).some(s => /young adult/i.test(String(s))))
+            },
+            {
+                id: "smut",
+                title: "Smut / Erotica",
+                query: `subject:erotica OR "spicy romance" OR subject:"adult romance" OR subject:"erotic fiction"`,
+                tags: ["18+"],
+                filter: (d) => !((d.subject || []).some(s => /young adult/i.test(String(s))))
+            },
+            {
+                id: "splatter",
+                title: "Splatterpunk & Extreme Horror",
+                query: `"splatterpunk" OR subject:"splatterpunk" OR subject:"extreme horror" OR subject:gore OR subject:"body horror" OR subject:horror`,
+                tags: ["Graphic"]
+            },
+            {
+                id: "xmas",
+                title: "Christmas Books",
+                query: `subject:christmas OR subject:"christmas stories" OR subject:"holiday fiction" OR "christmas romance"`,
+                tags: ["Seasonal"]
+            },
+            {
+                id: "forb",
+                title: "Forbidden / Challenged",
+                query: `subject:"banned books" OR subject:censorship OR "challenged books"`,
+                tags: ["Controversial"]
+            },
+            {
+                id: "found",
+                title: "Found Family",
+                query: `"found family" OR subject:"friendship" OR subject:"families"`,
+                tags: ["Wholesome"]
+            },
+            {
+                id: "enemies",
+                title: "Enemies to Lovers",
+                query: `"enemies to lovers" OR subject:rivals OR (subject:romance AND "enemies")`,
+                tags: ["Trope"]
+            },
+        ];
+
+        for (const d of defs) {
+            await buildCuratedRail(d.id, d.title, d.query, LIB_CACHE, { filter: d.filter, tags: d.tags });
+            await sleep(60);
+        }
+    }
+
+    /* ----------------- BOOT ----------------- */
+    function bootDiscover() {
+        // Fjern gamle sidebaren helt, og bruk drawer i stedet
+        document.querySelector(".disc-side")?.remove();
+        document.querySelector(".disc-shell")?.classList.add("disc-shell--drawer");
+
+        ensureActionbarButton();
+        wireUI();
+        buildHomeRails();
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", bootDiscover, { once: true });
+    } else {
+        bootDiscover();
+    }
 })();

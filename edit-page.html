@@ -1,21 +1,62 @@
 <!DOCTYPE html>
-
 <html lang="en">
 
 <head>
   <script src="theme-init.js"></script>
   <meta charset="utf-8" />
-  <meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Edit Book – PageBud</title>
 
-  <link href="style.css" rel="stylesheet" />
-  <script defer="" src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js"></script>
+  <link rel="stylesheet" href="style.css" />
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js"></script>
+
   <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
   <script src="firebase-config.js"></script>
   <script src="firebase-init.js"></script>
+
+  <!-- Cover extraction helpers -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";</script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.93/epub.min.js"></script>
+
+  <style>
+    #genres,
+    #moods,
+    #tropes,
+    #statusChips,
+    #formatChips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px
+    }
+
+    .form-actions-fixed {
+      position: sticky;
+      bottom: calc(var(--bottom-nav-h) + 10px);
+      display: flex;
+      gap: 8px;
+      justify-content: space-between;
+      padding: 10px;
+      background: color-mix(in oklab, var(--card) 88%, transparent);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin-top: 12px
+    }
+
+    .cover {
+      width: 180px;
+      height: 260px;
+      object-fit: cover;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      display: block
+    }
+  </style>
 </head>
 
 <body>
@@ -26,20 +67,23 @@
         <button class="back-fab" onclick="history.back()"><i class="fa fa-chevron-left"></i></button>
       </div>
     </header>
-    <div class="content-wrapper" style="padding:16px">
+
+    <div class="content-wrapper form-page">
       <form class="card" id="bookForm" style="padding:16px;display:grid;gap:14px">
         <!-- Cover -->
         <div class="form-row">
           <label>Cover</label>
           <div class="cover-wrap" style="max-width:180px">
-            <img alt="Cover preview" class="cover" id="coverPreview" />
+            <img id="coverPreview" class="cover" alt="Cover preview" />
           </div>
         </div>
+
         <!-- Title & Author -->
         <div class="form-row" style="display:grid;gap:10px;grid-template-columns:1fr 1fr">
-          <div><label>Title *</label><input id="title" required="" type="text" /></div>
-          <div><label>Author *</label><input id="author" required="" type="text" /></div>
+          <div><label>Title *</label><input id="title" type="text" required></div>
+          <div><label>Author *</label><input id="author" type="text" required></div>
         </div>
+
         <!-- Status -->
         <div class="form-row">
           <label>Status</label>
@@ -47,46 +91,93 @@
             <span class="category" data-val="reading">Reading</span>
             <span class="category" data-val="finished">Finished</span>
             <span class="category" data-val="tbr">TBR</span>
+            <span class="category" data-val="dnf">DNF</span>
           </div>
         </div>
+
         <!-- Dates -->
         <div class="form-row" style="display:grid;gap:10px;grid-template-columns:1fr 1fr">
-          <div><label>Started</label><input id="started" type="date" /></div>
-          <div><label>Finished</label><input id="finished" type="date" /></div>
+          <div><label>Started</label><input id="started" type="date"></div>
+          <div><label>Finished</label><input id="finished" type="date"></div>
         </div>
-        <!-- Genres -->
-        <details class="card" id="genresBox" open="">
+
+        <!-- Format -->
+        <div class="form-row">
+          <label>Format</label>
+          <div class="categories" id="formatChips">
+            <span class="category" data-val="ebook">Ebook</span>
+            <span class="category" data-val="paperback">Paperback</span>
+            <span class="category" data-val="hardcover">Hardcover</span>
+            <span class="category" data-val="audiobook">Audiobook</span>
+          </div>
+        </div>
+
+        <!-- Replace file -->
+        <div class="form-row">
+          <label>Replace file (PDF/EPUB)</label>
+          <input id="bookFile" type="file" accept=".pdf,.epub">
+        </div>
+
+        <!-- Genres/Moods/Tropes -->
+        <details class="card" id="genresBox" open>
           <summary style="font-weight:900">Genres</summary>
           <div class="categories" id="genres"></div>
         </details>
-        <!-- Moods -->
+
         <details class="card" id="moodsBox">
           <summary style="font-weight:900">Moods</summary>
           <div class="categories" id="moods"></div>
         </details>
-        <!-- Tropes -->
+
         <details class="card" id="tropesBox">
           <summary style="font-weight:900">Tropes</summary>
           <div class="categories" id="tropes"></div>
         </details>
-        <!-- Rating & Spice (PB_Rating renders here) -->
+
+        <!-- Rating & Spice -->
         <div class="form-row">
           <label>Rating</label>
-          <div class="rating" id="ratingBar"></div>
+          <div id="ratingBar" class="rating"></div>
           <label style="margin-top:8px">Spice</label>
-          <div class="spice" id="spiceBar"></div>
+          <div id="spiceBar" class="spice"></div>
         </div>
+
         <!-- Review -->
         <div class="form-row">
           <label>Review</label>
           <textarea id="review" rows="4"></textarea>
         </div>
+
+        <!-- Quotes -->
+        <details class="card" id="quotesBox" open>
+          <summary style="font-weight:900">Quotes (optional)</summary>
+
+          <div class="row wrap" style="gap:8px; margin-top:8px;">
+            <textarea id="quoteInput" rows="3" class="row-grow"
+              placeholder="Paste a quote and click Add (⌘/Ctrl+Enter also works)"></textarea>
+
+            <!-- Single action for quotes -->
+            <button type="button" id="addQuoteBtn" class="btn" style="height:fit-content; white-space:nowrap;">
+              Add
+            </button>
+          </div>
+
+          <!-- Saved/pending quotes render here -->
+          <div id="quotesList" class="quotes-list" style="margin-top:10px;"></div>
+        </details>
+
+
       </form>
+
       <div class="form-actions-fixed">
-        <button class="btn" id="deleteBtn" style="background:#e23a3a;color:#fff" type="button">Delete</button>
-        <button class="btn btn-primary" id="saveBtn" type="button">Save</button>
+        <button type="button" class="btn" id="deleteBtn" style="background:#e23a3a;color:#fff">Delete</button>
+        <div style="display:flex;gap:8px">
+          <button type="button" class="btn btn-secondary" onclick="history.back()">Cancel</button>
+          <button type="button" class="btn btn-primary" id="saveBtn">Save</button>
+        </div>
       </div>
     </div>
+
     <nav class="bottom-nav">
       <div class="nav-item active"><i class="fas fa-book"></i> Library</div>
       <div class="nav-item" onclick="location.href='stats.html'"><i class="fas fa-chart-line"></i> Stats</div>
@@ -94,10 +185,10 @@
       <div class="nav-item" onclick="location.href='settings.html'"><i class="fas fa-cog"></i> Settings</div>
     </nav>
   </div>
+
   <script src="constants.js"></script>
-  <!-- half-star widgets -->
-  <script defer="" src="rating-controls.js"></script>
-  <script defer="" src="edit-page.js"></script>
+  <script defer src="rating-controls.js"></script>
+  <script defer src="edit-page.js"></script>
 </body>
 
 </html>

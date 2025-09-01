@@ -23,7 +23,7 @@
     // “BookTok-style” moods with emoji, alphabetical-ish by word
     const MOODS = [
         "🥺 Angsty", "🤯 Astonished", "🥊 Badass", "🥶 Bitter", "😌 Blissful", "😎 Brave", "🕯️ Calm", "🌀 Confused", "🧣 Cozy", "🌙 Dreamy", "😭 Devastated", "😳 Embarrassed", "🌟 Empowered", "😏 Excited", "🤓 Focused", "😡 Frustrated", "😱 Frightened", "🤣 Funny", "🌌 Grateful", "💔 Heartbroken", "🥳 Hilarious", "💖 Hopeful", "🧘 Inspired", "😶‍🌫️ Kinda Lost", "💕 Loved", "🌧 Moody", "😔 Nostalgic",
-        "😮‍💨 Overwhelmed", "🌀 Obsessed", "🌹 Optimistic", "🫠 Panicked", "🌪️ Shocked", "😏 Spicy", "🧠 Thought - provoking", "💫 Whimsical", "🌀 Weird", "😴 Zoned Out",
+        "😮‍💨 Overwhelmed", "🌀 Obsessed", "🌹 Optimistic", "🫠 Panicked", "Sad", "🌪️ Shocked", "😏 Spicy", "🧠 Thought - provoking", "💫 Whimsical", "🌀 Weird", "😴 Zoned Out",
     ];
 
     // Tropes (alpha)
