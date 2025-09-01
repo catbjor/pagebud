@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="en">
 
 <head>
@@ -22,6 +21,7 @@
                 </button>
             </div>
         </header>
+
         <main class="container">
             <!-- Appearance -->
             <section class="card">
@@ -36,6 +36,7 @@
                     </button>
                 </div>
             </section>
+
             <!-- Reading Timer -->
             <section class="card">
                 <div class="card-head">
@@ -72,6 +73,29 @@
                     <button class="btn" id="btnResetTimer">Reset timer state</button>
                 </div>
             </section>
+
+            <!-- Language (EN / NO) -->
+            <section class="card">
+                <div class="card-head">
+                    <h2>Language</h2>
+                </div>
+                <div id="langChips" class="chips scroll-x">
+                    <span class="category" data-lang="en">English</span>
+                    <span class="category" data-lang="no">Norsk</span>
+                </div>
+                <p class="muted small">Changes the app’s interface language.</p>
+            </section>
+
+            <!-- Account -->
+            <section class="card">
+                <div class="card-head">
+                    <h2>Account</h2>
+                </div>
+                <div class="row">
+                    <button id="btnLogout" class="btn">Log out</button>
+                </div>
+            </section>
+
             <!-- Reset cache -->
             <section class="card" style="margin-bottom: 90px;">
                 <div class="card-head">
@@ -84,6 +108,7 @@
                 </div>
             </section>
         </main>
+
         <nav class="bottom-nav">
             <div class="nav-item" onclick="location.href='index.html'"><i class="fas fa-book"></i> Library</div>
             <div class="nav-item" onclick="location.href='stats.html'"><i class="fas fa-chart-line"></i> Stats</div>
@@ -91,13 +116,37 @@
             <div class="nav-item active"><i class="fas fa-cog"></i> Settings</div>
         </nav>
     </div>
+
+    <!-- Scripts -->
     <script src="toast.js" defer></script>
     <script src="push.js" defer></script>
     <script src="timer.js" defer></script>
     <script src="settings.js" defer></script>
     <script src="settings-fix.js" defer></script>
 
+    <!-- i18n (språk) -->
+    <script src="i18n.js"></script>
+    <script src="settings-lang.js"></script>
 
+    <!-- Log out handler (liten, påvirker ikke annet) -->
+    <script>
+        (function () {
+            const btn = document.getElementById('btnLogout');
+            if (!btn) return;
+            btn.addEventListener('click', async () => {
+                try {
+                    const auth = (window.fb?.auth) || firebase.auth();
+                    await auth.signOut();
+                    // Tøm språk-cache kun for sikkerhets skyld
+                    try { localStorage.removeItem('pb_lang'); sessionStorage.clear(); } catch { }
+                    location.href = 'auth.html';
+                } catch (e) {
+                    console.error(e);
+                    alert('Could not sign out.');
+                }
+            });
+        })();
+    </script>
 </body>
 
 </html>
