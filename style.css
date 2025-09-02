@@ -383,6 +383,40 @@ input[type="text"] {
   grid-template-columns: 1fr
 }
 
+/* << ADDED: support the actual container used on index.html (#books-grid) */
+.books-grid {
+  display: grid;
+  gap: 16px;
+  padding: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+}
+
+@media (max-width: 600px) {
+  .books-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  }
+}
+
+@media (min-width: 900px) {
+  .books-grid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  }
+}
+
+/* list mode for .books-grid */
+.books-grid.list-view {
+  grid-template-columns: 1fr;
+}
+
+.books-grid.list-view .book-card {
+  grid-template-columns: 90px 1fr;
+}
+
+.books-grid.list-view .thumb-wrap {
+  width: 90px;
+  height: 120px;
+}
+
 /* ---------- Book card ---------- */
 .book-card {
   display: grid;
@@ -451,6 +485,7 @@ input[type="text"] {
   margin-top: 6px
 }
 
+/* keep the existing .book-grid list rules too (harmless if unused) */
 .book-grid.list-view .book-card {
   grid-template-columns: 90px 1fr
 }
@@ -662,8 +697,7 @@ input[type="text"] {
   margin: 16px 0 calc(var(--bottom-nav-h) + 56px);
 }
 
-/* ---------- (FJERNET: gammel Timer dock blokk som kranglet) ---------- */
-/* Ingen timer-posisjon her. Timer styres av timer-ring.css + timer.js (placeDock). */
+/* ---------- (no timer layout here; timer handled elsewhere) ---------- */
 
 /* Add-book FAB */
 .add-book {
@@ -691,8 +725,6 @@ input[type="text"] {
 .add-book:active {
   transform: scale(.97)
 }
-
-/* (FJERNET) .has-add-fab .timer-dock.right { ... } – denne kolliderte med ny timer */
 
 /* ---------- Stats page styles ---------- */
 .page-header {
@@ -853,8 +885,7 @@ input[type="text"] {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 10px
+  gap: 12px
 }
 
 .streak-badge {
@@ -1272,22 +1303,4 @@ input[type="file"]::file-selector-button:hover {
 
 #pb-timer-dock.timer-dock.open .timer-drawer {
   z-index: 2;
-}
-
-/* ---- Timer override: la timer-ring.css + timer.js bestemme plassering ---- */
-#pb-timer-dock.timer-dock {
-  position: fixed !important;
-  z-index: 2200 !important;
-  bottom: auto !important;
-  left: auto !important;
-  right: auto !important;
-}
-
-/* Ikke slå av klikk på sirkelen når åpen */
-#pb-timer-dock.timer-dock.open .timer-circle {
-  z-index: 2;
-}
-
-#pb-timer-dock.timer-dock.open .timer-drawer {
-  z-index: 1;
 }
