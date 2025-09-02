@@ -1,36 +1,14 @@
 "use strict";
 
-/* ============ Utils ============ */
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 
-// Firestore-håndtak (støtter både window.fb.db og compat)
 const db = (window.fb && fb.db)
   ? fb.db
   : (window.firebase && firebase.firestore ? firebase.firestore() : null);
 
-/* ============ View toggle (Grid/List) ============ */
-function initViewToggle() {
-  const grid = $("#book-grid");
-  const btnGrid = $("#viewGrid");
-  const btnList = $("#viewList");
-  if (!grid || !btnGrid || !btnList) return;
+let CURRENT_USER = null; // settes når vi har auth
 
-  function setActive(mode) {
-    btnGrid.classList.toggle("active", mode === "grid");
-    btnList.classList.toggle("active", mode === "list");
-  }
-  function apply(mode) {
-    grid.classList.toggle("list-view", mode === "list");
-    localStorage.setItem("pb:view", mode);
-    setActive(mode);
-  }
-  btnGrid.addEventListener("click", () => apply("grid"));
-  btnList.addEventListener("click", () => apply("list"));
-  apply(localStorage.getItem("pb:view") || "grid");
-}
-
-/* ============ Placeholder cover ============ */
 const phCover =
   "data:image/svg+xml;utf8," +
   encodeURIComponent(
@@ -41,7 +19,6 @@ const phCover =
      </svg>`
   );
 
-/* ============ Småhjelpere til kort ============ */
 function escapeHtml(s) {
   return String(s || "").replace(/[&<>"']/g, c => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
@@ -55,7 +32,6 @@ function starsRow(val) {
   for (let i = 1; i <= 6; i++) {
     out += `<span class="${i <= full ? "card-star--on" : "card-star"}"></span>`;
   }
-  // Forenklet halv-stjerne: slå på første ledige "off"
   if (half && full < 6) {
     out = out.replace(/(<span class="card-star"><\/span>)/, `<span class="card-star--on"></span>`);
   }
@@ -71,7 +47,6 @@ function chilisRow(val) {
   return out;
 }
 
-/* ============ Kort (HTML) ============ */
 function cardHTML(doc) {
   const d = doc.data();
   const id = doc.id;
@@ -82,11 +57,10 @@ function cardHTML(doc) {
 
   const rating = Number(d.rating || 0);
   const spice = Number(d.spice || 0);
-  const status = (d.status || "").toLowerCase();         // reading|finished|tbr|dnf
+  const status = (d.status || "").toLowerCase();
   const favorite = !!d.favorite;
-  const format = (d.format || "").toLowerCase();         // ebook|paperback|hardcover|audiobook
+  const format = (d.format || "").toLowerCase();
 
-  // 👇 consider a file present if any of these fields exist
   const hasFile = !!(
     d.fileUrl || d.pdfUrl || d.epubUrl || d.storagePath || d.filePath || d.hasFile
   );
@@ -122,24 +96,19 @@ function cardHTML(doc) {
     </article>`;
 }
 
-
-/* ============ Synlighet (søk + chipfilter) ============ */
 function applyVisibility(card) {
   const hide = card.classList.contains("filter-hide-chip") ||
     card.classList.contains("filter-hide-text");
   card.style.display = hide ? "none" : "";
 }
 
-/* ============ Laste + rendre bibliotek ============ */
 async function loadAndRenderLibrary(user) {
-  const grid = $("#book-grid");
+  const grid = $("#books-grid");
   const empty = $("#empty-state");
   if (!db || !user || !grid) return;
 
-  // Viktig: IKKE bruk orderBy her – tåler docs uten createdAt
   const snap = await db.collection("users").doc(user.uid).collection("books").get();
 
-  // Robust klientsortering på createdAt (TS/Date/ISO), nyest først
   const docs = snap.docs.slice().sort((a, b) => {
     const da = a.data(), dbb = b.data();
     const ta = da.createdAt?.toMillis?.()
@@ -158,8 +127,18 @@ async function loadAndRenderLibrary(user) {
 
   grid.innerHTML = docs.map(cardHTML).join("");
 
-  // Klikk-actions på kort
   grid.addEventListener("click", async (e) => {
+    const card = e.target.closest(".book-card");
+
+    // ---- Multi-select toggle (the only click handler for cards while in mode) ----
+    if (MS_IN_MODE && card) {
+      e.preventDefault();
+      e.stopPropagation();
+      MS_toggleCard(card);
+      return;
+    }
+
+    // ---- Normal actions ----
     const openBtn = e.target.closest("[data-action='open']");
     if (openBtn) {
       const id = openBtn.dataset.id;
@@ -184,7 +163,6 @@ async function loadAndRenderLibrary(user) {
         const next = !d.favorite;
         await ref.set({ favorite: next, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
 
-        // Oppdater DOM + behold aktivt filter
         const card = favBtn.closest(".book-card");
         favBtn.classList.toggle("active", next);
         if (card) {
@@ -197,14 +175,15 @@ async function loadAndRenderLibrary(user) {
     }
   });
 
-  // Etter render: anvend gjeldende filter (f.eks. hvis bruker sto på "Favorites")
+  // Long-press to enter multi-select
+  MS_attachLongPress(grid);
+
   applyCurrentFilter();
 }
 
-/* ============ Søk (tittel/forfatter) ============ */
 function initSearch() {
   const input = $("#search-input");
-  const grid = $("#book-grid");
+  const grid = $("#books-grid");
   if (!input || !grid) return;
 
   input.addEventListener("input", () => {
@@ -219,7 +198,6 @@ function initSearch() {
   });
 }
 
-/* ============ Filterchips (status / favorites / ev. format) ============ */
 let currentFilter = "all";
 
 function initFilterChips() {
@@ -234,7 +212,7 @@ function initFilterChips() {
 }
 
 function applyCurrentFilter() {
-  const grid = $("#book-grid");
+  const grid = $("#books-grid");
   if (!grid) return;
 
   grid.querySelectorAll(".book-card").forEach(card => {
@@ -251,8 +229,6 @@ function applyCurrentFilter() {
       case "tbr": if (st !== "tbr") card.classList.add("filter-hide-chip"); break;
       case "dnf": if (st !== "dnf") card.classList.add("filter-hide-chip"); break;
       case "favorites": if (!fav) card.classList.add("filter-hide-chip"); break;
-
-      // (valgfritt) format-filtre hvis du har chips for dem i UI
       case "ebook": if (fmt !== "ebook") card.classList.add("filter-hide-chip"); break;
       case "paperback": if (fmt !== "paperback") card.classList.add("filter-hide-chip"); break;
       case "hardcover": if (fmt !== "hardcover") card.classList.add("filter-hide-chip"); break;
@@ -264,20 +240,217 @@ function applyCurrentFilter() {
   });
 }
 
-/* ============ Boot ============ */
+function initViewToggle() {
+  const grid = document.getElementById("books-grid");
+  const btnGrid = document.getElementById("viewGrid");
+  const btnList = document.getElementById("viewList");
+  if (!grid || !btnGrid || !btnList) {
+    console.warn("Grid/List toggle not initialized – missing elements.");
+    return;
+  }
+
+  function apply(mode) {
+    grid.classList.toggle("list-view", mode === "list");
+    btnGrid.classList.toggle("active", mode === "grid");
+    btnList.classList.toggle("active", mode === "list");
+    localStorage.setItem("pb:view", mode);
+  }
+
+  btnGrid.addEventListener("click", () => apply("grid"));
+  btnList.addEventListener("click", () => apply("list"));
+
+  const mode = localStorage.getItem("pb:view") || "grid";
+  apply(mode);
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   initViewToggle();
   initSearch();
   initFilterChips();
 
-  // Krever at firebase-init.js eksponerer requireAuth
   if (typeof requireAuth === "function") {
-    requireAuth(user => loadAndRenderLibrary(user));
+    requireAuth(user => {
+      CURRENT_USER = user;
+      loadAndRenderLibrary(user);
+      window.startSocialFeedPreview?.(); // Initialize the friends feed preview
+    });
   } else {
-    // Fallback – forsøk å hente currentUser etter en liten delay
     const tryNow = setInterval(() => {
       const u = (firebase?.auth?.().currentUser) || (fb?.auth?.currentUser);
-      if (u) { clearInterval(tryNow); loadAndRenderLibrary(u); }
+      if (u) { clearInterval(tryNow); CURRENT_USER = u; loadAndRenderLibrary(u); }
     }, 300);
   }
 });
+
+document.querySelectorAll("#langToggle [data-lang]").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const lang = btn.getAttribute("data-lang");
+    window.PB_I18N?.setLang?.(lang);
+    document.dispatchEvent(new CustomEvent("pb:lang:update"));
+    alert("Language switched to " + lang);
+  });
+});
+
+/* =========================================================
+   Multi-select (long-press)
+========================================================= */
+
+let MS_IN_MODE = false;
+const MS_SELECTED = new Set();
+
+let MS_bar = null, MS_countEl = null, MS_cancelBtn = null, MS_deleteBtn = null;
+
+function MS_getId(card) {
+  return card?.dataset?.id || null;
+}
+
+function MS_ensureBar() {
+  if (MS_bar) return MS_bar;
+  MS_bar = document.createElement("div");
+  MS_bar.className = "multi-select-bar";
+  MS_bar.innerHTML = `
+    <button class="btn btn-secondary" id="msCancel" type="button">Cancel</button>
+    <div class="select-count" aria-live="polite"><span id="msCount">0</span> selected</div>
+    <button class="btn btn-danger" id="msDelete" type="button">Delete</button>
+  `;
+  document.body.appendChild(MS_bar);
+  MS_countEl = $("#msCount", MS_bar);
+  MS_cancelBtn = $("#msCancel", MS_bar);
+  MS_deleteBtn = $("#msDelete", MS_bar);
+
+  MS_cancelBtn.addEventListener("click", MS_exitMode);
+  MS_deleteBtn.addEventListener("click", MS_onDelete);
+  return MS_bar;
+}
+
+function MS_updateBar() {
+  MS_ensureBar();
+  MS_countEl.textContent = String(MS_SELECTED.size);
+  MS_bar.classList.toggle("show", MS_IN_MODE);
+  MS_deleteBtn.disabled = MS_SELECTED.size === 0;
+}
+
+function MS_selectCard(card, on) {
+  const id = MS_getId(card);
+  if (!id) return;
+  if (on) {
+    MS_SELECTED.add(id);
+    card.classList.add("selected");
+  } else {
+    MS_SELECTED.delete(id);
+    card.classList.remove("selected");
+  }
+  MS_updateBar();
+}
+
+function MS_toggleCard(card) {
+  const id = MS_getId(card);
+  if (!id) return;
+  MS_selectCard(card, !MS_SELECTED.has(id));
+}
+
+function MS_enterMode(initialCard) {
+  if (MS_IN_MODE) return;
+  MS_IN_MODE = true;
+  document.body.classList.add("multi-select-mode");
+  MS_ensureBar();
+  MS_bar.classList.add("show");
+
+  if (initialCard) MS_selectCard(initialCard, true);
+
+  -  document.addEventListener("click", MS_preventNavInMode, true);
+  document.addEventListener("keydown", MS_onKeyDown);
+
+  MS_updateBar();
+}
+
+
+function MS_exitMode() {
+  if (!MS_IN_MODE) return;
+  MS_IN_MODE = false;
+  document.body.classList.remove("multi-select-mode");
+  MS_bar?.classList.remove("show");
+  MS_SELECTED.clear();
+  $$(".book-card").forEach(c => c.classList.remove("selected"));
+
+  -  document.removeEventListener("click", MS_preventNavInMode, true);
+  document.removeEventListener("keydown", MS_onKeyDown);
+  MS_updateBar();
+}
+
+
+function MS_onKeyDown(e) { if (e.key === "Escape") MS_exitMode(); }
+
+async function MS_onDelete() {
+  if (!MS_SELECTED.size || !db || !CURRENT_USER) return;
+  const ids = Array.from(MS_SELECTED);
+
+  const ok = confirm(`Delete ${ids.length} selected book(s)?`);
+  if (!ok) return;
+
+  try {
+    const batchDeletes = ids.map(id =>
+      db.collection("users").doc(CURRENT_USER.uid).collection("books").doc(id).delete()
+    );
+    await Promise.all(batchDeletes);
+
+    const grid = $("#books-grid");
+    if (grid) {
+      ids.forEach(id => {
+        const node = grid.querySelector(`.book-card[data-id="${id}"]`);
+        if (node) node.remove();
+      });
+    }
+
+    MS_exitMode();
+  } catch (err) {
+    console.error("Bulk delete failed:", err);
+    alert("Failed to delete some items. Please try again.");
+  }
+}
+
+function MS_attachLongPress(container) {
+  const LONG_MS = 450;
+  const MOVE_CANCEL = 10;
+  let timer = null, startX = 0, startY = 0, pressedCard = null;
+
+  function clearTimer() {
+    if (timer) { clearTimeout(timer); timer = null; }
+    pressedCard = null;
+  }
+
+  container.addEventListener("pointerdown", (e) => {
+    const card = e.target.closest(".book-card");
+    if (!card) return;
+
+    if (MS_IN_MODE) return;
+
+    pressedCard = card;
+    startX = e.clientX; startY = e.clientY;
+
+    timer = setTimeout(() => {
+      MS_enterMode(pressedCard);
+      clearTimer();
+    }, LONG_MS);
+  });
+
+  container.addEventListener("pointermove", (e) => {
+    if (!timer) return;
+    const dx = Math.abs(e.clientX - startX);
+    const dy = Math.abs(e.clientY - startY);
+    if (dx > MOVE_CANCEL || dy > MOVE_CANCEL) clearTimer();
+  });
+
+  ["pointerup", "pointercancel", "pointerleave"].forEach(type => {
+    container.addEventListener(type, clearTimer);
+  });
+
+  container.addEventListener("contextmenu", (e) => {
+    const card = e.target.closest(".book-card");
+    if (!card) return;
+    if (!MS_IN_MODE) {
+      e.preventDefault();
+      MS_enterMode(card);
+    }
+  });
+}

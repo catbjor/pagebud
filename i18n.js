@@ -108,3 +108,10 @@
 
     window.PB_I18N = { loadUserLang, setLang, getLang, list };
 })();
+
+document.addEventListener("pb:lang:update", () => {
+    const lang = localStorage.getItem("pb:lang") || "en";
+    document.documentElement.lang = lang;
+    updateLangTexts();
+});
+  

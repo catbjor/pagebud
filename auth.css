@@ -166,3 +166,17 @@
     line-height: 1.3;
     color: var(--text-light);
 }
+
+.toast {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #e23a3a;
+    color: white;
+    padding: 12px 16px;
+    border-radius: 12px;
+    z-index: 999;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+    font-weight: bold;
+}

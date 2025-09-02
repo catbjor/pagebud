@@ -7,13 +7,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Add Book – PageBud</title>
 
-  <!-- Styles -->
   <link rel="stylesheet" href="style.css" />
-  <link rel="stylesheet" href="rating.css" />
-  <link rel="stylesheet" href="file-chip.css" />
+  <link rel="stylesheet" href="rating.css">
+  <link rel="stylesheet" href="file-chip.css">
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js"></script>
 
-  <!-- Firebase (compat) -->
+  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -21,12 +20,31 @@
   <script src="firebase-config.js"></script>
   <script src="firebase-init.js"></script>
 
-  <!-- Cover extraction helpers -->
+  <!-- PDF/EPUB helpers -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script>pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";</script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.93/epub.min.js"></script>
 
   <style>
+    /* Kun for skjema-sider – ikke homepage */
+    .form-page #genres,
+    .form-page #moods,
+    .form-page #tropes,
+    .form-page #statusChips,
+    .form-page #formatChips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .form-page .categories .category {
+      min-width: auto;
+      width: auto;
+      height: auto;
+      padding: 10px 12px;
+      line-height: 1.2;
+    }
+
     .form-actions-fixed {
       position: sticky;
       bottom: calc(var(--bottom-nav-h) + 10px);
@@ -38,6 +56,12 @@
       border: 1px solid var(--border);
       border-radius: 12px;
       margin-top: 12px;
+      z-index: 50;
+      pointer-events: auto;
+    }
+
+    .form-actions-fixed .btn {
+      pointer-events: auto;
     }
 
     .cover {
@@ -50,11 +74,34 @@
       display: block;
     }
 
-    /* chips-layout (små tags) */
-    .chips {
+    .file-row {
+      position: relative;
       display: flex;
-      flex-wrap: wrap;
+      align-items: center;
       gap: 8px;
+      flex-wrap: wrap;
+      z-index: 40;
+    }
+
+    .file-row input[type=file] {
+      position: absolute;
+      left: -9999px;
+      top: auto;
+    }
+
+    .btn-file-chip {
+      margin-right: 8px;
+      pointer-events: auto;
+    }
+
+    #readNowBtn {
+      margin-left: 8px;
+      pointer-events: auto;
+    }
+
+    .file-row,
+    .file-row * {
+      pointer-events: auto !important;
     }
   </style>
 </head>
@@ -70,73 +117,73 @@
 
     <div class="content-wrapper form-page">
       <form class="card" id="bookForm" style="padding:16px; display:grid; gap:14px">
-        <!-- Cover -->
+        <!-- Cover field -->
         <div class="form-row">
-          <label style="font-weight:700;display:block;margin-bottom:6px">Cover</label>
+          <label style="font-weight:700; display:block; margin-bottom:6px">Cover</label>
           <div class="cover-wrap" style="max-width:180px">
             <img id="coverPreview" class="cover" alt="Cover preview" />
           </div>
         </div>
 
         <!-- Title & Author -->
-        <div class="form-row" style="display:grid;gap:10px;grid-template-columns:1fr 1fr">
+        <div class="form-row" style="display:grid; gap:10px; grid-template-columns:1fr 1fr">
           <div><label>Title *</label><input id="title" type="text" required></div>
           <div><label>Author *</label><input id="author" type="text" required></div>
         </div>
 
-        <!-- Status (chips, ikke category-tiles) -->
+        <!-- Status -->
         <div class="form-row">
           <label>Status</label>
-          <div class="chips" id="statusChips">
-            <span class="chip" data-val="reading">Reading</span>
-            <span class="chip" data-val="finished">Finished</span>
-            <span class="chip" data-val="tbr">TBR</span>
-            <span class="chip" data-val="dnf">DNF</span>
+          <div class="categories" id="statusChips">
+            <span class="category" data-val="reading">Reading</span>
+            <span class="category" data-val="finished">Finished</span>
+            <span class="category" data-val="tbr">TBR</span>
+            <span class="category" data-val="dnf">DNF</span>
           </div>
         </div>
 
         <!-- Dates -->
-        <div class="form-row" style="display:grid;gap:10px;grid-template-columns:1fr 1fr">
+        <div class="form-row" style="display:grid; gap:10px; grid-template-columns:1fr 1fr">
           <div><label>Started</label><input id="started" type="date"></div>
           <div><label>Finished</label><input id="finished" type="date"></div>
         </div>
 
-        <!-- Format (chips) -->
+        <!-- Format -->
         <div class="form-row">
           <label>Format</label>
-          <div class="chips" id="formatChips">
-            <span class="chip" data-val="ebook">Ebook</span>
-            <span class="chip" data-val="paperback">Paperback</span>
-            <span class="chip" data-val="hardcover">Hardcover</span>
-            <span class="chip" data-val="audiobook">Audiobook</span>
+          <div class="categories" id="formatChips">
+            <span class="category" data-val="ebook">Ebook</span>
+            <span class="category" data-val="paperback">Paperback</span>
+            <span class="category" data-val="hardcover">Hardcover</span>
+            <span class="category" data-val="audiobook">Audiobook</span>
           </div>
         </div>
 
-        <!-- Book File -->
+        <!-- Activate file upload -->
         <div class="form-row file-row">
           <label>UPLOAD / REPLACE (PDF/EPUB)</label>
-          <input id="bookFile" type="file" accept=".pdf,.epub" style="display:none">
-          <button type="button" id="btnPickFile" class="btn-file-chip">Velg fil</button>
+          <input id="bookFile" type="file" accept=".pdf,.epub">
+          <button type="button" id="btnPickFile" class="btn btn-file-chip">Velg fil</button>
           <span id="fileName" class="file-name"></span>
         </div>
 
-        <!-- Genres/Moods/Tropes (chips) -->
+        <!-- Genres / Moods / Tropes -->
         <details class="card" id="genresBox" open>
           <summary style="font-weight:900">Genres</summary>
-          <div class="chips" id="genres" style="margin-top:8px"></div>
+          <div class="categories" id="genres" style="margin-top:8px"></div>
         </details>
 
         <details class="card" id="moodsBox">
           <summary style="font-weight:900">Moods</summary>
-          <div class="chips" id="moods" style="margin-top:8px"></div>
+          <div class="categories" id="moods" style="margin-top:8px"></div>
         </details>
 
         <details class="card" id="tropesBox">
           <summary style="font-weight:900">Tropes</summary>
-          <div class="chips" id="tropes" style="margin-top:8px"></div>
+          <div class="categories" id="tropes"></div>
         </details>
 
-        <!-- Rating & Spice (tegne av rating-controls.js) -->
+        <!-- Rating & Spice -->
         <div class="form-row">
           <label>Rating</label>
           <div id="ratingBar" class="rating"></div>
@@ -149,26 +196,10 @@
           <label>Review</label>
           <textarea id="review" rows="4" placeholder="Write your review…"></textarea>
         </div>
-
-        <!-- Quotes -->
-        <details class="card" id="quotesBox" open>
-          <summary style="font-weight:900">Quotes (optional)</summary>
-
-          <div class="row wrap" style="gap:8px; margin-top:8px;">
-            <textarea id="quoteInput" rows="3" class="row-grow"
-              placeholder="Paste a quote and click Add (⌘/Ctrl+Enter also works)"></textarea>
-
-            <button type="button" id="addQuoteBtn" class="btn" style="height:fit-content; white-space:nowrap;">
-              Add
-            </button>
-          </div>
-
-          <div id="quotesList" class="quotes-list" style="margin-top:10px;"></div>
-        </details>
       </form>
 
       <div class="form-actions-fixed">
-        <button type="button" class="btn btn-secondary" onclick="history.back()">Cancel</button>
+        <button type="button" class="btn btn-secondary">Cancel</button>
         <button type="button" class="btn btn-primary" id="saveBtn">Save Book</button>
       </div>
     </div>
@@ -181,7 +212,6 @@
     </nav>
   </div>
 
-  <!-- App scripts (riktig rekkefølge) -->
   <script src="constants.js"></script>
   <script defer src="rating-controls.js"></script>
   <script defer src="add-book.js"></script>

@@ -8,7 +8,6 @@
   "use strict";
 
   const $ = (s, r = document) => r.querySelector(s);
-  const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 
   // Firestore handles (fb.* first, then compat)
   const DB = () => (window.fb?.db) || (window.firebase?.firestore?.() || null);
@@ -185,5 +184,34 @@
     } else {
       const t = setInterval(() => { if (USER() && DB()) { clearInterval(t); boot(); } }, 300);
     }
+  });
+})();
+
+// stats.js – most active days, total minutes, etc.
+(function () {
+  "use strict";
+  const $ = (s, r = document) => r.querySelector(s);
+  const statsEl = $("#statsContent");
+
+  firebase.auth().onAuthStateChanged(async user => {
+    if (!user) return location.href = "auth.html";
+
+    const snap = await fb.db.collection("users").doc(user.uid).collection("sessions").get();
+    const days = {};
+
+    snap.forEach(doc => {
+      const d = doc.data();
+      if (!d.day || !d.minutes) return;
+      days[d.day] = (days[d.day] || 0) + d.minutes;
+    });
+
+    const sorted = Object.entries(days).sort((a, b) => b[1] - a[1]);
+    const total = sorted.reduce((sum, [_, min]) => sum + min, 0);
+
+    statsEl.innerHTML = `
+      <p>Total reading time: <strong>${total} min</strong></p>
+      <h3>Most active days:</h3>
+      <ul>${sorted.slice(0, 7).map(([day, min]) => `<li>${day}: ${min} min</li>`).join("")}</ul>
+    `;
   });
 })();

@@ -12,9 +12,7 @@
     display: grid;
     grid-template-rows: auto 1fr;
     background: #000;
-    /* Outer bg (behind page margins) */
     z-index: 9999;
-    /* Always on top when opened */
 }
 
 #epubReader[hidden] {
@@ -22,7 +20,6 @@
     visibility: hidden !important;
 }
 
-/* Top toolbar */
 #epubReader .reader-toolbar {
     display: flex;
     align-items: center;
@@ -53,12 +50,10 @@
     background: #152033;
 }
 
-/* The container ePub.js renders into */
 #viewer {
     position: relative;
     width: 100%;
     height: 100%;
-    /* ePub.js fills this; make sure the parent grid row is 1fr */
     overflow: hidden;
     outline: none;
 }
@@ -71,7 +66,6 @@
     display: grid;
     grid-template-rows: auto 1fr auto;
     background: var(--card, #111);
-    /* Use theme token with fallback */
     color: var(--text, #eee);
     z-index: 9999;
 }
@@ -81,7 +75,6 @@
     visibility: hidden !important;
 }
 
-/* Top bar */
 #pdfReader .reader-top {
     display: flex;
     align-items: center;
@@ -111,22 +104,18 @@
     background: #222;
 }
 
-/* Main canvas area */
 #pdfReader .reader-body {
     position: relative;
     background: #111;
-    /* Keep dark around pages to avoid visual seams */
     overflow: auto;
 }
 
-/* Center the page canvas, keep transparency */
 #pdfCanvas {
     display: block;
     margin: 0 auto;
     background: transparent;
 }
 
-/* Bottom bar (pager) */
 #pdfReader .reader-bottom {
     display: flex;
     align-items: center;
@@ -142,7 +131,6 @@
 
 /* ---------------- Helpers / Responsive ---------------- */
 
-/* Small screens: keep buttons tappable */
 @media (max-width: 420px) {
     #epubReader .reader-toolbar button {
         min-width: 34px;
@@ -150,7 +138,52 @@
     }
 }
 
-/* If you use a “.open” class instead of [hidden], this keeps it working */
+@media (max-width: 600px) {
+
+    #pdfReader .reader-top,
+    #pdfReader .reader-bottom,
+    #epubReader .reader-toolbar {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    #pdfReader .reader-top button,
+    #pdfReader .reader-bottom button,
+    #epubReader .reader-toolbar button {
+        flex: 1 1 auto;
+        min-width: 42px;
+    }
+
+    #pdfCanvas {
+        width: 100% !important;
+        height: auto !important;
+    }
+
+    #epubReader {
+        grid-template-rows: auto 1fr !important;
+    }
+}
+
+@media (max-height: 700px) {
+
+    #viewer,
+    #pdfCanvas {
+        height: 60vh !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .form-actions-fixed {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+    }
+
+    .form-actions-fixed button {
+        width: 100%;
+    }
+}
+
 .reader-shell.open {
     display: grid !important;
 }
@@ -159,7 +192,6 @@
     display: grid !important;
 }
 
-/* Respect hidden anywhere */
 [hidden] {
     display: none !important;
     visibility: hidden !important;
@@ -171,7 +203,6 @@
     left: 0;
     right: 0;
     bottom: 78px;
-    /* over PDF/EPUB bars + bottom nav */
     display: grid;
     place-items: center;
     z-index: 10000;

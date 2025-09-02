@@ -3,7 +3,6 @@
     "use strict";
     const $ = (s, r = document) => r.querySelector(s);
 
-    // --- helpers ---
     async function sha256(s) {
         const b = new TextEncoder().encode(s.trim().toLowerCase());
         const h = await crypto.subtle.digest("SHA-256", b);
@@ -17,7 +16,6 @@
         return doc.exists ? (doc.data().uid) : null;
     }
 
-    // --- core API ---
     async function sendRequest(toEmail) {
         const from = me(); if (!from) throw new Error("Not signed in");
         const toUid = await findUidByEmail(toEmail);
@@ -36,25 +34,15 @@
 
     async function acceptRequest(reqId, fromUid) {
         const u = me(); if (!u) throw new Error("Not signed in");
-
-        // 1) mark request accepted
         await fb.db.collection("users").doc(u.uid).collection("friendRequests").doc(reqId)
             .set({ status: "accepted", handledAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
 
-        // 2) create two-way friend docs in subcollection "friends"
         const myRef = fb.db.collection("users").doc(u.uid).collection("friends").doc(fromUid);
         const yourRef = fb.db.collection("users").doc(fromUid).collection("friends").doc(u.uid);
 
-        const payloadMine = {
-            friendUid: fromUid,
-            status: "accepted",
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        };
-        const payloadTheirs = {
-            friendUid: u.uid,
-            status: "accepted",
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        };
+        const payloadMine = { friendUid: fromUid, status: "accepted", createdAt: firebase.firestore.FieldValue.serverTimestamp() };
+        const payloadTheirs = { friendUid: u.uid, status: "accepted", createdAt: firebase.firestore.FieldValue.serverTimestamp() };
+
         await Promise.all([myRef.set(payloadMine, { merge: true }), yourRef.set(payloadTheirs, { merge: true })]);
     }
 
@@ -64,11 +52,9 @@
             .set({ status: "declined", handledAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
     }
 
-    // --- UI wiring for friends.html ---
     async function startFriends() {
         const u = me(); if (!u) return;
 
-        // Send request by email
         $("#send-req")?.addEventListener("click", async () => {
             const email = ($("#friend-email")?.value || "").trim();
             const status = $("#req-status"); if (status) status.textContent = "Sending…";
@@ -80,7 +66,6 @@
             }
         });
 
-        // Live incoming requests (pending)
         const incoming = $("#incoming");
         fb.db.collection("users").doc(u.uid).collection("friendRequests")
             .where("status", "==", "pending").orderBy("createdAt", "desc")
@@ -107,7 +92,6 @@
                 });
             });
 
-        // Your friends (subcollection)
         const list = $("#friend-list");
         fb.db.collection("users").doc(u.uid).collection("friends")
             .where("status", "==", "accepted")
@@ -116,7 +100,6 @@
                 list.innerHTML = "";
                 if (snap.empty) { list.textContent = "No friends yet."; return; }
 
-                // fetch profiles
                 const ids = snap.docs.map(d => d.id);
                 for (const fid of ids) {
                     const pd = await fb.db.collection("users").doc(fid).get();
@@ -142,4 +125,9 @@
 
     window.startFriends = startFriends;
     window.PBSocial = { sendRequest, acceptRequest, declineRequest };
+
+    // Auto-init if friends.html is loaded
+    document.addEventListener("DOMContentLoaded", () => {
+        if (document.getElementById("friend-list")) startFriends();
+    });
 })();

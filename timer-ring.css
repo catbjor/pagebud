@@ -1,0 +1,145 @@
+/* ========== Timer Dock base ========== */
+.timer-dock {
+    position: fixed;
+    /* timer.js setter inline bottom dynamisk (placeDock) */
+    z-index: 2200;
+}
+
+.timer-dock.right {
+    right: 20px;
+    left: auto;
+}
+
+.timer-dock.left {
+    left: 20px;
+    right: auto;
+}
+
+/* Ikke deaktiver sirkelen når åpen – du skal kunne klikke sirkelen for å lukke */
+.timer-dock.open .timer-circle {
+    z-index: 2;
+}
+
+.timer-dock.open .timer-drawer {
+    z-index: 1;
+}
+
+/* ========== Collapsed circle button ========== */
+.timer-circle {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    border: none;
+    background: var(--card, #fff);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    z-index: 2;
+    position: relative;
+}
+
+/* Idle ikon (inline-SVG) */
+.timer-circle .clock-svg {
+    width: 22px;
+    height: 22px;
+    display: block;
+}
+
+.timer-circle .clock-svg path {
+    fill: currentColor;
+}
+
+/* Running/paused (tid + ring i sirkelen) */
+.timer-circle .collapsed-ring {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.timer-circle .collapsed-ring .mini-time {
+    position: absolute;
+    font-size: 12px;
+    font-weight: bold;
+    color: var(--text, #000);
+}
+
+.timer-circle .collapsed-ring svg {
+    width: 60px;
+    height: 60px;
+    transform: rotate(-90deg);
+}
+
+/* Progress-ring farger */
+.ring-bg {
+    fill: none;
+    stroke: #ddd;
+    stroke-width: 6;
+}
+
+.ring-fg {
+    fill: none;
+    stroke: #4caf50;
+    stroke-width: 6;
+    stroke-linecap: round;
+    transition: stroke-dashoffset .4s ease;
+}
+
+/* ========== Drawer (sirkel-boble) ========== */
+.timer-drawer {
+    display: none;
+    position: absolute;
+    bottom: 0;
+    width: 160px;
+    height: 160px;
+    border-radius: 50%;
+    background: var(--card, #fff);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    padding: 20px;
+    box-sizing: border-box;
+    z-index: 1;
+}
+
+/* fold ut fra sirkelen */
+.timer-dock.right .timer-drawer {
+    right: 0;
+    transform: translateX(-80px);
+}
+
+/* til venstre */
+.timer-dock.left .timer-drawer {
+    left: 0;
+    transform: translateX(80px);
+}
+
+/* til høyre */
+
+/* Åpen skuff */
+.timer-dock:not(.collapsed) .timer-drawer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+/* Innhold i skuffen */
+.timer-drawer .timer-time {
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
+.timer-drawer .timer-btn {
+    border: none;
+    background: var(--primary, #eee);
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.timer-drawer .timer-btn:disabled {
+    opacity: .4;
+    cursor: default;
+}

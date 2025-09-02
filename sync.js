@@ -68,6 +68,8 @@
     const PBSync = {
         _unsubBooks: null,
         _bootstrapped: false,
+        getLocalBooks,
+        setLocalBooks,
 
         /**
          * Start listening to remote changes and keep LocalStorage in sync.
@@ -161,18 +163,44 @@
         },
 
         /**
-         * Delete a book by id locally and in Firestore.
+         * Delete a book locally and from Firestore.
          */
-        async deleteBook(id) {
-            if (!id) return;
-            const all = getLocalBooks().filter(b => b.id !== id);
-            setLocalBooks(all);
+        async deleteBook(bookId) {
+            if (!bookId) return;
 
+            // Remove from local (optimistic)
+            const all = getLocalBooks();
+            const filtered = all.filter(b => b.id !== bookId);
+            setLocalBooks(filtered);
+
+            // Remove from remote if signed in
             const u = getUser();
             if (u) {
-                try { await userBooksCol().doc(id).delete(); }
-                catch (e) { console.error("[PBSync] deleteBook remote failed:", e); }
+                try {
+                    await userBooksCol().doc(bookId).delete();
+                } catch (e) {
+                    console.error("[PBSync] deleteBook remote failed:", e);
+                    // Note: local is already deleted. We could try to re-add it,
+                    // but for now we'll accept the inconsistency and let the next
+                    // sync potentially fix it.
+                }
             }
+        },
+
+        /**
+         * Wipes all local book data.
+         * Typically used on sign-out.
+         */
+        clearLocal() {
+            setLocalBooks([]);
+        },
+
+        /**
+         * Get current user's book collection reference.
+         * Throws if not signed in.
+         */
+        getUserBooksCol() {
+            return userBooksCol();
         }
     };
 
@@ -188,6 +216,7 @@
             } else {
                 // User out: keep local data; no remote listener
                 if (PBSync._unsubBooks) { PBSync._unsubBooks(); PBSync._unsubBooks = null; }
+                PBSync.clearLocal();
             }
         });
     }

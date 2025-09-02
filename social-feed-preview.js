@@ -72,9 +72,14 @@
         render(host, merged);
     }
 
-    window.startSocialFeedPreview = function () {
-        const host = $("#friends-feed");
-        if (!host) return;
+    // This function is called from index.html
+    window.renderSocialFeedPreview = function () {
+        const host = $("#social-feed-preview-container");
+        if (!host) {
+            // Don't throw an error, just warn. This prevents breaking other scripts.
+            console.warn("Social feed preview container not found on this page.");
+            return;
+        }
         requireAuth(async (me) => { await buildPreview(me, host); });
     };
 })();

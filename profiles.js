@@ -1,51 +1,51 @@
-// profiles.js
+// profile.js – photo + name editor
 (function () {
     "use strict";
 
-    // Liten SHA-256 helper (hash av email som nøkkel i "directory")
-    async function sha256(str) {
-        const enc = new TextEncoder().encode(str);
-        const buf = await crypto.subtle.digest("SHA-256", enc);
-        return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
-    }
+    const $ = (s, r = document) => r.querySelector(s);
 
-    async function ensureProfile(user) {
-        const p = {
-            uid: user.uid,
-            email: user.email || "",
-            name: user.displayName || (user.email ? user.email.split("@")[0] : "User"),
-            photoURL: user.photoURL || "",
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            // venneliste som array (enkel å lese)
-            friends: []
-        };
-        const ref = fb.db.collection("users").doc(user.uid);
-        const snap = await ref.get();
-        if (!snap.exists) {
-            await ref.set(p, { merge: true });
-        } else {
-            await ref.set({ updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    async function run(user) {
+        const nameInput = $("#profileName");
+        const photoInput = $("#profilePhoto");
+        const photoPreview = $("#photoPreview");
+        const saveBtn = $("#saveProfile");
+
+        // If the elements for this script don't exist, do nothing.
+        // This makes the script safe to include on pages that don't have a profile form.
+        if (!nameInput && !photoInput && !photoPreview && !saveBtn) {
+            return;
         }
 
-        // Public directory: directory/{emailHash} -> { uid }
-        if (user.email) {
-            const key = (await sha256(user.email.trim().toLowerCase()));
-            await fb.db.collection("directory").doc(key).set({
-                uid: user.uid,
-                email: user.email,
-                at: firebase.firestore.FieldValue.serverTimestamp()
-            }, { merge: true });
+        const snap = await fb.db.collection("users").doc(user.uid).get();
+        const data = snap.data();
+        if (nameInput) nameInput.value = user.displayName || data?.displayName || "";
+        if (photoPreview && (user.photoURL || data?.photoURL)) {
+            photoPreview.src = user.photoURL || data.photoURL;
         }
-    }
 
-    // Kjør når auth er klart
-    document.addEventListener("firebase-ready", async () => {
-        const u = fb.auth.currentUser || await new Promise(res => {
-            const off = fb.auth.onAuthStateChanged(x => { off(); res(x); });
+        saveBtn?.addEventListener("click", async () => {
+            const newName = nameInput.value.trim();
+            const file = photoInput.files?.[0];
+            const updates = { displayName: newName, displayName_lower: newName.toLowerCase(), updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+
+            if (file) {
+                const path = `users/${user.uid}/profile.jpg`;
+                const ref = fb.storage.ref(path);
+                await ref.put(file);
+                const url = await ref.getDownloadURL();
+                updates.photoURL = url;
+                if (photoPreview) photoPreview.src = url;
+            }
+
+            try {
+                await user.updateProfile({ displayName: newName, photoURL: updates.photoURL || user.photoURL });
+            } catch { }
+
+            await fb.db.collection("users").doc(user.uid).set(updates, { merge: true });
+            alert("Profile updated!");
         });
-        if (u) ensureProfile(u).catch(console.warn);
-    });
+    }
 
-    window.PBProfile = { ensureProfile };
+    // Use requireAuth to safely run the page logic
+    window.requireAuth(run);
 })();

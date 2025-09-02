@@ -1,4 +1,4 @@
-/* PageBud – Global styles (mobile-first, consolidated) */
+/* PageBud – Global styles  */
 
 /* ---------- Design tokens ---------- */
 :root {
@@ -662,124 +662,8 @@ input[type="text"] {
   margin: 16px 0 calc(var(--bottom-nav-h) + 56px);
 }
 
-
-/* ---------- Timer dock (high-contrast, centered) ---------- */
-.timer-dock {
-  position: fixed;
-  bottom: calc(var(--bottom-nav-h) + 200px + env(safe-area-inset-bottom, 0px));
-  left: 18px;
-  z-index: 2100;
-  display: grid;
-  grid-auto-flow: column;
-  gap: 8px;
-  align-items: center;
-  background: color-mix(in oklab, var(--card) 92%, transparent);
-  border: 1px solid rgba(0, 0, 0, .12);
-  border-radius: 14px;
-  padding: 8px 10px;
-  box-shadow: 0 10px 26px rgba(0, 0, 0, .25);
-}
-
-.timer-dock.right {
-  left: auto;
-  right: 18px
-}
-
-.timer-dock.hidden {
-  display: none
-}
-
-.timer-dock.collapsed {
-  width: 56px;
-  height: 56px;
-  border-radius: 999px;
-  padding: 0;
-  place-items: center
-}
-
-.timer-dock.collapsed .timer-time,
-.timer-dock.collapsed [data-role="start"],
-.timer-dock.collapsed [data-role="pause"],
-.timer-dock.collapsed [data-role="resume"],
-.timer-dock.collapsed [data-role="stop"] {
-  display: none
-}
-
-.timer-time {
-  font-weight: 900;
-  letter-spacing: .5px;
-  min-width: 84px;
-  text-align: center
-}
-
-.timer-btn {
-  width: 44px;
-  height: 44px;
-  display: grid;
-  place-items: center;
-  border-radius: 10px;
-  border: 1px solid rgba(0, 0, 0, .16);
-  background: #fff;
-  color: var(--text);
-  cursor: pointer;
-  padding: 0;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6)
-}
-
-.timer-btn.primary {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: var(--btn-text)
-}
-
-.timer-btn[disabled] {
-  background: #eff2f6;
-  border-color: #d7dce5;
-  color: #9aa3b2;
-  opacity: 1;
-  cursor: not-allowed
-}
-
-.timer-btn i,
-.timer-btn svg {
-  display: block;
-  width: 18px;
-  height: 18px;
-  margin: 0 auto;
-  line-height: 1
-}
-
-.btn-inner {
-  display: grid;
-  justify-items: center;
-  align-content: center;
-  gap: 4px
-}
-
-.btn-label {
-  display: block;
-  font-size: 10px;
-  color: var(--text);
-  opacity: .75
-}
-
-.timer-dock.pulse {
-  animation: dockpulse .25s ease-out
-}
-
-@keyframes dockpulse {
-  0% {
-    transform: scale(1)
-  }
-
-  50% {
-    transform: scale(.98)
-  }
-
-  100% {
-    transform: scale(1)
-  }
-}
+/* ---------- (FJERNET: gammel Timer dock blokk som kranglet) ---------- */
+/* Ingen timer-posisjon her. Timer styres av timer-ring.css + timer.js (placeDock). */
 
 /* Add-book FAB */
 .add-book {
@@ -808,9 +692,7 @@ input[type="text"] {
   transform: scale(.97)
 }
 
-.has-add-fab .timer-dock.right {
-  bottom: calc(var(--bottom-nav-h) + var(--addfab-size) + var(--addfab-gap) + 16px + env(safe-area-inset-bottom, 0px));
-}
+/* (FJERNET) .has-add-fab .timer-dock.right { ... } – denne kolliderte med ny timer */
 
 /* ---------- Stats page styles ---------- */
 .page-header {
@@ -1057,26 +939,19 @@ input[type="text"] {
 }
 
 /* ==== Add/Edit: wrap chips i bokser (Genres / Moods / Tropes) ==== */
-/* Overstyr den horisontale scrolleren slik at chips bryter til flere rader
-   og holder seg inne i kortet. Gjelder kun disse tre boksene. */
 #genresBox .categories,
 #moodsBox .categories,
 #tropesBox .categories {
-  /* overstyrer base .categories */
   display: grid !important;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 8px 10px;
   padding: 8px 10px;
   margin: 8px 0;
   white-space: normal;
-  /* bryt linjer */
   overflow: visible;
-  /* ikke horisontal scroll i disse kortene */
   scroll-snap-type: none;
-  /* slå av snap her */
 }
 
-/* Litt tettere look i skjemaene uten å endre “chip”-stilen globalt */
 #genresBox .category,
 #moodsBox .category,
 #tropesBox .category {
@@ -1084,7 +959,6 @@ input[type="text"] {
   font-weight: 700;
 }
 
-/* Mindre kolonner på veldig smale skjermer */
 @media (max-width: 680px) {
 
   #genresBox .categories,
@@ -1097,10 +971,9 @@ input[type="text"] {
 /* Add/Edit: sørg for at fixed action bar ikke overlapper innholdet */
 .content-wrapper {
   padding-bottom: 120px;
-  /* nok klaring for .form-actions-fixed */
 }
 
-/* (fra forrige runde) Chips i Genres/Moods/Tropes ligger pent i grid */
+/* (fra forrige runde) Chips i Genres/Moods/Tropes ligger pent i grid (duplikat ok) */
 #genresBox .categories,
 #moodsBox .categories,
 #tropesBox .categories {
@@ -1123,7 +996,8 @@ input[type="text"] {
   }
 }
 
-<style>.content-wrapper {
+/* (ryddet vekk feilaktig <style>-tag som lå her i originalen) */
+.content-wrapper {
   padding-bottom: 120px;
 }
 
@@ -1141,28 +1015,22 @@ input[type="text"] {
 .form-row textarea {
   width: 100%;
   min-height: 120px;
-  /* adjust if you want it taller/shorter */
 }
 
-/* ===== Add/Edit – mobile friendly layout & no overflow ===== */
-
-/* Kill accidental horizontal scroll everywhere */
+/* ===== Add/Edit – mobile & overflow ===== */
 html,
 body,
 .app-container {
   overflow-x: hidden;
 }
 
-/* Page padding + keep space for the sticky action bar */
 .content-wrapper.form-page {
   max-width: var(--content-max);
   margin: 0 auto;
   padding: 16px;
   padding-bottom: 140px;
-  /* room for bottom buttons */
 }
 
-/* 2-column rows that collapse on small screens */
 .form-row.two-col {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1175,9 +1043,7 @@ body,
   }
 }
 
-/* Make long chip sets wrap inside their card (no sideways scroll) */
 .categories.picker-grid {
-  /* replaces the horizontal chip scroller just on these forms */
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 8px;
@@ -1190,19 +1056,17 @@ body,
   padding: 10px 12px;
 }
 
-/* Details sections look like boxes but never overflow */
 details.card {
   overflow: hidden;
 }
 
-/* Bigger writing areas */
 textarea.big {
   width: 100%;
   min-height: 140px;
   resize: vertical;
 }
 
-/* Sticky action bar that never covers fields and stays centered */
+/* Sticky action bar */
 .form-actions-fixed {
   position: fixed;
   left: 0;
@@ -1218,17 +1082,16 @@ textarea.big {
   border-radius: 12px;
   padding: 10px 12px;
   z-index: 2050;
-  /* above page content, below add-fab (which is 2050+) */
 }
 
-/* Images never burst out of their boxes */
+/* Images never burst out */
 img,
 .cover,
 .thumb {
   max-width: 100%;
 }
 
-/* --- Fix: Save/Cancel bar must be clickable and above content/timer/bottom-nav --- */
+/* Ensure bar is clickable and above */
 .form-actions-fixed {
   position: sticky;
   bottom: calc(var(--bottom-nav-h) + 12px);
@@ -1240,13 +1103,11 @@ img,
   gap: 8px;
   justify-content: flex-end;
   z-index: 2200;
-  /* timer-dock is 2100; bottom-nav is 2000 */
   pointer-events: auto;
   isolation: isolate;
-  /* prevents underlying elements from catching clicks */
 }
 
-/* Make the quotes editor never spill over the buttons */
+/* Quotes box */
 .quotes-box {
   position: relative;
   overflow: hidden;
@@ -1258,20 +1119,19 @@ img,
   min-height: 120px;
 }
 
-/* Ensure no random overlay blocks clicks */
+/* Prevent random overlay blocks */
 .content-wrapper,
 .card {
   position: relative;
 }
 
-/* --- File input row --- */
+/* File input row */
 .form-row.file-row {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-/* Prøv å style native file-knappen som chip */
 input[type="file"]::file-selector-button {
   border: 1px solid var(--border);
   background: var(--surface);
@@ -1286,7 +1146,6 @@ input[type="file"]::file-selector-button:hover {
   background: var(--card);
 }
 
-/* Fallback-chip (hvis browser ignorerer ::file-selector-button) */
 .btn-file-chip {
   border: 1px solid var(--border);
   background: var(--surface);
@@ -1295,14 +1154,12 @@ input[type="file"]::file-selector-button:hover {
   border-radius: 999px;
   cursor: pointer;
   line-height: 1;
-  /* matcher «category»-looket uten å forstyrre andre */
 }
 
 .btn-file-chip:hover {
   background: var(--card);
 }
 
-/* Valgfri liten label for filnavn */
 .file-name {
   font-size: .9rem;
   color: var(--muted);
@@ -1311,14 +1168,6 @@ input[type="file"]::file-selector-button:hover {
   white-space: nowrap;
 }
 
-/* File-rad – ingen visuelt bråk */
-.form-row.file-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* Skjul selve inputen, men bevar tilgjengelighet */
 #bookFile {
   position: absolute !important;
   width: 1px;
@@ -1331,81 +1180,114 @@ input[type="file"]::file-selector-button:hover {
   white-space: nowrap;
 }
 
-/* Chip-knappen som matcher tag-stilen */
-.btn-file-chip {
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
-  padding: 6px 12px;
-  border-radius: 999px;
-  cursor: pointer;
-  line-height: 1;
+.form-row.file-row {
+  position: relative;
+  z-index: 10;
 }
 
-.btn-file-chip:hover {
-  background: var(--card);
+.categories,
+.category,
+.file-row,
+.btn,
+#btnPickFile {
+  pointer-events: auto !important;
 }
 
-/* Filnavn som rolig tekst */
-.file-name {
-  font-size: .9rem;
-  color: var(--muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 50%;
+.btn-file-chip,
+.btn-file-chip * {
+  pointer-events: auto !important;
 }
 
-.page-subtle {
-  font-size: 0.95rem;
-  font-weight: 500;
-  /* litt tynnere */
-  color: var(--text-light);
-  /* passer til temaet ditt */
-  margin-top: 4px;
-  /* tett under PageBud */
+#btnPickFile {
+  position: relative;
+  z-index: 10;
+  pointer-events: auto !important;
 }
 
-/* Stack tittel + hilsen i headeren uten å påvirke resten */
-.header .title-stack {
+/* ---------- Multi-select ---------- */
+.multi-select-bar {
+  position: fixed;
+  bottom: calc(var(--bottom-nav-h) + 12px);
+  left: 50%;
+  width: calc(100% - 32px);
+  max-width: 500px;
   display: flex;
-  flex-direction: column;
-}
-
-.header .title-stack .page-subtle {
-  margin-top: 2px;
-  font-weight: 500;
-  /* tynnere */
-  font-size: 0.95rem;
-  color: var(--text-light);
-}
-
-/* --- Fix: anchor-kort + to-kol grid --- */
-
-/* La <a class="card"> rendres som kort */
-a.card {
-  display: block;
-  text-decoration: none;
-  color: inherit;
-}
-
-/* Sikre at card-link ikke får underlinje ved hover/focus */
-.card.card-link:hover,
-.card.card-link:focus {
-  text-decoration: none;
-}
-
-/* To kolonner side-om-side */
-.grid-2 {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
+  justify-content: space-between;
   gap: 12px;
-  align-items: stretch;
+  padding: 10px 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, .15);
+  z-index: 2100;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s, transform .2s;
+  transform: translateX(-50%) translateY(20px);
 }
 
-/* Behold to kolonner også på mobil (juster hvis du vil ha 1-kol på veldig smalt) */
-@media (max-width: 360px) {
-  .grid-2 {
-    grid-template-columns: 1fr 1fr;
-  }
+.multi-select-bar.show {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+}
+
+.select-count {
+  font-weight: 700;
+  flex-grow: 1;
+  text-align: center;
+  color: var(--text);
+}
+
+.btn.btn-danger {
+  background-color: #e23a3a;
+  color: #fff;
+  border-color: #e23a3a;
+}
+
+.multi-select-mode .book-card {
+  cursor: pointer;
+  transition: transform .2s, box-shadow .2s;
+}
+
+.book-card.selected {
+  transform: scale(0.96);
+  box-shadow: 0 0 0 3px var(--primary);
+}
+
+/* ---- Timer override: la timer-ring.css + timer.js bestemme plassering ---- */
+#pb-timer-dock.timer-dock {
+  position: fixed !important;
+  z-index: 2200 !important;
+  bottom: auto !important;
+  left: auto !important;
+  right: auto !important;
+}
+
+#pb-timer-dock.timer-dock.open .timer-circle {
+  pointer-events: none;
+  z-index: 1;
+}
+
+#pb-timer-dock.timer-dock.open .timer-drawer {
+  z-index: 2;
+}
+
+/* ---- Timer override: la timer-ring.css + timer.js bestemme plassering ---- */
+#pb-timer-dock.timer-dock {
+  position: fixed !important;
+  z-index: 2200 !important;
+  bottom: auto !important;
+  left: auto !important;
+  right: auto !important;
+}
+
+/* Ikke slå av klikk på sirkelen når åpen */
+#pb-timer-dock.timer-dock.open .timer-circle {
+  z-index: 2;
+}
+
+#pb-timer-dock.timer-dock.open .timer-drawer {
+  z-index: 1;
 }

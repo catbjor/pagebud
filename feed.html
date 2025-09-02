@@ -22,6 +22,7 @@
     <script src="firebase-config.js"></script>
     <script src="firebase-init.js?v=dev-1"></script>
     <script src="profiles.js"></script>
+
     <!-- 2) 🔧 Inline config -->
     <script>
 
@@ -47,6 +48,11 @@
             <div class="card" id="friends-feed" style="padding:12px"></div>
         </section>
     </div>
+
+
+    <div id="feedContainer"></div>
+    <div id="feedSentinel" style="height:1px"></div>
+    <script src="feed-lazy.js" defer></script>
     <script src="activity.js"></script>
     <script src="social-feed.js"></script>
     <script>

@@ -1,30 +1,54 @@
-// firebase-init.js (merged, single source of truth)
+// firebase-init.js
 (function () {
-  "use strict";
-  if (window.fb?.app) return; // guard double init
+  // If already initialized, skip
+  if (window.fb?.auth) return;
 
-  const cfg = window.__PB_FIREBASE || window.PB_FIREBASE_CONFIG;
-  if (!cfg) { console.error("[fb] Missing firebase-config"); return; }
+  const config = window.__PB_FIREBASE;
+  if (!config) {
+    console.warn("⚠️ Firebase config missing (window.__PB_FIREBASE)");
+    return;
+  }
 
-  firebase.initializeApp(cfg);
+  // Initialize
+  const app = firebase.initializeApp(config);
   const auth = firebase.auth();
   const db = firebase.firestore();
-  const storage = firebase.storage?.();
+  const storage = firebase.storage();
 
-  // Global shim
-  window.fb = { app: firebase.app(), auth, db, storage };
+  // Optional: emulator support for localhost
+  if (location.hostname === "localhost") {
+    try {
+      db.useEmulator("localhost", 8080);
+      auth.useEmulator("http://localhost:9099");
+      storage.useEmulator("localhost", 9199);
+    } catch { }
+  }
 
-  // Helper: requireAuth(cb)
+  // Expose globally
+  window.fb = { app, auth, db, storage };
+
+  // 🛠️ Safe requireAuth for protected pages
   window.requireAuth = function (cb) {
     const u = auth.currentUser;
-    if (u) { try { cb(u); } catch { } return; }
-    const off = auth.onAuthStateChanged(x => {
+    if (u) {
+      try { cb(u); } catch { }
+      return;
+    }
+
+    const off = auth.onAuthStateChanged(user => {
       off();
-      if (x) { try { cb(x); } catch { } }
-      else location.href = "auth.html";
+      if (user) {
+        try { cb(user); } catch { }
+      } else {
+        const isAuthPage = location.pathname.endsWith("auth.html");
+        if (!isAuthPage) {
+          console.warn("🚪 Not signed in — redirecting to auth.html");
+          location.href = "auth.html";
+        } else {
+          console.log("🟡 Not signed in — but already on auth.html");
+        }
+      }
     });
   };
 
-  // Signal once
-  document.dispatchEvent(new CustomEvent("firebase-ready"));
 })();

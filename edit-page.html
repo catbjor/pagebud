@@ -8,9 +8,8 @@
   <title>Edit Book – PageBud</title>
 
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="rating.css" />
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js"></script>
-  <link rel="stylesheet" href="rating.css">
-  <script src="rating-controls.js" defer></script>
 
   <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -20,20 +19,28 @@
   <script src="firebase-config.js"></script>
   <script src="firebase-init.js"></script>
 
-  <!-- Cover extraction helpers -->
+  <!-- PDF/EPUB helpers -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script>pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";</script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.93/epub.min.js"></script>
 
   <style>
-    #genres,
-    #moods,
-    #tropes,
-    #statusChips,
-    #formatChips {
+    .form-page #genres,
+    .form-page #moods,
+    .form-page #tropes,
+    .form-page #statusChips,
+    .form-page #formatChips {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px
+      gap: 8px;
+    }
+
+    .form-page .categories .category {
+      min-width: auto;
+      width: auto;
+      height: auto;
+      padding: 10px 12px;
+      line-height: 1.2;
     }
 
     .form-actions-fixed {
@@ -46,7 +53,13 @@
       background: color-mix(in oklab, var(--card) 88%, transparent);
       border: 1px solid var(--border);
       border-radius: 12px;
-      margin-top: 12px
+      margin-top: 12px;
+      z-index: 50;
+      pointer-events: auto;
+    }
+
+    .form-actions-fixed .btn {
+      pointer-events: auto;
     }
 
     .cover {
@@ -56,7 +69,32 @@
       border-radius: 10px;
       border: 1px solid var(--border);
       background: var(--surface);
-      display: block
+      display: block;
+    }
+
+    .file-row {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      z-index: 40;
+    }
+
+    .file-row input[type=file] {
+      position: absolute;
+      left: -9999px;
+      top: auto;
+    }
+
+    .file-row,
+    .file-row * {
+      pointer-events: auto !important;
+    }
+
+    #readNowBtn {
+      margin-left: 8px;
+      pointer-events: auto;
     }
   </style>
 </head>
@@ -66,13 +104,14 @@
     <header class="header">
       <h1>Edit Book</h1>
       <div class="header-actions">
-        <button class="back-fab" onclick="history.back()"><i class="fa fa-chevron-left"></i></button>
+        <button class="back-fab" onclick="history.back()" title="Back">
+          <i class="fa fa-chevron-left"></i>
+        </button>
       </div>
     </header>
 
     <div class="content-wrapper form-page">
-      <form class="card" id="bookForm" style="padding:16px;display:grid;gap:14px">
-        <!-- Cover -->
+      <form class="card" id="bookForm" style="padding:16px; display:grid; gap:14px">
         <div class="form-row">
           <label>Cover</label>
           <div class="cover-wrap" style="max-width:180px">
@@ -80,13 +119,11 @@
           </div>
         </div>
 
-        <!-- Title & Author -->
-        <div class="form-row" style="display:grid;gap:10px;grid-template-columns:1fr 1fr">
+        <div class="form-row" style="display:grid; gap:10px; grid-template-columns:1fr 1fr">
           <div><label>Title *</label><input id="title" type="text" required></div>
           <div><label>Author *</label><input id="author" type="text" required></div>
         </div>
 
-        <!-- Status -->
         <div class="form-row">
           <label>Status</label>
           <div class="categories" id="statusChips">
@@ -97,13 +134,11 @@
           </div>
         </div>
 
-        <!-- Dates -->
-        <div class="form-row" style="display:grid;gap:10px;grid-template-columns:1fr 1fr">
+        <div class="form-row" style="display:grid; gap:10px; grid-template-columns:1fr 1fr">
           <div><label>Started</label><input id="started" type="date"></div>
           <div><label>Finished</label><input id="finished" type="date"></div>
         </div>
 
-        <!-- Format -->
         <div class="form-row">
           <label>Format</label>
           <div class="categories" id="formatChips">
@@ -114,15 +149,13 @@
           </div>
         </div>
 
-        <!-- Book File -->
         <div class="form-row file-row">
           <label>UPLOAD / REPLACE (PDF/EPUB)</label>
           <input id="bookFile" type="file" accept=".pdf,.epub">
-          <button type="button" id="btnPickFile" class="btn-file-chip">Velg fil</button>
+          <button type="button" id="btnPickFile" class="btn btn-file-chip">Choose file</button>
           <span id="fileName" class="file-name"></span>
         </div>
 
-        <!-- Genres/Moods/Tropes -->
         <details class="card" id="genresBox" open>
           <summary style="font-weight:900">Genres</summary>
           <div class="categories" id="genres"></div>
@@ -138,7 +171,6 @@
           <div class="categories" id="tropes"></div>
         </details>
 
-        <!-- Rating & Spice -->
         <div class="form-row">
           <label>Rating</label>
           <div id="ratingBar" class="rating"></div>
@@ -146,36 +178,15 @@
           <div id="spiceBar" class="spice"></div>
         </div>
 
-        <!-- Review -->
         <div class="form-row">
           <label>Review</label>
           <textarea id="review" rows="4"></textarea>
         </div>
-
-        <!-- Quotes -->
-        <details class="card" id="quotesBox" open>
-          <summary style="font-weight:900">Quotes (optional)</summary>
-
-          <div class="row wrap" style="gap:8px; margin-top:8px;">
-            <textarea id="quoteInput" rows="3" class="row-grow"
-              placeholder="Paste a quote and click Add (⌘/Ctrl+Enter also works)"></textarea>
-
-            <!-- Single action for quotes -->
-            <button type="button" id="addQuoteBtn" class="btn" style="height:fit-content; white-space:nowrap;">
-              Add
-            </button>
-          </div>
-
-          <!-- Saved/pending quotes render here -->
-          <div id="quotesList" class="quotes-list" style="margin-top:10px;"></div>
-        </details>
-
-
       </form>
 
       <div class="form-actions-fixed">
-        <button type="button" class="btn" id="deleteBtn" style="background:#e23a3a;color:#fff">Delete</button>
-        <div style="display:flex;gap:8px">
+        <button type="button" id="deleteBtn" class="btn" style="background:#e23a3a;color:#fff">Delete</button>
+        <div style="display:flex; gap:8px">
           <button type="button" class="btn btn-secondary" onclick="history.back()">Cancel</button>
           <button type="button" class="btn btn-primary" id="saveBtn">Save</button>
         </div>
@@ -190,9 +201,11 @@
     </nav>
   </div>
 
+  <!-- Core logic scripts -->
   <script src="constants.js"></script>
-  <script defer src="rating-controls.js"></script>
-  <script defer src="edit-page.js"></script>
+  <script src="rating-controls.js" defer></script>
+  <script src="edit-page.js" defer></script>
+  <script src="delete.js" defer></script>
 </body>
 
 </html>

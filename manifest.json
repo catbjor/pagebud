@@ -3,7 +3,7 @@
   "short_name": "PageBud",
   "description": "Track your reading, rate books, and follow friends' activity.",
   "id": "/",
-  "start_url": "index.html",
+  "start_url": "/index.html",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
@@ -34,7 +34,7 @@
     {
       "name": "Add Book",
       "short_name": "Add",
-      "url": "add-book.html",
+      "url": "/add-book.html",
       "icons": [
         {
           "src": "icons/icon-192.png",
@@ -46,7 +46,7 @@
     {
       "name": "Friends",
       "short_name": "Friends",
-      "url": "friends.html",
+      "url": "/friends.html",
       "icons": [
         {
           "src": "icons/icon-192.png",
@@ -58,7 +58,7 @@
     {
       "name": "Feed",
       "short_name": "Feed",
-      "url": "feed.html",
+      "url": "/feed.html",
       "icons": [
         {
           "src": "icons/icon-192.png",
@@ -70,7 +70,7 @@
     {
       "name": "Stats",
       "short_name": "Stats",
-      "url": "stats.html",
+      "url": "/stats.html",
       "icons": [
         {
           "src": "icons/icon-192.png",
@@ -82,7 +82,7 @@
     {
       "name": "Settings",
       "short_name": "Settings",
-      "url": "settings.html",
+      "url": "/settings.html",
       "icons": [
         {
           "src": "icons/icon-192.png",

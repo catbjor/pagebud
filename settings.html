@@ -30,6 +30,19 @@
             </div>
         </header>
 
+        <h2>Profile</h2>
+        <label>Name</label>
+        <input type="text" id="profileName" placeholder="Your name" />
+
+        <label>Photo</label>
+        <input type="file" id="profilePhoto" accept="image/*" />
+        <img id="photoPreview" alt="Preview" style="max-width: 120px;" />
+
+        <button id="saveProfile" class="btn">Save Profile</button>
+
+        <script src="profile.js"></script>
+
+
         <main class="container">
             <!-- Appearance -->
             <section class="card">
@@ -131,6 +144,7 @@
     <script src="timer.js" defer></script>
     <script src="settings.js" defer></script>
     <script src="settings-fix.js" defer></script>
+    <script src="export-notes.js" defer></script>
 
     <!-- i18n og språkstyring -->
     <script src="i18n.js"></script>
