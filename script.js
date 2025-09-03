@@ -358,12 +358,10 @@ function MS_enterMode(initialCard) {
 
   if (initialCard) MS_selectCard(initialCard, true);
 
-  -  document.addEventListener("click", MS_preventNavInMode, true);
   document.addEventListener("keydown", MS_onKeyDown);
 
   MS_updateBar();
 }
-
 
 function MS_exitMode() {
   if (!MS_IN_MODE) return;
@@ -373,11 +371,9 @@ function MS_exitMode() {
   MS_SELECTED.clear();
   $$(".book-card").forEach(c => c.classList.remove("selected"));
 
-  -  document.removeEventListener("click", MS_preventNavInMode, true);
   document.removeEventListener("keydown", MS_onKeyDown);
   MS_updateBar();
 }
-
 
 function MS_onKeyDown(e) { if (e.key === "Escape") MS_exitMode(); }
 
