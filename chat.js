@@ -76,7 +76,8 @@
 
     // buddy from URL (?buddy=UID)
     const params = new URLSearchParams(location.search);
-    const buddy = params.get("buddy");
+    // etter – støtter flere aliaser
+    const buddy = params.get("buddy") || params.get("friend") || params.get("uid");    
     if (!buddy) {
       console.warn("[Chat] Missing ?buddy=UID");
       return;

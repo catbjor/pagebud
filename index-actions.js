@@ -8,19 +8,29 @@
     function auth() { return (window.fb?.auth) || (window.firebase?.auth?.()) || firebase.auth(); }
     function db() { return (window.fb?.db) || (window.firebase?.firestore?.()) || firebase.firestore(); }
 
-    // ---------- delete book ----------
+    // ---------- delete book (single) ----------
     async function deleteBook(id) {
         const u = auth().currentUser;
         if (!u || !id) return;
         if (!confirm("Delete this book?")) return;
+
         try {
-            await db().collection("users").doc(u.uid).collection("books").doc(id).delete();
+            if (window.PBSync?.deleteBook) {
+                await window.PBSync.deleteBook(id);                 // ✅ riktig vei
+            } else {
+                await db().collection("users").doc(u.uid).collection("books").doc(id).delete();
+            }
+
+            // Fjern fra DOM – prøv både id og data-attributt
             document.getElementById("book-" + id)?.remove();
+            document.querySelector(`.book-card[data-id="${id}"]`)?.remove();
+
             alert("Book deleted");
         } catch (e) {
             alert("Error: " + (e.message || e));
         }
     }
+
     document.addEventListener("DOMContentLoaded", () => {
         document.body.addEventListener("click", (e) => {
             const btn = e.target.closest("[data-del-id]");

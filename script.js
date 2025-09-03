@@ -377,6 +377,7 @@ function MS_exitMode() {
 
 function MS_onKeyDown(e) { if (e.key === "Escape") MS_exitMode(); }
 
+// ✅ OPPDATERT: ruter via PBSync.deleteBook
 async function MS_onDelete() {
   if (!MS_SELECTED.size || !db || !CURRENT_USER) return;
   const ids = Array.from(MS_SELECTED);
@@ -385,20 +386,22 @@ async function MS_onDelete() {
   if (!ok) return;
 
   try {
-    const batchDeletes = ids.map(id =>
-      db.collection("users").doc(CURRENT_USER.uid).collection("books").doc(id).delete()
-    );
-    await Promise.all(batchDeletes);
+    for (const id of ids) {
+      if (window.PBSync?.deleteBook) {
+        await window.PBSync.deleteBook(id);           // ✅ riktig vei
+      } else {
+        await db.collection("users").doc(CURRENT_USER.uid).collection("books").doc(id).delete();
+      }
 
-    const grid = $("#books-grid");
-    if (grid) {
-      ids.forEach(id => {
+      const grid = $("#books-grid");
+      if (grid) {
         const node = grid.querySelector(`.book-card[data-id="${id}"]`);
         if (node) node.remove();
-      });
+      }
     }
 
     MS_exitMode();
+    window.toast?.("Deleted");
   } catch (err) {
     console.error("Bulk delete failed:", err);
     alert("Failed to delete some items. Please try again.");

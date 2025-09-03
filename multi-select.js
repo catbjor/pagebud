@@ -126,10 +126,7 @@
             return;
         }
 
-        // Not in select mode ⇒ let your normal handlers in script.js run:
-        // - Edit (data-action="open")
-        // - Read (data-action="read")
-        // - Favorite, etc.
+        // Not in select mode ⇒ normal handlers (edit/read/fav) i script.js
     });
 
     // --- Bar actions ---
@@ -150,12 +147,18 @@
         delBtn.disabled = true;
         cancelBtn.disabled = true;
 
-        const col = db.collection("users").doc(user.uid).collection("books");
         let success = 0, fail = 0;
 
         for (const id of ids) {
             try {
-                await col.doc(id).delete();
+                if (window.PBSync?.deleteBook) {
+                    // ✅ riktig: sletter lokalt + i Firestore i riktig rekkefølge
+                    await window.PBSync.deleteBook(id);
+                } else {
+                    // fallback (kan gi “pop-back” hvis lokal sync finnes)
+                    await db.collection("users").doc(user.uid).collection("books").doc(id).delete();
+                }
+
                 success++;
                 // remove card from DOM
                 const card = grid.querySelector(`.book-card[data-id="${id}"]`);
@@ -170,15 +173,11 @@
         delBtn.disabled = false;
         cancelBtn.disabled = false;
 
-        // Update bar/count or exit if nothing left selected
         updateBar();
         if (selected.size === 0) exitMode();
 
-        // Friendly message (no blocking alert spam)
-        if (fail > 0) {
-            console.warn(`[multi-select] Deleted ${success}, ${fail} failed.`);
-            alert(`Deleted ${success}. ${fail} failed.`);
-        }
+        if (success) { try { window.toast?.(`${success} deleted`); } catch { } }
+        if (fail > 0) alert(`${fail} failed to delete.`);
     });
 
     // Optional: ESC exits multi-select
