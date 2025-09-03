@@ -2,6 +2,7 @@
  PageBud – add-book.js (local-file first, no Firebase Storage)
  - Reserve stable bookId før fil-lagring
  - Lagre fil lokalt (PBFileStore) og MERGE meta inn i Firestore-doc
+ - Logger aktivitet (book_saved, file_attached)
  - Ingen layout-endringer, rating/chili/chips urørt
 ========================================================= */
 (function () {
@@ -228,9 +229,9 @@
                 review: byId("review")?.value || "",
                 status: inpStatus.value || null,
                 format: inpFormat.value || null,
-                genres: safeParse(inpGenres.value, []),
-                moods: safeParse(inpMoods.value, []),
-                tropes: safeParse(inpTropes.value, []),
+                genres: JSON.parse(inpGenres.value || "[]"),
+                moods: JSON.parse(inpMoods.value || "[]"),
+                tropes: JSON.parse(inpTropes.value || "[]"),
                 ...(rating ? { rating: Number(rating) || 0 } : {}),
                 ...(spice ? { spice: Number(spice) || 0 } : {}),
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -240,12 +241,16 @@
             // 1) skriv boka først
             await ref.set(payload, { merge: true });
 
+            // logg aktivitet
+            try { window.PB?.logActivity?.({ action: "book_saved", targetId: createdBookId, meta: { title } }); } catch { }
+
             // 2) hvis fil valgt => lagre lokalt og MERGE meta
             const f = fileInput?.files?.[0] || null;
             if (f && window.PBFileStore?.save) {
                 const meta = await PBFileStore.save({ file: f, uid: user.uid, bookId: createdBookId, coverBlob });
                 if (meta) {
                     await ref.set({ ...meta, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+                    try { window.PB?.logActivity?.({ action: "file_attached", targetId: createdBookId, meta: { title, kind: meta.fileType } }); } catch { }
                 }
             }
 

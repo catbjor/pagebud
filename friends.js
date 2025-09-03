@@ -4,7 +4,6 @@
 
     const $ = (s, r = document) => r.querySelector(s);
     const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
-    const log = (...a) => console.log("[Friends]", ...a);
     const warn = (...a) => console.warn("[Friends]", ...a);
 
     function qsAny(list) { for (const s of list) { const el = $(s); if (el) return el; } return null; }
@@ -15,10 +14,11 @@
     async function requireUser() {
         const a = auth();
         if (a.currentUser) return a.currentUser;
-        return new Promise((res, rej) => { const off = a.onAuthStateChanged(u => { off(); u ? res(u) : rej(new Error("Not signed in")); }); });
+        return new Promise((res, rej) => {
+            const off = a.onAuthStateChanged(u => { off(); u ? res(u) : rej(new Error("Not signed in")); });
+        });
     }
 
-    // --- Elements
     function getEls() {
         return {
             input: qsAny(["#friendSearch", "#searchUser", "#searchInput"]),
@@ -27,7 +27,6 @@
             incomingList: qsAny(["#incomingList", "[data-list='incoming']"]),
             outgoingList: qsAny(["#outgoingList", "[data-list='outgoing']"]),
             friendsList: qsAny(["#friendsList", "[data-list='friends']"]),
-            // modal
             mBackdrop: $("#friendModalBackdrop"),
             mSheet: $("#friendModal"),
             mTitle: $("#friendModalTitle"),
@@ -36,21 +35,21 @@
         };
     }
 
-    // --- tiny dom helpers
     function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
     function button(label, cls = "btn") { const b = el("button", cls, label); b.type = "button"; return b; }
     function clear(node) { if (node) node.innerHTML = ""; }
 
-    // --- username helpers
     async function getUsernameByUid(uid) {
         try {
             const qs = await db().collection("usernames").where("uid", "==", uid).limit(1).get();
-            if (!qs.empty) { const d = qs.docs[0]; return { username: d.id, ...(d.data() || {}) }; }
+            if (!qs.empty) {
+                const d = qs.docs[0];
+                return { username: d.id, ...(d.data() || {}) };
+            }
         } catch (e) { warn("getUsernameByUid failed:", e); }
         return { username: uid };
     }
 
-    // --- friend requests helpers
     const reqId = (a, b) => [a, b].sort().join("__");
 
     async function sendRequest(fromUid, toUid) {
@@ -61,6 +60,7 @@
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
         }, { merge: true });
+        try { window.PB?.logActivity?.({ action: "friend_requested", meta: { to: toUid } }); } catch { }
         return id;
     }
     async function setRequestStatus(id, status) {
@@ -72,7 +72,7 @@
     async function ensureLocalFriend(uid, otherUid, extra = {}) {
         try {
             await db().collection("users").doc(uid).collection("friends").doc(otherUid).set({
-                uid: otherUid, ...extra,
+                uid: otherUid, status: "accepted", ...extra,
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             }, { merge: true });
@@ -83,7 +83,6 @@
         catch (e) { warn("removeLocalFriend failed:", e); }
     }
 
-    // --- renderer
     function renderUserRow(container, item, actions = [], onRowClick = null) {
         if (!container) return;
         const row = el("div", "friend-row");
@@ -98,34 +97,37 @@
             avatar.appendChild(img);
         } else {
             avatar.textContent = (item.displayName || item.username || item.uid || "?").slice(0, 1).toUpperCase();
-            Object.assign(avatar.style, { width: "32px", height: "32px", borderRadius: "50%", display: "grid", placeItems: "center", border: "1px solid var(--border)" });
+            avatar.style.width = "32px"; avatar.style.height = "32px";
+            avatar.style.borderRadius = "50%"; avatar.style.display = "grid"; avatar.style.placeItems = "center";
+            avatar.style.border = "1px solid var(--border)";
         }
 
         const name = el("div", "friend-name", item.displayName || item.username || item.uid || "");
         const sub = el("div", "friend-sub", item.username ? `@${item.username}` : (item.uid || ""));
-        const textWrap = el("div", "friend-text-wrap"); textWrap.append(name, sub);
+
+        const textWrap = el("div", "friend-text-wrap");
+        textWrap.append(name, sub);
         left.append(avatar, textWrap);
 
         right.style.display = "flex"; right.style.gap = "8px";
         actions.forEach(b => right.appendChild(b));
 
-        Object.assign(row.style, { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" });
+        row.style.display = "flex"; row.style.alignItems = "center"; row.style.justifyContent = "space-between"; row.style.gap = "10px";
         row.append(left, right);
 
         if (onRowClick) {
             row.style.cursor = "pointer";
             row.addEventListener("click", (e) => { if (e.target.closest("button")) return; onRowClick(e); });
         }
+
         container.appendChild(row);
     }
 
-    // --- modal (profile/chat) ---
     function useFriendModal(els) {
-        if (!els.mBackdrop || !els.mSheet) return { show: () => { }, hide: () => { } };
         let current = null;
         const show = (friend) => {
             current = friend;
-            if (els.mTitle) els.mTitle.textContent = friend.displayName || friend.username || "Friend";
+            els.mTitle.textContent = friend.displayName || friend.username || "Friend";
             els.mBackdrop.style.display = "block";
             els.mSheet.style.display = "block";
         };
@@ -135,12 +137,17 @@
             current = null;
         };
         els.mBackdrop?.addEventListener("click", hide);
-        els.mProfile?.addEventListener("click", () => { if (!current) return; location.href = `profiles.html?uid=${encodeURIComponent(current.uid)}`; });
-        els.mChat?.addEventListener("click", () => { if (!current) return; location.href = `chat.html?buddy=${encodeURIComponent(current.uid)}`; });
+        els.mProfile?.addEventListener("click", () => {
+            if (!current) return;
+            location.href = `profiles.html?uid=${encodeURIComponent(current.uid)}`;
+        });
+        els.mChat?.addEventListener("click", () => {
+            if (!current) return;
+            location.href = `chat.html?buddy=${encodeURIComponent(current.uid)}`;
+        });
         return { show, hide };
     }
 
-    // --- search
     function wireSearch(me, els) {
         if (!els.input || !els.searchList) return;
 
@@ -161,7 +168,7 @@
                 renderUserRow(els.searchList, { uid, ...userInfo }, [addBtn]);
             };
 
-            // Exact @username
+            // 1) Exact username
             try {
                 const d = await db().collection("usernames").doc(q).get();
                 if (d.exists && d.data()?.uid) {
@@ -170,18 +177,19 @@
                 }
             } catch (e) { warn("exact username lookup failed:", e); }
 
-            // Username prefix (docId)
+            // 2) Username prefix
             try {
                 const FieldPath = firebase.firestore.FieldPath;
                 const qs = await db().collection("usernames")
-                    .orderBy(FieldPath.documentId()).startAt(q).endAt(q + "\uf8ff").limit(10).get();
+                    .orderBy(FieldPath.documentId())
+                    .startAt(q).endAt(q + "\uf8ff").limit(10).get();
                 qs.forEach(doc => {
                     const data = doc.data() || {};
                     renderAddItem(data.uid, { username: doc.id, displayName: data.displayName, photoURL: data.photoURL });
                 });
             } catch (e) { warn("prefix username search failed:", e); }
 
-            // Email exact (if stored)
+            // 3) Exact email (requires emailLower on usernames docs)
             if (q.includes("@")) {
                 try {
                     const qs = await db().collection("usernames").where("emailLower", "==", q).limit(5).get();
@@ -189,27 +197,25 @@
                         const data = doc.data() || {};
                         renderAddItem(data.uid, { username: doc.id, displayName: data.displayName, photoURL: data.photoURL });
                     });
-                } catch (e) { /* optional field */ }
+                } catch (e) { /* field may not exist */ }
             }
 
-            // displayNameLower prefix (if stored)
+            // 4) Name prefix (requires displayNameLower on usernames docs)
             try {
                 const ref = db().collection("usernames");
-                const qs = await ref.orderBy("displayNameLower").startAt(q).endAt(q + "\uf8ff").limit(10).get();
-                qs.forEach(doc => {
+                const qs2 = await ref.orderBy("displayNameLower").startAt(q).endAt(q + "\uf8ff").limit(10).get();
+                qs2.forEach(doc => {
                     const data = doc.data() || {};
                     renderAddItem(data.uid, { username: doc.id, displayName: data.displayName, photoURL: data.photoURL });
                 });
-            } catch (e) { /* optional field / index */ }
+            } catch (e) { /* field/index may not exist */ }
         }
 
         els.input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); runSearch(); } });
         els.searchBtn?.addEventListener("click", (e) => { e.preventDefault(); runSearch(); });
     }
 
-    // --- requests listeners
     function wireRequests(me, els) {
-        // incoming
         if (els.incomingList) {
             db().collection("friend_requests").where("to", "==", me.uid).where("status", "==", "pending")
                 .onSnapshot(async (snap) => {
@@ -221,8 +227,11 @@
                         const declineBtn = button("Decline", "btn btn-secondary");
                         acceptBtn.addEventListener("click", async () => {
                             acceptBtn.disabled = declineBtn.disabled = true;
-                            try { await setRequestStatus(doc.id, "accepted"); await ensureLocalFriend(me.uid, req.from, { username: other.username }); }
-                            catch (e) { warn("accept failed:", e); }
+                            try {
+                                await setRequestStatus(doc.id, "accepted");
+                                await ensureLocalFriend(me.uid, req.from, { username: other.username });
+                                try { window.PB?.logActivity?.({ action: "friend_accepted", meta: { other: req.from } }); } catch { }
+                            } catch (e) { warn("accept failed:", e); }
                         });
                         declineBtn.addEventListener("click", async () => {
                             declineBtn.disabled = acceptBtn.disabled = true;
@@ -234,7 +243,6 @@
                 });
         }
 
-        // outgoing
         if (els.outgoingList) {
             db().collection("friend_requests").where("from", "==", me.uid).where("status", "==", "pending")
                 .onSnapshot(async (snap) => {
@@ -253,12 +261,13 @@
                 });
         }
 
-        // accepted → mirror i /users/{me}/friends
         const acceptedFrom = db().collection("friend_requests").where("from", "==", me.uid).where("status", "==", "accepted");
         const acceptedTo = db().collection("friend_requests").where("to", "==", me.uid).where("status", "==", "accepted");
+
         const onAccepted = async (snap, meIsFrom) => {
             for (const doc of snap.docs) {
-                const req = doc.data(); const otherUid = meIsFrom ? req.to : req.from;
+                const req = doc.data();
+                const otherUid = meIsFrom ? req.to : req.from;
                 const other = await getUsernameByUid(otherUid);
                 await ensureLocalFriend(me.uid, otherUid, { username: other.username });
             }
@@ -267,7 +276,6 @@
         acceptedTo.onSnapshot(s => onAccepted(s, false));
     }
 
-    // --- friends list
     function wireFriendsList(me, els) {
         const modal = useFriendModal(els);
         if (!els.friendsList) return;
@@ -287,7 +295,7 @@
                     const rmBtn = button("Remove", "btn btn-secondary");
                     rmBtn.addEventListener("click", async () => {
                         rmBtn.disabled = true;
-                        try { await removeLocalFriend(me.uid, f.uid); } catch (e) { warn(e); }
+                        try { await removeLocalFriend(me.uid, f.uid); try { window.PB?.logActivity?.({ action: "friend_removed", meta: { other: f.uid } }); } catch { } } catch (e) { warn(e); }
                     });
                     renderUserRow(els.friendsList, f, [chatBtn, rmBtn], () => modal.show(f));
                 }
@@ -295,15 +303,15 @@
             });
     }
 
-    // --- boot
     async function boot() {
         const me = await requireUser();
         const els = getEls();
+        try { window.NAV && window.NAV.init && window.NAV.init(); } catch { }
         wireSearch(me, els);
         wireRequests(me, els);
         wireFriendsList(me, els);
     }
 
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot, { once: true });
-    else boot();
+    else { boot(); }
 })();

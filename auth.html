@@ -20,7 +20,7 @@
     <script src="firebase-init.js?v=dev-1"></script>
     <script src="profiles.js"></script>
 
-    <!-- Firebase config -->
+    <!-- Optional inline config (if you rely on it) -->
     <script>
         window.__PB_FIREBASE = {
             apiKey: "AIzaSyCEV-dncbQSnP7q9AvF2_Re93l-VHN-2cg",
@@ -40,8 +40,10 @@
         <div class="auth-card glass" id="view-login" aria-hidden="false">
             <h1 class="auth-title">Log into your account</h1>
             <form class="auth-form" id="emailForm">
-                <label>Username/Email</label>
-                <input id="email" placeholder="you@example.com" required type="email" autocomplete="email" />
+                <label>Username or Email</label>
+                <!-- text type so @username works -->
+                <input id="emailOrUsername" placeholder="@yourname or you@example.com" required type="text"
+                    autocomplete="username" />
 
                 <div class="row row-inline">
                     <label>Password</label>
@@ -73,8 +75,9 @@
             <div id="greeting" class="signup-greeting" aria-live="polite"></div>
 
             <form class="auth-form" id="createForm">
-                <label>Name</label>
-                <input id="firstName" placeholder="First name" required type="text" autocomplete="given-name" />
+                <label>Username</label>
+                <!-- was firstName; now username -->
+                <input id="username" placeholder="e.g. ariel_anderson" required type="text" autocomplete="username" />
 
                 <label>Email</label>
                 <input id="emailCreate" placeholder="you@example.com" required type="email" autocomplete="email" />
@@ -92,19 +95,17 @@
         </div>
     </div>
 
-    <!-- ✅ Offline notice -->
+    <!-- Offline notice -->
     <div id="offlineNotice" class="toast" style="display:none">
         <i class="fas fa-wifi-slash"></i> You’re offline
     </div>
 
-    <!-- ✅ Scripts -->
+    <!-- Scripts -->
     <script src="auth.js" defer></script>
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js"></script>
     <script>
         const offlineNotice = document.getElementById('offlineNotice');
-        function updateOnlineStatus() {
-            offlineNotice.style.display = navigator.onLine ? "none" : "block";
-        }
+        function updateOnlineStatus() { offlineNotice.style.display = navigator.onLine ? "none" : "block"; }
         window.addEventListener("online", updateOnlineStatus);
         window.addEventListener("offline", updateOnlineStatus);
         updateOnlineStatus();

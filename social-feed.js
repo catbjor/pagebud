@@ -1,10 +1,9 @@
-// social-feed.js — full friends' activity feed (sort by createdAt, fallback to at)
-// Renders into #friends-feed and wires like/comment actions
+// social-feed.js — friends' activity feed (best-effort).
+// Renders into #friends-feed and wires like/comment actions.
 (function () {
   "use strict";
   const $ = (s, r = document) => r.querySelector(s);
 
-  // ----- time helpers -----
   function toWhen(e) {
     if (e.createdAt?.toDate) return e.createdAt.toDate();
     if (e.createdAt?.seconds) return new Date(e.createdAt.seconds * 1000);
@@ -16,30 +15,35 @@
   }
   function esc(s) { return (s || "").replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
 
-  // ----- data -----
   async function getFriendsUids(uid) {
-    // friends subcollection: { friendUid, status: "accepted" }
-    const out = new Set([uid]); // include self
+    const out = new Set([uid]); // include self always
     try {
       const snap = await fb.db.collection("users").doc(uid).collection("friends")
         .where("status", "==", "accepted").get();
-      snap.forEach(d => out.add(d.id)); // doc id == friendUid
+      snap.forEach(d => out.add(d.id));
     } catch { /* ignore */ }
     return Array.from(out);
   }
 
-  async function loadActivities(uids, limitPerUser = 30) {
-    const all = [];
-    for (const id of uids) {
-      try {
-        const snap = await fb.db.collection("users").doc(id).collection("activity")
-          .orderBy("createdAt", "desc").limit(limitPerUser).get();
-        snap.forEach(d => all.push({ id: d.id, owner: id, ...d.data() }));
-      } catch {
-        // If missing index or older docs, you could add a fallback query here if desired
-      }
-    }
-    // global sort with robust fallback
+  async function loadUserActivities(uid, limit = 30) {
+    // 1) try users/{uid}/public_activity (cross-readable if rules allow)
+    try {
+      const s = await fb.db.collection("users").doc(uid).collection("public_activity")
+        .orderBy("createdAt", "desc").limit(limit).get();
+      if (!s.empty) return s.docs.map(d => ({ id: d.id, owner: uid, ...d.data() }));
+    } catch { }
+    // 2) fallback to private users/{uid}/activity (works for self)
+    try {
+      const s = await fb.db.collection("users").doc(uid).collection("activity")
+        .orderBy("createdAt", "desc").limit(limit).get();
+      if (!s.empty) return s.docs.map(d => ({ id: d.id, owner: uid, ...d.data() }));
+    } catch { }
+    return [];
+  }
+
+  async function loadActivities(uids, limitPerUser = 20) {
+    const chunks = await Promise.all(uids.map(u => loadUserActivities(u, limitPerUser)));
+    const all = chunks.flat();
     all.sort((a, b) => {
       const ad = toWhen(a)?.getTime?.() || 0;
       const bd = toWhen(b)?.getTime?.() || 0;
@@ -48,8 +52,10 @@
     return all.slice(0, 120);
   }
 
-  // ----- rendering -----
   function iconFor(type) {
+    if (type === "book_saved") return "fa-floppy-disk";
+    if (type === "file_attached") return "fa-paperclip";
+    if (type === "progress_updated") return "fa-book-open";
     if (type === "started") return "fa-play";
     if (type === "finished") return "fa-flag-checkered";
     if (type === "rated") return "fa-star";
@@ -57,8 +63,15 @@
     return "fa-book";
   }
   function lineFor(item) {
-    const t = item.type;
-    const title = item.title ? `“${esc(item.title)}”` : "";
+    const t = item.type || item.action;
+    const title = item.title ? `“${esc(item.title)}”` : (item.meta?.title ? `“${esc(item.meta.title)}”` : "");
+    if (t === "book_saved") return `saved <b>${title || "a book"}</b>`;
+    if (t === "file_attached") return `attached a ${esc(item.meta?.kind || "file")} ${title}`;
+    if (t === "progress_updated") {
+      if (item.meta?.kind === "pdf" && item.meta.page) return `reading… page ${item.meta.page}`;
+      if (item.meta?.kind === "epub" && (item.meta.percent || item.meta.percent === 0)) return `reading… ${item.meta.percent}%`;
+      return `reading…`;
+    }
     if (t === "started") return `started <b>${title}</b>`;
     if (t === "finished") return `finished <b>${title}</b>${item.rating ? ` — ${esc(String(item.rating))}★` : ""}`;
     if (t === "rated") return `rated <b>${title}</b> ${esc(String(item.rating))}★`;
@@ -67,27 +80,19 @@
   }
 
   function itemHTML(it) {
-    const cover = it.cover
-      ? `<img src="${it.cover}" alt="" style="width:42px;height:58px;object-fit:cover;border-radius:6px;border:1px solid var(--border)">`
-      : "";
     const when = toWhen(it);
     const whenTxt = when ? when.toLocaleString() : "";
     const likeN = Number(it.likeCount || 0);
     const comN = Number(it.commentCount || 0);
-    const openBtn = it.bookId ? `<a class="btn" href="reader.html?id=${encodeURIComponent(it.bookId)}"><i class="fa-solid fa-book-open"></i> Open</a>` : ``;
-
     return `
       <div class="feed-item" data-owner="${it.owner}" data-id="${it.id}"
            style="display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border)">
-        ${cover}
         <div style="flex:1;min-width:0">
-          <div class="muted" style="font-size:.85rem"><i class="fa-solid ${iconFor(it.type)}"></i> ${whenTxt}</div>
+          <div class="muted" style="font-size:.85rem"><i class="fa-solid ${iconFor(it.type || it.action)}"></i> ${whenTxt}</div>
           <div style="font-weight:700;margin:2px 0">${lineFor(it)}</div>
-          ${it.type === "note" && it.text ? `<div class="muted" style="margin-top:4px">${esc(it.text)}</div>` : ``}
           <div class="row" style="display:flex;gap:8px;align-items:center;margin-top:8px">
             <button class="btn btn-secondary btn-like"><i class="fa-solid fa-heart"></i> ${likeN}</button>
             <button class="btn btn-secondary btn-comment"><i class="fa-solid fa-comment"></i> ${comN}</button>
-            ${openBtn}
           </div>
           <div class="comment-box" style="display:none;margin-top:8px">
             <input class="comment-input" placeholder="Write a comment…" />
@@ -110,12 +115,10 @@
           b.innerHTML = `<i class="fa-solid fa-heart"></i> ${liked ? n + 1 : Math.max(0, n - 1)}`;
         } catch { /* noop */ }
       }
-
       if (e.target.closest(".btn-comment")) {
         const box = root.querySelector(".comment-box");
         if (box) box.style.display = box.style.display === "none" ? "" : "none";
       }
-
       if (e.target.closest(".btn-send")) {
         const inp = root.querySelector(".comment-input");
         const txt = (inp?.value || "").trim();
@@ -148,10 +151,8 @@
     });
   }
 
-  // Public bootstrapper for feed.html
   window.startSocialFeed = renderFeed;
 
-  // Optional auto-start if #friends-feed exists
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => { if ($("#friends-feed")) renderFeed(); });
   } else {

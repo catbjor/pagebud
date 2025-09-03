@@ -1,4 +1,4 @@
-// reader.js — EPUB + paged PDF w/ resume (Firestore + localStorage), arrows, click-zones, progress & go-to
+// reader.js — EPUB + paged PDF w/ resume (Firestore + localStorage), arrows, click-zones, progress log
 (function () {
     "use strict";
 
@@ -41,14 +41,16 @@
             Promise.resolve(fn(...lastArgs)).catch(() => { }).finally(() => { inFlight = false; });
         };
     };
+    function makeActivityWriter(bookId) {
+        return throttle((meta) => {
+            try { window.PB?.logActivity?.({ action: "progress_updated", targetId: bookId, meta }); } catch { }
+        }, 5000);
+    }
 
-    // --- robust script loader for EPUB ---
     function loadScript(src) {
         return new Promise((res, rej) => {
             const s = document.createElement("script");
             s.src = src;
-            s.async = true;
-            s.referrerPolicy = "no-referrer";
             s.onload = () => res(true);
             s.onerror = () => rej(new Error("Failed to load " + src));
             document.head.appendChild(s);
@@ -56,23 +58,9 @@
     }
     async function ensureEPUB() {
         if (window.ePub) return true;
-        const sources = [
-            "https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.93/epub.min.js",
-            "https://cdn.jsdelivr.net/npm/epubjs@0.3.93/build/epub.min.js",
-            "https://unpkg.com/epubjs@0.3.93/build/epub.min.js",
-            // legg inn lokal kopi i prosjektet for offline fallback og fjern kommentaren:
-            // "epub.min.js"
-        ];
-        for (const src of sources) {
-            try {
-                await loadScript(src);
-                const t0 = Date.now();
-                while (!window.ePub && Date.now() - t0 < 2000) {
-                    await new Promise(r => setTimeout(r, 50));
-                }
-                if (window.ePub) return true;
-            } catch { /* prøv neste */ }
-        }
+        try { await loadScript("https://cdn.jsdelivr.net/npm/epubjs@0.3.93/build/epub.min.js"); } catch { }
+        if (window.ePub) return true;
+        try { await loadScript("https://unpkg.com/epubjs@0.3.93/build/epub.min.js"); } catch { }
         return !!window.ePub;
     }
 
@@ -84,19 +72,11 @@
             const ref = db().collection("users").doc(uid).collection("books").doc(bookId);
             const snap = await ref.get();
             const data = snap.exists ? snap.data() : null;
-            if (data?.reading && typeof data.reading === "object") {
-                log("Loaded reading from Firestore:", data.reading);
-                return data.reading;
-            }
-        } catch (e) { warn("loadSaved Firestore failed:", e); }
-
+            if (data?.reading && typeof data.reading === "object") return data.reading;
+        } catch { }
         try {
             const raw = localStorage.getItem(lsKey(uid, bookId));
-            if (raw) {
-                const obj = JSON.parse(raw);
-                log("Loaded reading from localStorage:", obj);
-                return obj;
-            }
+            if (raw) return JSON.parse(raw);
         } catch { }
         return null;
     }
@@ -110,9 +90,9 @@
                 reading: { ...reading, updatedAt: firebase.firestore.FieldValue.serverTimestamp() },
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             }, { merge: true });
-            log("Saved reading to Firestore:", reading);
-        } catch (e) { warn("saveSaved Firestore failed:", e); }
+        } catch { }
     }
+
     function makeProgressWriter(uid, bookId) {
         return throttle((reading) => saveSaved(uid, bookId, reading), 1000);
     }
@@ -122,7 +102,6 @@
         const url = doc.fileUrl || doc.pdfUrl || doc.epubUrl || "";
         if (!url) return null;
         const type = preferType(doc.fileType, doc.fileExt, extFromUrl(url));
-        log("Resolved from explicit URL:", { type });
         return { url, type };
     }
     async function tryFromStorage(doc) {
@@ -131,9 +110,8 @@
             const st = storage(); if (!st?.ref) return null;
             const url = await st.ref(doc.storagePath).getDownloadURL();
             const type = preferType(doc.fileType, doc.fileExt, extFromUrl(url));
-            log("Resolved from Firebase Storage:", { type });
             return { url, type };
-        } catch (e) { warn("Storage resolve failed:", e); return null; }
+        } catch { return null; }
     }
     async function tryFromLocalFilePath(doc) {
         try {
@@ -142,10 +120,9 @@
             if (rec?.blob) {
                 const url = URL.createObjectURL(rec.blob);
                 const type = preferType(doc.fileType, doc.fileExt, rec.ext, extFromUrl(rec.name || ""));
-                log("Resolved via LocalFiles.filePath:", { type });
                 return { url, type };
             }
-        } catch (e) { warn("LocalFiles.loadByPath failed:", e); }
+        } catch { }
         return null;
     }
     async function tryPB_getURL_fromDoc(doc) {
@@ -155,10 +132,9 @@
             const url = await PBFileStore.getURL(doc);
             if (url) {
                 const type = preferType(doc.fileType, doc.fileExt, extFromUrl(doc.fileName || ""));
-                log("Resolved via PBFileStore.getURL(meta):", { type });
                 return { url, type };
             }
-        } catch (e) { warn("PBFileStore.getURL(meta) failed:", e); }
+        } catch { }
         return null;
     }
     async function tryPB_getUrl_byIds(uid, bookId, doc) {
@@ -167,10 +143,9 @@
             const url = await PBFileStore.getUrl(uid, bookId);
             if (url) {
                 const type = preferType(doc?.fileType, doc?.fileExt, extFromUrl(url));
-                log("Resolved via PBFileStore.getUrl(uid,bookId):", { type });
                 return { url, type };
             }
-        } catch (e) { warn("PBFileStore.getUrl(uid,bookId) failed:", e); }
+        } catch { }
         return null;
     }
 
@@ -179,7 +154,6 @@
         const root = $("#viewerRoot");
         root.innerHTML = "";
 
-        // host
         const host = document.createElement("div");
         host.id = "epubViewer";
         host.style.width = "100%";
@@ -187,7 +161,6 @@
         host.style.position = "relative";
         root.appendChild(host);
 
-        // controls
         const ctrls = document.createElement("div");
         ctrls.style.position = "absolute";
         ctrls.style.bottom = "12px";
@@ -199,26 +172,21 @@
         ctrls.style.alignItems = "center";
 
         const btnPrev = document.createElement("button");
-        btnPrev.className = "btn";
-        btnPrev.textContent = "‹ Prev";
+        btnPrev.className = "btn"; btnPrev.textContent = "‹ Prev";
 
         const pageInfo = document.createElement("span");
-        pageInfo.style.fontSize = "12px";
-        pageInfo.style.opacity = "0.8";
+        pageInfo.style.fontSize = "12px"; pageInfo.style.opacity = "0.8";
 
         const btnNext = document.createElement("button");
-        btnNext.className = "btn";
-        btnNext.textContent = "Next ›";
+        btnNext.className = "btn"; btnNext.textContent = "Next ›";
 
-        // progress (prosent)
         const prog = document.createElement("input");
         prog.type = "range"; prog.min = "0"; prog.max = "100"; prog.value = "0";
         prog.style.width = "160px";
 
         const gotoPct = document.createElement("input");
         gotoPct.type = "number"; gotoPct.min = "0"; gotoPct.max = "100"; gotoPct.value = "0";
-        gotoPct.style.width = "64px";
-        gotoPct.title = "Go to %";
+        gotoPct.style.width = "64px"; gotoPct.title = "Go to %";
 
         const idxLabel = document.createElement("span");
         idxLabel.textContent = "Indexing…";
@@ -229,29 +197,24 @@
         ctrls.append(btnPrev, pageInfo, btnNext, prog, gotoPct, idxLabel);
         host.appendChild(ctrls);
 
-        // tap-zones
         const leftZone = document.createElement("div");
         const rightZone = document.createElement("div");
         [leftZone, rightZone].forEach(z => {
             z.style.position = "absolute";
             z.style.top = "0"; z.style.bottom = "0";
-            z.style.width = "30%";
-            z.style.cursor = "pointer";
-            z.style.zIndex = "5";
+            z.style.width = "30%"; z.style.cursor = "pointer"; z.style.zIndex = "5";
         });
-        leftZone.style.left = "0";
-        rightZone.style.right = "0";
+        leftZone.style.left = "0"; rightZone.style.right = "0";
         host.append(leftZone, rightZone);
 
         const ok = await ensureEPUB();
         if (!ok) { root.textContent = "EPUB viewer not loaded."; return; }
-
         const book = ePub(url);
         const rendition = book.renderTo(host, { width: "100%", height: "100%" });
 
         const writeProgress = makeProgressWriter(uid, bookId);
+        const writeActivity = makeActivityWriter(bookId);
 
-        // Resume (CFI -> percent)
         let startDisplayed = null;
         if (saved?.kind === "epub") {
             if (saved.cfi) startDisplayed = saved.cfi;
@@ -264,24 +227,21 @@
                 } catch (e) { warn("EPUB resume by percent failed:", e); }
             }
         }
+
         await rendition.display(startDisplayed || undefined);
 
-        // side-info
         const updateDisplayedInfo = async () => {
             try {
                 const loc = rendition.currentLocation();
                 if (loc && loc.start && loc.start.displayed) {
                     const { page, total } = loc.start.displayed;
                     pageInfo.textContent = `${page} / ${total}`;
-                } else {
-                    pageInfo.textContent = "";
-                }
+                } else pageInfo.textContent = "";
             } catch { pageInfo.textContent = ""; }
         };
         rendition.on("rendered", updateDisplayedInfo);
         await updateDisplayedInfo();
 
-        // Locations (global progress)
         let locationsReady = false;
         try {
             idxLabel.style.display = "";
@@ -300,17 +260,17 @@
                 const cur = rendition.currentLocation();
                 const cfi = cur?.start?.cfi;
                 if (!cfi) return;
-                const pct = book.locations.percentageFromCfi(cfi); // 0..1
+                const pct = book.locations.percentageFromCfi(cfi);
                 const pct100 = Math.round(pct * 100);
                 prog.value = String(pct100);
                 gotoPct.value = String(pct100);
                 writeProgress({ kind: "epub", cfi, percent: pct100 });
+                writeActivity({ kind: "epub", percent: pct100 });
             } catch { }
         };
         rendition.on("relocated", () => { updateDisplayedInfo(); setProgressFromLoc(); });
         setProgressFromLoc();
 
-        // navigasjon
         const goPrev = () => rendition.prev();
         const goNext = () => rendition.next();
         btnPrev.addEventListener("click", goPrev);
@@ -322,7 +282,6 @@
             if (e.key === "ArrowLeft") goPrev();
         });
 
-        // progress & go to %
         const gotoPercent = (pct) => {
             if (!locationsReady) return;
             pct = Math.max(0, Math.min(100, Number(pct) || 0));
@@ -334,7 +293,6 @@
         prog.addEventListener("input", () => gotoPercent(prog.value));
         gotoPct.addEventListener("change", () => gotoPercent(gotoPct.value));
 
-        // Save on unload
         window.addEventListener("beforeunload", () => {
             try {
                 const cur = rendition.currentLocation();
@@ -347,10 +305,9 @@
         });
     }
 
-    // ---------- PDF render (paged, pdf.js) ----------
+    // ---------- PDF render (paged) ----------
     async function renderPDFPaged(url, uid, bookId, saved) {
         if (!window.pdfjsLib) {
-            // fallback: iframe
             const root = $("#viewerRoot");
             root.innerHTML = "";
             const iframe = document.createElement("iframe");
@@ -366,23 +323,16 @@
         const root = $("#viewerRoot");
         root.innerHTML = "";
 
-        // wrapper
         const wrap = document.createElement("div");
-        wrap.style.position = "relative";
-        wrap.style.width = "100%";
-        wrap.style.height = "100vh";
-        wrap.style.display = "grid";
-        wrap.style.placeItems = "center";
+        wrap.style.position = "relative"; wrap.style.width = "100%"; wrap.style.height = "100vh";
+        wrap.style.display = "grid"; wrap.style.placeItems = "center";
         root.appendChild(wrap);
 
-        // canvas
         const canvas = document.createElement("canvas");
-        canvas.style.maxWidth = "100%";
-        canvas.style.maxHeight = "100vh";
+        canvas.style.maxWidth = "100%"; canvas.style.maxHeight = "100vh";
         wrap.appendChild(canvas);
         const ctx = canvas.getContext("2d");
 
-        // controls
         const ctrls = document.createElement("div");
         ctrls.style.position = "absolute";
         ctrls.style.bottom = "12px";
@@ -394,46 +344,37 @@
         ctrls.style.alignItems = "center";
 
         const btnPrev = document.createElement("button");
-        btnPrev.className = "btn";
-        btnPrev.textContent = "‹ Prev";
+        btnPrev.className = "btn"; btnPrev.textContent = "‹ Prev";
 
         const pageInfo = document.createElement("span");
-        pageInfo.style.fontSize = "12px";
-        pageInfo.style.opacity = "0.8";
+        pageInfo.style.fontSize = "12px"; pageInfo.style.opacity = "0.8";
 
         const btnNext = document.createElement("button");
-        btnNext.className = "btn";
-        btnNext.textContent = "Next ›";
+        btnNext.className = "btn"; btnNext.textContent = "Next ›";
 
-        // progress & goto
         const prog = document.createElement("input");
         prog.type = "range"; prog.min = "1"; prog.value = "1";
         prog.style.width = "160px";
 
         const gotoPage = document.createElement("input");
         gotoPage.type = "number"; gotoPage.min = "1"; gotoPage.value = "1";
-        gotoPage.style.width = "64px";
-        gotoPage.title = "Go to page";
+        gotoPage.style.width = "64px"; gotoPage.title = "Go to page";
 
         ctrls.append(btnPrev, pageInfo, btnNext, prog, gotoPage);
         wrap.appendChild(ctrls);
 
-        // tap-zones
         const leftZone = document.createElement("div");
         const rightZone = document.createElement("div");
         [leftZone, rightZone].forEach(z => {
-            z.style.position = "absolute";
-            z.style.top = "0"; z.style.bottom = "0";
-            z.style.width = "30%";
-            z.style.cursor = "pointer";
-            z.style.zIndex = "5";
+            z.style.position = "absolute"; z.style.top = "0"; z.style.bottom = "0";
+            z.style.width = "30%"; z.style.cursor = "pointer"; z.style.zIndex = "5";
         });
-        leftZone.style.left = "0";
-        rightZone.style.right = "0";
+        leftZone.style.left = "0"; rightZone.style.right = "0";
         wrap.append(leftZone, rightZone);
 
         const pdf = await pdfjsLib.getDocument({ url }).promise;
         const writeProgress = makeProgressWriter(uid, bookId);
+        const writeActivity = makeActivityWriter(bookId);
 
         let pageNum = 1;
         if (saved?.kind === "pdf" && typeof saved.page === "number" && saved.page >= 1 && saved.page <= pdf.numPages) {
@@ -442,7 +383,6 @@
 
         async function renderPage(n) {
             const page = await pdf.getPage(n);
-            // scale to viewport
             const vw = root.clientWidth || window.innerWidth;
             const vh = root.clientHeight || window.innerHeight;
             const scaleBase = 1.5;
@@ -464,8 +404,8 @@
             gotoPage.max = String(pdf.numPages);
             gotoPage.value = String(n);
 
-            // Save progress (throttled)
             writeProgress({ kind: "pdf", page: n });
+            writeActivity({ kind: "pdf", page: n });
         }
 
         const goPrev = () => { if (pageNum > 1) { pageNum--; renderPage(pageNum); } };
@@ -491,11 +431,9 @@
 
         await renderPage(pageNum);
 
-        // Save best-effort on unload
         window.addEventListener("beforeunload", () => {
             try { saveSaved(uid, bookId, { kind: "pdf", page: pageNum }); } catch { }
         });
-
         window.addEventListener("resize", () => renderPage(pageNum));
     }
 
@@ -512,7 +450,6 @@
         const doc = snap.data() || {};
         if (doc.title) { const h = $("#bookTitle"); if (h) h.textContent = doc.title; }
 
-        log("Doc fields:", Object.keys(doc));
         const saved = await loadSaved(uid, id);
 
         const src =
