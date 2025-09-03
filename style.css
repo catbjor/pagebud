@@ -497,6 +497,37 @@ input[type="text"] {
   margin-top: 6px
 }
 
+/* Rated badge (top-left of cover) */
+.rated-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--card) 92%, transparent);
+  font-weight: 800;
+  font-size: 0.85rem;
+  line-height: 1;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, .08);
+  z-index: 2;
+  /* stays above the cover but below the heart on the right */
+}
+
+.rated-badge .star {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+.rated-badge .val {
+  translate: 0 0;
+  /* keeps text crisp */
+}
+
 /* keep the existing .book-grid list rules too (harmless if unused) */
 .book-grid.list-view .book-card {
   grid-template-columns: 90px 1fr

@@ -65,12 +65,24 @@ function cardHTML(doc) {
     d.fileUrl || d.pdfUrl || d.epubUrl || d.storagePath || d.filePath || d.hasFile
   );
 
-  const attrs = `data-id="${id}" data-status="${status}" data-fav="${favorite ? 1 : 0}" data-format="${format}"`;
+  // NEW: mark rated state and compute compact label (e.g., 4.5)
+  const ratingLabel = rating > 0
+    ? (Number.isInteger(rating) ? String(rating) : String(Math.round(rating * 10) / 10))
+    : "";
+
+  const attrs = `data-id="${id}" data-status="${status}" data-fav="${favorite ? 1 : 0}" data-format="${format}" data-rated="${rating > 0 ? 1 : 0}"`;
 
   return `
     <article class="book-card" ${attrs}>
       <div class="thumb-wrap">
         <img class="thumb" src="${cover}" alt="Cover for ${escapeHtml(title)}">
+
+        ${rating > 0 ? `
+        <span class="rated-badge" title="Rated ${ratingLabel}">
+          <img class="star" src="icons/yellow-star.svg" alt="" aria-hidden="true">
+          <span class="val">${ratingLabel}</span>
+        </span>` : ``}
+
         <button type="button" class="heart-btn ${favorite ? 'active' : ''}" data-action="fav" data-id="${id}" title="Favorite">
           <i class="fa-regular fa-heart"></i>
         </button>
