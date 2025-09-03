@@ -1,4 +1,5 @@
-// friends.js — search users (@username, email, name), requests, local friends, modal (profile/chat)
+// friends.js — search users (@username, email, name), requests, local friends,
+// local friends list, modal (profile/chat) + 🔔 unread badges per friend & total
 (function () {
     "use strict";
 
@@ -32,12 +33,39 @@
             mTitle: $("#friendModalTitle"),
             mProfile: $("#friendModalProfile"),
             mChat: $("#friendModalChat"),
+            globalHook: qsAny(["#btnFriends", "[data-action='friends']"]) // for total badge if present
         };
     }
 
     function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
     function button(label, cls = "btn") { const b = el("button", cls, label); b.type = "button"; return b; }
     function clear(node) { if (node) node.innerHTML = ""; }
+
+    // ---------- badge helpers ----------
+    function makeBadge(n) {
+        const b = document.createElement("span");
+        b.className = "pb-badge";
+        b.textContent = String(n);
+        Object.assign(b.style, {
+            minWidth: "18px", height: "18px", borderRadius: "9px",
+            background: "var(--primary)", color: "#000", display: "inline-grid",
+            placeItems: "center", fontSize: "12px", padding: "0 6px", marginLeft: "6px"
+        });
+        return b;
+    }
+    function paintGlobalBadge(hookEl, total) {
+        if (!hookEl) return;
+        hookEl.style.position = hookEl.style.position || "relative";
+        let b = document.getElementById("pbFriendsTotal");
+        if (!b) {
+            b = makeBadge(total);
+            b.id = "pbFriendsTotal";
+            Object.assign(b.style, { position: "absolute", top: "-6px", right: "-6px", marginLeft: "0" });
+            hookEl.appendChild(b);
+        }
+        b.textContent = String(total);
+        b.style.display = total > 0 ? "inline-grid" : "none";
+    }
 
     async function getUsernameByUid(uid) {
         try {
@@ -83,9 +111,12 @@
         catch (e) { warn("removeLocalFriend failed:", e); }
     }
 
+    // ---------- rows ----------
     function renderUserRow(container, item, actions = [], onRowClick = null) {
         if (!container) return;
         const row = el("div", "friend-row");
+        row.dataset.uid = item.uid || ""; // needed for badges
+
         const left = el("div", "friend-left");
         const right = el("div", "friend-actions");
 
@@ -97,9 +128,10 @@
             avatar.appendChild(img);
         } else {
             avatar.textContent = (item.displayName || item.username || item.uid || "?").slice(0, 1).toUpperCase();
-            avatar.style.width = "32px"; avatar.style.height = "32px";
-            avatar.style.borderRadius = "50%"; avatar.style.display = "grid"; avatar.style.placeItems = "center";
-            avatar.style.border = "1px solid var(--border)";
+            Object.assign(avatar.style, {
+                width: "32px", height: "32px", borderRadius: "50%", display: "grid", placeItems: "center",
+                border: "1px solid var(--border)"
+            });
         }
 
         const name = el("div", "friend-name", item.displayName || item.username || item.uid || "");
@@ -112,7 +144,7 @@
         right.style.display = "flex"; right.style.gap = "8px";
         actions.forEach(b => right.appendChild(b));
 
-        row.style.display = "flex"; row.style.alignItems = "center"; row.style.justifyContent = "space-between"; row.style.gap = "10px";
+        Object.assign(row.style, { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" });
         row.append(left, right);
 
         if (onRowClick) {
@@ -123,6 +155,7 @@
         container.appendChild(row);
     }
 
+    // ---------- modal ----------
     function useFriendModal(els) {
         let current = null;
         const show = (friend) => {
@@ -148,6 +181,7 @@
         return { show, hide };
     }
 
+    // ---------- search ----------
     function wireSearch(me, els) {
         if (!els.input || !els.searchList) return;
 
@@ -168,7 +202,7 @@
                 renderUserRow(els.searchList, { uid, ...userInfo }, [addBtn]);
             };
 
-            // 1) Exact username
+            // 1) exact username
             try {
                 const d = await db().collection("usernames").doc(q).get();
                 if (d.exists && d.data()?.uid) {
@@ -177,7 +211,7 @@
                 }
             } catch (e) { warn("exact username lookup failed:", e); }
 
-            // 2) Username prefix
+            // 2) username prefix
             try {
                 const FieldPath = firebase.firestore.FieldPath;
                 const qs = await db().collection("usernames")
@@ -189,7 +223,7 @@
                 });
             } catch (e) { warn("prefix username search failed:", e); }
 
-            // 3) Exact email (requires emailLower on usernames docs)
+            // 3) exact email
             if (q.includes("@")) {
                 try {
                     const qs = await db().collection("usernames").where("emailLower", "==", q).limit(5).get();
@@ -197,10 +231,10 @@
                         const data = doc.data() || {};
                         renderAddItem(data.uid, { username: doc.id, displayName: data.displayName, photoURL: data.photoURL });
                     });
-                } catch (e) { /* field may not exist */ }
+                } catch { /* optional field */ }
             }
 
-            // 4) Name prefix (requires displayNameLower on usernames docs)
+            // 4) displayName prefix
             try {
                 const ref = db().collection("usernames");
                 const qs2 = await ref.orderBy("displayNameLower").startAt(q).endAt(q + "\uf8ff").limit(10).get();
@@ -208,13 +242,14 @@
                     const data = doc.data() || {};
                     renderAddItem(data.uid, { username: doc.id, displayName: data.displayName, photoURL: data.photoURL });
                 });
-            } catch (e) { /* field/index may not exist */ }
+            } catch { /* optional field/index */ }
         }
 
         els.input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); runSearch(); } });
         els.searchBtn?.addEventListener("click", (e) => { e.preventDefault(); runSearch(); });
     }
 
+    // ---------- requests ----------
     function wireRequests(me, els) {
         if (els.incomingList) {
             db().collection("friend_requests").where("to", "==", me.uid).where("status", "==", "pending")
@@ -276,7 +311,8 @@
         acceptedTo.onSnapshot(s => onAccepted(s, false));
     }
 
-    function wireFriendsList(me, els) {
+    // ---------- friends list ----------
+    function wireFriendsList(me, els, repaintBadges) {
         const modal = useFriendModal(els);
         if (!els.friendsList) return;
 
@@ -300,16 +336,74 @@
                     renderUserRow(els.friendsList, f, [chatBtn, rmBtn], () => modal.show(f));
                 }
                 if (snap.empty) els.friendsList.innerHTML = `<p class="muted">No friends yet.</p>`;
+
+                // repaint badges after DOM re-render
+                repaintBadges?.();
             });
     }
 
+    // ---------- unread badges (per friend + global) ----------
+    function wireUnreadBadges(me, els) {
+        let unreadMap = new Map(); // otherUid -> count (we use 1 per unread chat)
+        let total = 0;
+
+        const paint = () => {
+            // per-friend rows
+            if (els.friendsList) {
+                els.friendsList.querySelectorAll(".friend-row").forEach(row => {
+                    const uid = row.dataset.uid || "";
+                    const textWrap = row.querySelector(".friend-text-wrap");
+                    if (!textWrap) return;
+
+                    // remove old
+                    const old = textWrap.querySelector(".pb-badge");
+                    if (old) old.remove();
+
+                    const n = unreadMap.get(uid) || 0;
+                    if (n > 0) textWrap.appendChild(makeBadge(n));
+                });
+            }
+            // global
+            paintGlobalBadge(els.globalHook, total);
+        };
+
+        // watch all chats where I'm participant
+        db().collection("chats").where(`participants.${me.uid}`, "==", true)
+            .onSnapshot((snap) => {
+                unreadMap = new Map();
+                total = 0;
+
+                snap.forEach(doc => {
+                    const data = doc.data() || {};
+                    const parts = data.participants || {};
+                    const read = data.read || {};
+                    const isUnreadForMe = read[me.uid] === false;
+                    if (!isUnreadForMe) return;
+
+                    const otherUid = Object.keys(parts).find(u => u !== me.uid);
+                    if (!otherUid) return;
+
+                    unreadMap.set(otherUid, (unreadMap.get(otherUid) || 0) + 1);
+                    total += 1;
+                });
+
+                paint();
+            });
+
+        return paint; // so friends list can call after it re-renders
+    }
+
+    // ---------- boot ----------
     async function boot() {
         const me = await requireUser();
         const els = getEls();
         try { window.NAV && window.NAV.init && window.NAV.init(); } catch { }
+
+        const repaintBadges = wireUnreadBadges(me, els);
+
         wireSearch(me, els);
         wireRequests(me, els);
-        wireFriendsList(me, els);
+        wireFriendsList(me, els, repaintBadges);
     }
 
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot, { once: true });

@@ -1,15 +1,15 @@
-// index-actions.js — header actions + home enhancements (Continue-reading + centered heart)
+// index-actions.js — header actions + home enhancements (+ 🔔 global friends badge)
 (function () {
     "use strict";
 
     const $ = (s, r = document) => r.querySelector(s);
     const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 
-    // ---------- small Firebase helpers ----------
+    // ---------- Firebase helpers ----------
     function auth() { return (window.fb?.auth) || (window.firebase?.auth?.()) || firebase.auth(); }
     function db() { return (window.fb?.db) || (window.firebase?.firestore?.()) || firebase.firestore(); }
 
-    // ---------- delete (existing) ----------
+    // ---------- delete book ----------
     async function deleteBook(id) {
         const u = auth().currentUser;
         if (!u || !id) return;
@@ -31,7 +31,7 @@
         });
     });
 
-    // ---------- util: safe hook to links/buttons ----------
+    // ---------- util ----------
     function hookBtn(selector, onClick) {
         const el = document.querySelector(selector);
         if (!el) return;
@@ -61,7 +61,7 @@
         } catch { location.reload(); }
     }
 
-    // ---------- greeting (unchanged) ----------
+    // ---------- greeting ----------
     async function initGreeting() {
         const el = document.getElementById("homeGreeting");
         if (!el) return;
@@ -105,9 +105,8 @@
         return msg;
     }
 
-    // ---------- enhancement: Continue-reading on cards ----------
+    // ---------- Continue-reading on cards ----------
     function cardRootForId(id) {
-        // Prefer #book-<id>, else [data-book-id="<id>"]
         return document.getElementById(`book-${id}`) || document.querySelector(`[data-book-id="${id}"]`) || null;
     }
     function findReadButton(root) {
@@ -124,10 +123,8 @@
         } else if (typeof r.percent === "number") {
             btn.textContent = `Continue · ${Math.round(r.percent)}%`;
         }
-        // Keep existing click to reader
         btn.onclick = () => { location.href = `reader.html?id=${encodeURIComponent(book.id)}`; };
     }
-
     async function enhanceCardsWithReading() {
         try {
             const a = auth();
@@ -153,32 +150,62 @@
         }
     }
 
-    // ---------- enhancement: center favorite-heart in its circle ----------
+    // ---------- center heart icons ----------
     function centerHeartIcons() {
         const candidates = $$('.fav, .favorite, .heart, .heart-btn, .fav-btn, [data-role="favorite"], [aria-label*="Favorite"], [aria-label*="favoritt"]');
         candidates.forEach(el => {
             const wrap = el.closest('.fav-circle, .favorite-circle, .circle, .badge, .icon-badge') || el.parentElement;
             if (!wrap) return;
-            Object.assign(wrap.style, {
-                display: 'grid',
-                placeItems: 'center'
-            });
-            Object.assign(el.style, {
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                lineHeight: '1'
-            });
+            Object.assign(wrap.style, { display: 'grid', placeItems: 'center' });
+            Object.assign(el.style, { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', lineHeight: '1' });
         });
+    }
+
+    // ---------- global friends badge ----------
+    function wireGlobalFriendsBadge() {
+        const hook = document.querySelector("#btnFriends,[data-action='friends']");
+        if (!hook) return; // nothing to attach to
+
+        function makeBadge(n) {
+            const b = document.createElement("span");
+            b.id = "homeFriendsBadge";
+            Object.assign(b.style, {
+                position: "absolute", top: "-6px", right: "-6px",
+                minWidth: "18px", height: "18px", borderRadius: "9px",
+                background: "var(--primary)", color: "#000",
+                display: "inline-grid", placeItems: "center",
+                fontSize: "12px", padding: "0 6px"
+            });
+            b.textContent = String(n);
+            return b;
+        }
+
+        hook.style.position = hook.style.position || "relative";
+        let badge = document.getElementById("homeFriendsBadge");
+        if (!badge) { badge = makeBadge(0); hook.appendChild(badge); }
+
+        (async () => {
+            const a = auth();
+            const u = a.currentUser || await new Promise(res => { const off = a.onAuthStateChanged(x => { off(); res(x); }); });
+            if (!u) return;
+
+            db().collection("chats").where(`participants.${u.uid}`, "==", true)
+                .onSnapshot((snap) => {
+                    let total = 0;
+                    snap.forEach(doc => {
+                        const d = doc.data() || {};
+                        if ((d.read || {})[u.uid] === false) total += 1;
+                    });
+                    badge.textContent = String(total);
+                    badge.style.display = total > 0 ? "inline-grid" : "none";
+                });
+        })();
     }
 
     // ---------- boot ----------
     function boot() {
-        // Friends-knappen skal nå åpne FRIENDS-siden (ikke feed)
+        // Make sure Friends button goes to friends page
         setHref("#btnFriends,[data-action='friends']", "friends.html");
-
-        // (valgfritt) egen selector hvis du fortsatt vil ha feed et annet sted:
-        // setHref("[data-action='friends-feed']", "feed.html");
 
         hookBtn("#btnUpdateApp,[data-action='update']", doUpdate);
         setHref("#btnCalendar,[data-action='calendar']", "stats.html");
@@ -187,6 +214,7 @@
         initGreeting();
         enhanceCardsWithReading();
         centerHeartIcons();
+        wireGlobalFriendsBadge(); // 🔔
     }
 
     if (document.readyState === "loading") {
