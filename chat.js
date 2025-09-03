@@ -1,222 +1,200 @@
-< !--chat.js — 1–1 chat(Firestore) + emoji picker + unread flags + friends - guard-- >
-  <script>
-    (function () {
-      "use strict";
+// chat.js — 1–1 chat (Firestore) med write-first opprettelse + unread flags + emoji
+(function () {
+  "use strict";
+
   const $ = (s, r = document) => r.querySelector(s);
 
-    // ------- Firebase helpers -------
-    function auth() { return (window.fb?.auth) || (window.firebase?.auth?.()) || firebase.auth(); }
-    function db()   { return (window.fb?.db)   || (window.firebase?.firestore?.()) || firebase.firestore(); }
+  // ------- Firebase helpers -------
+  function auth() { return (window.fb?.auth) || (window.firebase?.auth?.()) || firebase.auth(); }
+  function db() { return (window.fb?.db) || (window.firebase?.firestore?.()) || firebase.firestore(); }
 
-    async function requireUser() {
+  async function requireUser() {
     const a = auth();
     if (a.currentUser) return a.currentUser;
     return new Promise((res, rej) => {
-      const off = a.onAuthStateChanged(u => {off(); u ? res(u) : rej(new Error("Not signed in")); });
+      const off = a.onAuthStateChanged(u => { off(); u ? res(u) : rej(new Error("Not signed in")); });
     });
   }
 
-    // ------- DOM -------
-    const els = {
-      list:  $("#chatMessages"),
+  // ------- DOM -------
+  const els = {
+    list: $("#chatMessages"),
     input: $("#chatInput"),
-    send:  $("#chatSend"),
+    send: $("#chatSend"),
     emoji: $("#emojiBtn"),
+    picker: $("#emojiPicker") // optional
   };
 
   // ------- utils -------
   const chatIdFor = (a, b) => [a, b].sort().join("__");
   const nowTS = () => firebase.firestore.FieldValue.serverTimestamp();
-    function scrollToBottom(el) { try {el.scrollTop = el.scrollHeight + 99999; } catch { } }
 
-    // ------- ensure chat doc (participants MAP) -------
-    async function ensureChatDoc(meUid, otherUid) {
-    const id  = chatIdFor(meUid, otherUid);
-    const ref = db().collection("chats").doc(id);
-    const snap = await ref.get();
-
-    if (!snap.exists) {
-      await ref.set({
-        participants: { [meUid]: true, [otherUid]: true }, // MAP (rules krever dette)
-        createdAt: nowTS(),
-        updatedAt: nowTS(),
-        lastMessage: null,
-        typing: { [meUid]: false, [otherUid]: false },
-        read: { [meUid]: true, [otherUid]: false }
-      }, { merge: true });
-    return ref;
-    }
-
-    // Oppgrader ev. gammel ARRAY -> MAP
-    const data = snap.data() || { };
-    if (Array.isArray(data.participants)) {
-      const map = { }; data.participants.forEach(u => {map[u] = true; });
-    await ref.set({participants: map }, {merge: true });
-    }
-    return ref;
-  }
-
-    // ------- render -------
-    function renderMsg(doc, meUid) {
-    const m = doc.data();
-    const mine = m.from === meUid;
-
+  function addMessageBubble(container, msg, meUid) {
+    if (!container) return;
     const row = document.createElement("div");
-    row.className = "msg-row " + (mine ? "me" : "them");
-
+    row.className = "msg-row" + (msg.from === meUid ? " me" : "");
     const b = document.createElement("div");
     b.className = "msg-bubble";
-    b.textContent = m.text || "";
+    b.textContent = msg.text || "";
     row.appendChild(b);
-    return row;
+    container.appendChild(row);
+    container.scrollTop = container.scrollHeight;
   }
 
-    // ------- emoji picker -------
-    function setupEmojiPicker() {
-    if (!els.emoji || !els.input) return;
+  // WRITE-FIRST: ikke les først (read kan blokkeres av rules når doc ikke finnes).
+  async function ensureChatDoc(chatId, meUid, buddyUid) {
+    const ref = db().collection("chats").doc(chatId);
 
-    const picker = $("#emojiPicker") || (() => {
-      const p = document.createElement("div");
-    p.id = "emojiPicker";
-    // grunnleggende styling, men layout ligger i chat.html CSS
-    Object.assign(p.style, {
-      position: "absolute",
-    right: "12px",
-    bottom: "56px",
-    display: "none",
-    zIndex: "3000"
-      });
-    document.body.appendChild(p);
-    return p;
-    })();
+    const base = {
+      participants: { [meUid]: true, [buddyUid]: true }, // MAP (støttes av rules)
+      createdAt: nowTS(),
+      updatedAt: nowTS(),
+      lastMessage: null,
+      typing: {},
+      read: { [meUid]: true, [buddyUid]: true }
+    };
 
-    // Fyll emojis én gang
-    if (!picker.dataset.ready) {
-      picker.dataset.ready = "1";
-    const emojis = "😀😁😂🤣😅🙂😊😍😘😎🤓🤔🙄😴😭😡👍👎🙏👏🔥✨⭐🌙🌸🌈🍕🍔🍟🍰☕🍵⚽🏀🎮🎧🎬📚📝✈️🚗🏠💡❤️💯".split("");
-      emojis.forEach(e => {
-        const b = document.createElement("button");
-    b.type = "button";
-    b.textContent = e;
-    b.style.border = "none";
-    b.style.background = "transparent";
-    b.style.cursor = "pointer";
-    b.style.fontSize = "20px";
-    b.style.lineHeight = "1";
-        b.addEventListener("click", (ev) => {
-      ev.preventDefault(); ev.stopPropagation();
-    insertAtCursor(els.input, e + " ");
-    picker.style.display = "none";
-    els.input.focus();
-        });
-    picker.appendChild(b);
-      });
-    }
+    // Skriv alltid en base med merge — dette krever ikke read først
+    await ref.set(base, { merge: true });
 
-    els.emoji.addEventListener("click", (e) => {
-      e.preventDefault(); e.stopPropagation();
-    picker.style.display = (picker.style.display === "none" || !picker.style.display) ? "grid" : "none";
-    const rect = els.emoji.getBoundingClientRect();
-    picker.style.right = Math.max(12, window.innerWidth - rect.right + 8) + "px";
-    picker.style.bottom = "56px";
-    });
-
-    // Lukk ved klikk utenfor
-    document.addEventListener("click", (e) => {
-      if (!picker.contains(e.target) && e.target !== els.emoji) picker.style.display = "none";
-    });
-  }
-
-    function insertAtCursor(input, text) {
-    if (!input) return;
-    const start = input.selectionStart ?? input.value.length;
-    const end   = input.selectionEnd ?? input.value.length;
-    const before = input.value.slice(0, start);
-    const after  = input.value.slice(end);
-    input.value = before + text + after;
-    const pos = start + text.length;
-    input.selectionStart = input.selectionEnd = pos;
-    input.dispatchEvent(new Event("input"));
-  }
-
-    // ------- boot -------
-    async function boot() {
-    const me = await requireUser();
-    const other = new URLSearchParams(location.search).get("buddy");
-    if (!other) {alert("Missing buddy uid in ?buddy="); return; }
-
-    // ❗ Guard: krev akseptert vennskap før chat (ellers videresend til Friends)
+    // Ekstra “reparasjon” i tilfelle gammel struktur (array etc.)
     try {
-      const fdoc = await db().collection('users').doc(me.uid)
-    .collection('friends').doc(other).get();
-    if (!fdoc.exists || fdoc.data()?.status !== 'accepted') {
-      alert("You’re not friends yet. Accept the friend request first.");
-    location.href = "friends.html";
-    return;
-      }
+      await ref.set({ participants: { [meUid]: true, [buddyUid]: true } }, { merge: true });
     } catch { }
 
-    // Sørg for gyldig chat-doc i riktig format (MAP)
-    const ref = await ensureChatDoc(me.uid, other);
+    return ref;
+  }
 
-    // Markér lest når vises/åpnes
-    const markRead = async () => {
-      try {
-      await ref.set({ [`read.${me.uid}`]: true, updatedAt: nowTS() }, { merge: true });
-      } catch { }
-    };
-    await markRead();
-    document.addEventListener("visibilitychange", () => { if (!document.hidden) markRead(); });
-
-    // Live meldinger
-    ref.collection("messages").orderBy("createdAt", "asc").onSnapshot((snap) => {
-      els.list.innerHTML = "";
-    if (snap.empty) {
-      els.list.innerHTML = `<div class="muted" style="padding:8px">No messages yet.</div>`;
-      } else {
-      snap.forEach(d => els.list.appendChild(renderMsg(d, me.uid)));
-      }
-      setTimeout(() => {scrollToBottom(els.list); markRead(); }, 0);
-    });
-
-    // Send
-    async function send() {
-      const text = (els.input.value || "").trim();
-    if (!text) return;
-
-    els.input.value = "";
-    els.input.dispatchEvent(new Event("input"));
-
+  async function markRead(chatRef, meUid) {
     try {
-      await ref.collection("messages").add({
-        from: me.uid, to: other, text, type: "text", createdAt: nowTS()
+      await chatRef.set({ read: { [meUid]: true } }, { merge: true });
+    } catch { }
+  }
+
+  async function boot() {
+    const me = await requireUser();
+
+    // buddy from URL (?buddy=UID)
+    const params = new URLSearchParams(location.search);
+    const buddy = params.get("buddy");
+    if (!buddy) {
+      console.warn("[Chat] Missing ?buddy=UID");
+      return;
+    }
+
+    const chatId = chatIdFor(me.uid, buddy);
+    const chatRef = await ensureChatDoc(chatId, me.uid, buddy);
+
+    // ---- messages live listener (etter at doc finnes) ----
+    db().collection("chats").doc(chatId)
+      .collection("messages").orderBy("createdAt", "asc")
+      .onSnapshot((snap) => {
+        if (!els.list) return;
+        els.list.innerHTML = "";
+        snap.forEach(d => addMessageBubble(els.list, d.data() || {}, me.uid));
       });
 
-    // Unread-flagg på chat-doc (min side lest, andre side ulest)
-    await ref.set({
-      lastMessage: {text, at: nowTS(), from: me.uid },
-    updatedAt: nowTS(),
-    [`read.${me.uid}`]: true,
-    [`read.${other}`]: false
-        }, {merge: true });
+    // Markér lest når åpnet og når vindu får fokus
+    await markRead(chatRef, me.uid);
+    window.addEventListener("focus", () => markRead(chatRef, me.uid));
+
+    // ---- send() ----
+    async function send() {
+      const text = (els.input?.value || "").trim();
+      if (!text) return;
+      if (els.send) els.send.disabled = true;
+
+      const msg = {
+        from: me.uid,
+        to: buddy,
+        text,
+        type: "text",
+        createdAt: nowTS()
+      };
+
+      try {
+        // 1) lagre melding
+        await chatRef.collection("messages").add(msg);
+
+        // 2) oppdater metadata + unread flags
+        await chatRef.set({
+          updatedAt: nowTS(),
+          lastMessage: { text, from: me.uid, createdAt: nowTS() },
+          read: { [me.uid]: true, [buddy]: false }
+        }, { merge: true });
+
+        els.input.value = "";
       } catch (e) {
-      console.error("[Chat] send failed:", e);
-    alert(e?.message || "Could not send message (check Firestore rules and that chats/<A__B>.participants is a MAP).");
+        console.warn("[Chat] send failed:", e);
+        alert("Could not send. Check connection and Firestore rules.");
+      } finally {
+        if (els.send) els.send.disabled = false;
       }
     }
 
-    els.send?.addEventListener("click", (e) => {e.preventDefault(); send(); });
+    // ---- emoji picker (valgfri) ----
+    function setupEmojiPicker() {
+      if (!els.emoji || !els.input) return;
+      const emojis = ["😀", "😂", "😊", "😍", "🥳", "👍", "🙏", "🔥", "💯", "🎉", "📚", "🧠"];
+      let built = false;
+
+      function build() {
+        if (built) return;
+        built = true;
+        let pick = els.picker;
+        if (!pick) {
+          pick = document.createElement("div");
+          pick.id = "emojiPicker";
+          pick.className = "emoji-picker";
+          document.body.appendChild(pick);
+        }
+        pick.innerHTML = "";
+        emojis.forEach(e => {
+          const b = document.createElement("button");
+          b.type = "button";
+          b.className = "e";
+          b.textContent = e;
+          b.addEventListener("click", () => {
+            els.input.value += e;
+            pick.style.display = "none";
+            els.input.focus();
+          });
+          pick.appendChild(b);
+        });
+      }
+
+      function toggle() {
+        build();
+        const pick = els.picker || document.getElementById("emojiPicker");
+        if (!pick) return;
+        pick.style.display = (pick.style.display === "grid" ? "none" : "grid");
+      }
+
+      els.emoji.addEventListener("click", (e) => {
+        e.preventDefault();
+        toggle();
+      });
+
+      document.addEventListener("click", (e) => {
+        const pick = els.picker || document.getElementById("emojiPicker");
+        if (!pick) return;
+        if (e.target === els.emoji || pick.contains(e.target)) return;
+        pick.style.display = "none";
+      });
+    }
+
+    // Hook events
+    els.send?.addEventListener("click", (e) => { e.preventDefault(); send(); });
     els.input?.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {e.preventDefault(); send(); }
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
     });
 
-      setupEmojiPicker();
+    setupEmojiPicker();
   }
 
-      if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", boot, { once: true });
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot, { once: true });
   } else {
-        boot();
+    boot();
   }
 })();
-  </script>
