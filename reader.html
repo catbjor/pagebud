@@ -1,56 +1,66 @@
 <!DOCTYPE html>
-
 <html lang="en">
 
 <head>
+  <!-- Theme early -->
   <script src="theme-init.js"></script>
-  <meta charset="utf-8" />
-  <meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport" />
-  <title>Reader – PageBud</title>
-  <!-- Apply theme immediately -->
 
-  <link href="style.css" rel="stylesheet" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Reader – PageBud</title>
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+
   <!-- Firebase (compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
   <script src="firebase-config.js"></script>
-  <script src="firebase-init.js?v=dev-1"></script>
-  <!-- Local file store (your offline/local storage helper) -->
-  <script defer="" src="pb-filestore.js"></script>
-  <!-- Readers -->
-  <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
-  <script src="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+  <script src="firebase-init.js"></script>
+  <!-- PDF.js for paged PDF reading -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  </script>
+
+
+  <!-- Optional readers (EPUB in-page; PDFs use the browser viewer) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.93/epub.min.js"></script>
+
+  <style>
+    /* simple full-height host if we render inside the page */
+    #epubViewer,
+    #pdfFrame {
+      width: 100%;
+      height: 100vh;
+      border: 0;
+    }
+
+    .form-actions-fixed {
+      display: none;
+    }
+
+    /* hide the prev/next bar unless you add hooks later */
+  </style>
 </head>
 
 <body>
-  <div class="app-container" data-current-book-id="">
+  <div class="app-container">
     <header class="header">
       <h1 id="bookTitle">Reader</h1>
       <div class="header-actions">
-        <button class="back-fab" onclick="history.back()" title="Back"><i class="fa fa-chevron-left"></i></button>
+        <button class="back-fab" onclick="history.back()" title="Back">
+          <i class="fa fa-chevron-left"></i>
+        </button>
       </div>
     </header>
-    <div class="container" style="padding:12px">
-      <!-- EPUB container -->
-      <div id="epubContainer"
-        style="display:none; min-height:60vh; border:1px solid var(--border); border-radius:12px; background:var(--card); overflow:hidden">
-      </div>
-      <!-- PDF container -->
-      <div id="pdfContainer" style="display:none; text-align:center">
-        <canvas id="pdfCanvas"
-          style="max-width:100%; width:100%; background:var(--card); border:1px solid var(--border); border-radius:12px;"></canvas>
-        <div class="muted" id="pdfStatus" style="margin-top:8px"></div>
-      </div>
-    </div>
-    <!-- Floating action bar above bottom nav -->
-    <div class="form-actions-fixed">
-      <div style="margin-right:auto;display:flex;align-items:center;gap:10px">
-        <span class="muted" id="posLabel"></span>
-      </div>
-      <button class="btn" id="btnPrev" type="button">Prev</button>
-      <button class="btn" id="btnNext" type="button">Next</button>
-    </div>
+
+    <!-- The script will render either an EPUB viewer div or an iframe for PDFs -->
+    <div id="viewerRoot"></div>
+
     <nav class="bottom-nav">
       <div class="nav-item active"><i class="fas fa-book"></i> Library</div>
       <div class="nav-item" onclick="location.href='stats.html'"><i class="fas fa-chart-line"></i> Stats</div>
@@ -58,10 +68,19 @@
       <div class="nav-item" onclick="location.href='settings.html'"><i class="fas fa-cog"></i> Settings</div>
     </nav>
   </div>
-  <!-- Icons -->
-  <script defer="" src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js"></script>
-  <!-- Reader logic -->
-  <script src="reader-init.js"></script>
+
+  <script src="local-file-store.js" defer></script>
+  <!-- Local file store (alias to LocalFiles if it exports PBFileStore) -->
+  <script src="pb-filestore.js" defer></script>
+  <script>
+    // tiny alias in case your local store uses a different global name
+    window.addEventListener('DOMContentLoaded', () => {
+      if (window.PBFileStore && !window.LocalFiles) window.LocalFiles = window.PBFileStore;
+    });
+  </script>
+
+  <!-- Robust resolver / viewer -->
+  <script src="reader.js" defer></script>
 </body>
 
 </html>
