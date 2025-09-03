@@ -25,6 +25,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.93/epub.min.js"></script>
 
   <style>
+    /* local tweaks for this edit page only */
     .form-page #genres,
     .form-page #moods,
     .form-page #tropes,
@@ -41,6 +42,8 @@
       height: auto;
       padding: 10px 12px;
       line-height: 1.2;
+      cursor: pointer;
+      user-select: none;
     }
 
     .form-actions-fixed {
@@ -178,10 +181,12 @@
           <div id="spiceBar" class="spice"></div>
         </div>
 
-        <div class="form-row">
-          <label>Review</label>
-          <textarea id="review" rows="4"></textarea>
-        </div>
+        <!-- Hidden fields (created on-the-fly if missing; adding here avoids layout shifts) -->
+        <input type="hidden" name="genres">
+        <input type="hidden" name="moods">
+        <input type="hidden" name="tropes">
+        <input type="hidden" name="status">
+        <input type="hidden" name="format">
       </form>
 
       <div class="form-actions-fixed">
