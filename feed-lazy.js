@@ -28,6 +28,7 @@
         if (snap.empty) {
             hasMore = false;
             if (lastDoc === null) container.innerHTML = "<p>No feed items found.</p>";
+            isLoading = false;
             return;
         }
 
@@ -52,11 +53,9 @@
             console.warn("No IntersectionObserver support or missing #feedSentinel");
             return;
         }
-
         const io = new IntersectionObserver((entries) => {
             if (entries[0].isIntersecting) loadPage();
         });
-
         io.observe(target);
     }
 

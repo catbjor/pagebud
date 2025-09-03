@@ -1,107 +1,171 @@
 <!DOCTYPE html>
-
 <html lang="en">
 
 <head>
   <script src="theme-init.js"></script>
   <meta charset="utf-8" />
-  <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Friends – PageBud</title>
-  <!-- Put this inline snippet in the <head> of EVERY page BEFORE style.css -->
 
-  <link href="style.css" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 
-  <!-- 1) Firebase compat SDKs -->
+  <!-- Firebase (compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
   <script src="firebase-config.js"></script>
-  <script src="firebase-init.js?v=dev-1"></script>
-  <script src="profiles.js"></script>
-  <script src="social.js"></script>
-  <!-- 2) 🔧 Inline config -->
-  <script>
+  <script src="firebase-init.js"></script>
 
-    window.__PB_FIREBASE = {
-      apiKey: "AIzaSyCEV-dncbQSnP7q9AvF2_Re93l-VHN-2cg",
-      authDomain: "pagebud-cb6d9.firebaseapp.com",
-      projectId: "pagebud-cb6d9",
-      storageBucket: "pagebud-cb6d9.firebasestorage.app",
-      messagingSenderId: "974455288174",
-      appId: "1:974455288174:web:84d8a2e442ca193391d17f",
-      measurementId: "G-TK4VCBT1V9"
-    };
-  </script>
+  <style>
+    /* lite, diskret layout – rører ikke farger/typografi */
+    .friends-wrap {
+      display: grid;
+      gap: 12px;
+      padding: 12px
+    }
+
+    .search-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px
+    }
+
+    .section {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--card);
+      padding: 12px
+    }
+
+    .section h2 {
+      font-size: 16px;
+      margin: 0 0 8px 0
+    }
+
+    .friend-row {
+      padding: 8px 0
+    }
+
+    .friend-row+.friend-row {
+      border-top: 1px solid var(--border)
+    }
+
+    .friend-left {
+      display: flex;
+      align-items: center;
+      gap: 10px
+    }
+
+    .friend-text-wrap {
+      display: grid;
+      line-height: 1.1
+    }
+
+    .friend-name {
+      font-weight: 700
+    }
+
+    .friend-sub {
+      font-size: 12px;
+      opacity: .75
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, .15);
+      display: none;
+      z-index: 2000
+    }
+
+    .modal-sheet {
+      position: fixed;
+      left: 50%;
+      bottom: 16px;
+      transform: translateX(-50%);
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      min-width: 260px;
+      max-width: min(92vw, 420px);
+      padding: 12px;
+      z-index: 2001;
+      display: none
+    }
+
+    .modal-sheet h3 {
+      margin: 0 0 8px 0;
+      font-size: 16px
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end
+    }
+  </style>
 </head>
 
 <body>
   <div class="app-container">
-    <div class="header">
-      <h1>Friends</h1>
-      <div class="back-button" onclick="location.href='index.html'"><i class="fas fa-arrow-left"></i></div>
-    </div>
     <header class="header">
       <h1>Friends</h1>
       <div class="header-actions">
-        <button class="back-fab" onclick="history.back()" style="position:static" title="Back">
-          <i class="fa-solid fa-arrow-left"></i>
+        <button class="back-fab" onclick="location.href='index.html'" title="Back">
+          <i class="fa fa-chevron-left"></i>
         </button>
       </div>
     </header>
-    <script defer="" src="nav.js"></script>
+
     <div class="content-wrapper">
-      <div class="stats-section">
-        <div class="section-header">
-          <div class="section-title"><i class="fa-solid fa-user-plus"></i><span>Add a friend</span></div>
+      <div class="friends-wrap">
+        <!-- Search -->
+        <div class="section">
+          <div class="search-row">
+            <input id="friendSearch" type="search" placeholder="Search by @username, email or name…" />
+            <button id="btnFriendSearch" class="btn">Search</button>
+          </div>
+          <div id="searchResults" style="margin-top:10px"></div>
         </div>
-        <div class="form-group"><label>Email</label><input class="form-control" id="friend-email"
-            placeholder="friend@example.com" /></div>
-        <button class="btn btn-primary full-width" id="send-req">Send request</button>
-        <div class="muted" id="req-status" style="margin-top:8px"></div>
-      </div>
-      <div class="stats-section">
-        <div class="section-header">
-          <div class="section-title"><i class="fa-solid fa-inbox"></i><span>Requests</span></div>
+
+        <!-- Requests -->
+        <div class="section">
+          <h2>Requests</h2>
+          <div style="display:grid;gap:10px">
+            <div>
+              <div class="muted" style="font-weight:700;margin-bottom:6px">Incoming</div>
+              <div id="incomingList"></div>
+            </div>
+            <div>
+              <div class="muted" style="font-weight:700;margin-bottom:6px">Sent</div>
+              <div id="outgoingList"></div>
+            </div>
+          </div>
         </div>
-        <div id="incoming"></div>
-      </div>
-      <div class="stats-section">
-        <div class="section-header">
-          <div class="section-title"><i class="fa-solid fa-user-group"></i><span>Your friends</span></div>
+
+        <!-- Friends -->
+        <div class="section">
+          <h2>Your friends</h2>
+          <div id="friendsList"></div>
         </div>
-        <div id="friend-list"></div>
       </div>
     </div>
   </div>
-  <script src="sync.js"></script>
-  <script src="friends.js"></script>
-  <script>
-    requireAuth(async (user) => {
-      if (window.PBSync) { PBSync.subscribe(); await PBSync.pushAll(); }
-      startFriends && startFriends();
-    });
-  </script>
-  <script>
-    requireAuth(async (user) => {
-      // her er du garantert innlogget og fb.auth/fb.db finnes
-      // last data / start lyttere
-    });
-  </script>
-  <script>
-    requireAuth(() => startFriends && startFriends());
-  </script>
-  <script>
-    document.addEventListener("DOMContentLoaded", () => startFriends());
-  </script>
 
-  <script>
-    // Når feed lastes, nullstill badge
-    try { localStorage.setItem('pb_feed_unread_count', '0'); } catch { }
-    // hvis headeren finnes på samme side, oppdater direkte også:
-    window.pbFriendsBadge?.clear();
-  </script>
+  <!-- Modal (valg på venn) -->
+  <div id="friendModalBackdrop" class="modal-backdrop"></div>
+  <div id="friendModal" class="modal-sheet">
+    <h3 id="friendModalTitle">Friend</h3>
+    <div class="modal-actions">
+      <button id="friendModalProfile" class="btn btn-secondary">View profile</button>
+      <button id="friendModalChat" class="btn">Send message</button>
+    </div>
+  </div>
 
+  <!-- Scripts -->
+  <script src="nav.js" defer></script>
+  <script src="friends.js" defer></script>
 </body>
 
 </html>

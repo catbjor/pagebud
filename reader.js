@@ -1,4 +1,4 @@
-// reader.js — robust EPUB + paged PDF (pdf.js) med neste/forrige + piltaster
+// reader.js — EPUB + paged PDF w/ resume (Firestore + localStorage), arrows, click-zones, progress & go-to
 (function () {
     "use strict";
 
@@ -30,6 +30,92 @@
         const t = (hint || cands.find(Boolean) || "").toLowerCase();
         return t === "epub" || t === "pdf" ? t : "";
     };
+    const throttle = (fn, ms) => {
+        let t = 0, lastArgs = null, inFlight = false;
+        return (...args) => {
+            lastArgs = args;
+            const now = Date.now();
+            if (inFlight || now - t < ms) return;
+            inFlight = true;
+            t = now;
+            Promise.resolve(fn(...lastArgs)).catch(() => { }).finally(() => { inFlight = false; });
+        };
+    };
+
+    // --- robust script loader for EPUB ---
+    function loadScript(src) {
+        return new Promise((res, rej) => {
+            const s = document.createElement("script");
+            s.src = src;
+            s.async = true;
+            s.referrerPolicy = "no-referrer";
+            s.onload = () => res(true);
+            s.onerror = () => rej(new Error("Failed to load " + src));
+            document.head.appendChild(s);
+        });
+    }
+    async function ensureEPUB() {
+        if (window.ePub) return true;
+        const sources = [
+            "https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.93/epub.min.js",
+            "https://cdn.jsdelivr.net/npm/epubjs@0.3.93/build/epub.min.js",
+            "https://unpkg.com/epubjs@0.3.93/build/epub.min.js",
+            // legg inn lokal kopi i prosjektet for offline fallback og fjern kommentaren:
+            // "epub.min.js"
+        ];
+        for (const src of sources) {
+            try {
+                await loadScript(src);
+                const t0 = Date.now();
+                while (!window.ePub && Date.now() - t0 < 2000) {
+                    await new Promise(r => setTimeout(r, 50));
+                }
+                if (window.ePub) return true;
+            } catch { /* prøv neste */ }
+        }
+        return !!window.ePub;
+    }
+
+    // ---------- progress persistence ----------
+    function lsKey(uid, bookId) { return `pb:reading:${uid}:${bookId}`; }
+
+    async function loadSaved(uid, bookId) {
+        try {
+            const ref = db().collection("users").doc(uid).collection("books").doc(bookId);
+            const snap = await ref.get();
+            const data = snap.exists ? snap.data() : null;
+            if (data?.reading && typeof data.reading === "object") {
+                log("Loaded reading from Firestore:", data.reading);
+                return data.reading;
+            }
+        } catch (e) { warn("loadSaved Firestore failed:", e); }
+
+        try {
+            const raw = localStorage.getItem(lsKey(uid, bookId));
+            if (raw) {
+                const obj = JSON.parse(raw);
+                log("Loaded reading from localStorage:", obj);
+                return obj;
+            }
+        } catch { }
+        return null;
+    }
+
+    async function saveSaved(uid, bookId, reading) {
+        if (!reading || typeof reading !== "object") return;
+        try { localStorage.setItem(lsKey(uid, bookId), JSON.stringify(reading)); } catch { }
+        try {
+            const ref = db().collection("users").doc(uid).collection("books").doc(bookId);
+            await ref.set({
+                reading: { ...reading, updatedAt: firebase.firestore.FieldValue.serverTimestamp() },
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+            log("Saved reading to Firestore:", reading);
+        } catch (e) { warn("saveSaved Firestore failed:", e); }
+    }
+    function makeProgressWriter(uid, bookId) {
+        return throttle((reading) => saveSaved(uid, bookId, reading), 1000);
+    }
 
     // ---------- kilder (resolvers) ----------
     async function tryFromExplicitFields(doc) {
@@ -39,7 +125,6 @@
         log("Resolved from explicit URL:", { type });
         return { url, type };
     }
-
     async function tryFromStorage(doc) {
         try {
             if (!doc.storagePath) return null;
@@ -50,7 +135,6 @@
             return { url, type };
         } catch (e) { warn("Storage resolve failed:", e); return null; }
     }
-
     async function tryFromLocalFilePath(doc) {
         try {
             if (!doc.filePath || !window.LocalFiles?.loadByPath) return null;
@@ -64,7 +148,6 @@
         } catch (e) { warn("LocalFiles.loadByPath failed:", e); }
         return null;
     }
-
     async function tryPB_getURL_fromDoc(doc) {
         try {
             if (!window.PBFileStore?.getURL) return null;
@@ -78,7 +161,6 @@
         } catch (e) { warn("PBFileStore.getURL(meta) failed:", e); }
         return null;
     }
-
     async function tryPB_getUrl_byIds(uid, bookId, doc) {
         try {
             if (!window.PBFileStore?.getUrl) return null;
@@ -93,7 +175,7 @@
     }
 
     // ---------- EPUB render ----------
-    async function renderEPUB(url) {
+    async function renderEPUB(url, uid, bookId, saved) {
         const root = $("#viewerRoot");
         root.innerHTML = "";
 
@@ -114,6 +196,7 @@
         ctrls.style.display = "flex";
         ctrls.style.gap = "8px";
         ctrls.style.zIndex = "10";
+        ctrls.style.alignItems = "center";
 
         const btnPrev = document.createElement("button");
         btnPrev.className = "btn";
@@ -127,10 +210,26 @@
         btnNext.className = "btn";
         btnNext.textContent = "Next ›";
 
-        ctrls.append(btnPrev, pageInfo, btnNext);
+        // progress (prosent)
+        const prog = document.createElement("input");
+        prog.type = "range"; prog.min = "0"; prog.max = "100"; prog.value = "0";
+        prog.style.width = "160px";
+
+        const gotoPct = document.createElement("input");
+        gotoPct.type = "number"; gotoPct.min = "0"; gotoPct.max = "100"; gotoPct.value = "0";
+        gotoPct.style.width = "64px";
+        gotoPct.title = "Go to %";
+
+        const idxLabel = document.createElement("span");
+        idxLabel.textContent = "Indexing…";
+        idxLabel.style.fontSize = "12px";
+        idxLabel.style.opacity = "0.7";
+        idxLabel.style.display = "none";
+
+        ctrls.append(btnPrev, pageInfo, btnNext, prog, gotoPct, idxLabel);
         host.appendChild(ctrls);
 
-        // tap-soner (usynlige, for klikk/sveip)
+        // tap-zones
         const leftZone = document.createElement("div");
         const rightZone = document.createElement("div");
         [leftZone, rightZone].forEach(z => {
@@ -144,13 +243,31 @@
         rightZone.style.right = "0";
         host.append(leftZone, rightZone);
 
-        if (!window.ePub) { root.textContent = "EPUB viewer not loaded."; return; }
+        const ok = await ensureEPUB();
+        if (!ok) { root.textContent = "EPUB viewer not loaded."; return; }
+
         const book = ePub(url);
         const rendition = book.renderTo(host, { width: "100%", height: "100%" });
-        await rendition.display();
 
-        // vis "location" som side-ish info
-        const updateInfo = async () => {
+        const writeProgress = makeProgressWriter(uid, bookId);
+
+        // Resume (CFI -> percent)
+        let startDisplayed = null;
+        if (saved?.kind === "epub") {
+            if (saved.cfi) startDisplayed = saved.cfi;
+            else if (typeof saved.percent === "number") {
+                try {
+                    await book.ready;
+                    await book.locations.generate(1000);
+                    const cfi = book.locations.cfiFromPercentage(Math.max(0, Math.min(1, saved.percent / 100)));
+                    if (cfi) startDisplayed = cfi;
+                } catch (e) { warn("EPUB resume by percent failed:", e); }
+            }
+        }
+        await rendition.display(startDisplayed || undefined);
+
+        // side-info
+        const updateDisplayedInfo = async () => {
             try {
                 const loc = rendition.currentLocation();
                 if (loc && loc.start && loc.start.displayed) {
@@ -161,8 +278,37 @@
                 }
             } catch { pageInfo.textContent = ""; }
         };
-        rendition.on("rendered", updateInfo);
-        await updateInfo();
+        rendition.on("rendered", updateDisplayedInfo);
+        await updateDisplayedInfo();
+
+        // Locations (global progress)
+        let locationsReady = false;
+        try {
+            idxLabel.style.display = "";
+            await book.ready;
+            await book.locations.generate(1000);
+            locationsReady = true;
+            idxLabel.style.display = "none";
+        } catch (e) {
+            warn("EPUB locations.generate failed:", e);
+            idxLabel.textContent = "Index failed";
+        }
+
+        const setProgressFromLoc = () => {
+            if (!locationsReady) return;
+            try {
+                const cur = rendition.currentLocation();
+                const cfi = cur?.start?.cfi;
+                if (!cfi) return;
+                const pct = book.locations.percentageFromCfi(cfi); // 0..1
+                const pct100 = Math.round(pct * 100);
+                prog.value = String(pct100);
+                gotoPct.value = String(pct100);
+                writeProgress({ kind: "epub", cfi, percent: pct100 });
+            } catch { }
+        };
+        rendition.on("relocated", () => { updateDisplayedInfo(); setProgressFromLoc(); });
+        setProgressFromLoc();
 
         // navigasjon
         const goPrev = () => rendition.prev();
@@ -171,17 +317,40 @@
         btnNext.addEventListener("click", goNext);
         leftZone.addEventListener("click", goPrev);
         rightZone.addEventListener("click", goNext);
-
         window.addEventListener("keydown", (e) => {
             if (e.key === "ArrowRight") goNext();
             if (e.key === "ArrowLeft") goPrev();
         });
+
+        // progress & go to %
+        const gotoPercent = (pct) => {
+            if (!locationsReady) return;
+            pct = Math.max(0, Math.min(100, Number(pct) || 0));
+            try {
+                const cfi = book.locations.cfiFromPercentage(pct / 100);
+                if (cfi) rendition.display(cfi);
+            } catch (e) { warn("gotoPercent failed:", e); }
+        };
+        prog.addEventListener("input", () => gotoPercent(prog.value));
+        gotoPct.addEventListener("change", () => gotoPercent(gotoPct.value));
+
+        // Save on unload
+        window.addEventListener("beforeunload", () => {
+            try {
+                const cur = rendition.currentLocation();
+                const cfi = cur?.start?.cfi || null;
+                if (cfi) {
+                    const pct = locationsReady ? Math.round((book.locations.percentageFromCfi(cfi) || 0) * 100) : null;
+                    saveSaved(uid, bookId, { kind: "epub", cfi, percent: pct ?? undefined });
+                }
+            } catch { }
+        });
     }
 
     // ---------- PDF render (paged, pdf.js) ----------
-    async function renderPDFPaged(url) {
+    async function renderPDFPaged(url, uid, bookId, saved) {
         if (!window.pdfjsLib) {
-            // fallback til iframe hvis pdf.js mangler
+            // fallback: iframe
             const root = $("#viewerRoot");
             root.innerHTML = "";
             const iframe = document.createElement("iframe");
@@ -222,6 +391,7 @@
         ctrls.style.display = "flex";
         ctrls.style.gap = "8px";
         ctrls.style.zIndex = "10";
+        ctrls.style.alignItems = "center";
 
         const btnPrev = document.createElement("button");
         btnPrev.className = "btn";
@@ -235,10 +405,20 @@
         btnNext.className = "btn";
         btnNext.textContent = "Next ›";
 
-        ctrls.append(btnPrev, pageInfo, btnNext);
+        // progress & goto
+        const prog = document.createElement("input");
+        prog.type = "range"; prog.min = "1"; prog.value = "1";
+        prog.style.width = "160px";
+
+        const gotoPage = document.createElement("input");
+        gotoPage.type = "number"; gotoPage.min = "1"; gotoPage.value = "1";
+        gotoPage.style.width = "64px";
+        gotoPage.title = "Go to page";
+
+        ctrls.append(btnPrev, pageInfo, btnNext, prog, gotoPage);
         wrap.appendChild(ctrls);
 
-        // tap-soner for klikknavigasjon
+        // tap-zones
         const leftZone = document.createElement("div");
         const rightZone = document.createElement("div");
         [leftZone, rightZone].forEach(z => {
@@ -253,11 +433,16 @@
         wrap.append(leftZone, rightZone);
 
         const pdf = await pdfjsLib.getDocument({ url }).promise;
+        const writeProgress = makeProgressWriter(uid, bookId);
+
         let pageNum = 1;
+        if (saved?.kind === "pdf" && typeof saved.page === "number" && saved.page >= 1 && saved.page <= pdf.numPages) {
+            pageNum = saved.page;
+        }
 
         async function renderPage(n) {
             const page = await pdf.getPage(n);
-            // skaler til viewport
+            // scale to viewport
             const vw = root.clientWidth || window.innerWidth;
             const vh = root.clientHeight || window.innerHeight;
             const scaleBase = 1.5;
@@ -274,6 +459,13 @@
             pageInfo.textContent = `${n} / ${pdf.numPages}`;
             btnPrev.disabled = (n <= 1);
             btnNext.disabled = (n >= pdf.numPages);
+            prog.max = String(pdf.numPages);
+            prog.value = String(n);
+            gotoPage.max = String(pdf.numPages);
+            gotoPage.value = String(n);
+
+            // Save progress (throttled)
+            writeProgress({ kind: "pdf", page: n });
         }
 
         const goPrev = () => { if (pageNum > 1) { pageNum--; renderPage(pageNum); } };
@@ -288,7 +480,22 @@
             if (e.key === "ArrowLeft") goPrev();
         });
 
+        prog.addEventListener("input", () => {
+            const n = Math.max(1, Math.min(pdf.numPages, Number(prog.value) || 1));
+            if (n !== pageNum) { pageNum = n; renderPage(pageNum); }
+        });
+        gotoPage.addEventListener("change", () => {
+            const n = Math.max(1, Math.min(pdf.numPages, Number(gotoPage.value) || 1));
+            if (n !== pageNum) { pageNum = n; renderPage(pageNum); }
+        });
+
         await renderPage(pageNum);
+
+        // Save best-effort on unload
+        window.addEventListener("beforeunload", () => {
+            try { saveSaved(uid, bookId, { kind: "pdf", page: pageNum }); } catch { }
+        });
+
         window.addEventListener("resize", () => renderPage(pageNum));
     }
 
@@ -306,6 +513,7 @@
         if (doc.title) { const h = $("#bookTitle"); if (h) h.textContent = doc.title; }
 
         log("Doc fields:", Object.keys(doc));
+        const saved = await loadSaved(uid, id);
 
         const src =
             (await tryFromExplicitFields(doc)) ||
@@ -321,8 +529,8 @@
         }
 
         const t = (src.type || "").toLowerCase();
-        if (t === "epub") await renderEPUB(src.url);
-        else await renderPDFPaged(src.url); // default/fallback PDF
+        if (t === "epub") await renderEPUB(src.url, uid, id, saved);
+        else await renderPDFPaged(src.url, uid, id, saved);
     }
 
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
