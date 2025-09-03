@@ -1,11 +1,10 @@
-// index-actions.js — header actions + home enhancements (+ 🔔 global friends badge)
+// index-actions.js — header actions + home enhancements (+ 🔔 split badges: chat + requests)
 (function () {
     "use strict";
 
     const $ = (s, r = document) => r.querySelector(s);
     const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 
-    // ---------- Firebase helpers ----------
     function auth() { return (window.fb?.auth) || (window.firebase?.auth?.()) || firebase.auth(); }
     function db() { return (window.fb?.db) || (window.firebase?.firestore?.()) || firebase.firestore(); }
 
@@ -14,7 +13,6 @@
         const u = auth().currentUser;
         if (!u || !id) return;
         if (!confirm("Delete this book?")) return;
-
         try {
             await db().collection("users").doc(u.uid).collection("books").doc(id).delete();
             document.getElementById("book-" + id)?.remove();
@@ -23,7 +21,6 @@
             alert("Error: " + (e.message || e));
         }
     }
-
     document.addEventListener("DOMContentLoaded", () => {
         document.body.addEventListener("click", (e) => {
             const btn = e.target.closest("[data-del-id]");
@@ -31,7 +28,7 @@
         });
     });
 
-    // ---------- util ----------
+    // ---------- utils ----------
     function hookBtn(selector, onClick) {
         const el = document.querySelector(selector);
         if (!el) return;
@@ -128,26 +125,20 @@
     async function enhanceCardsWithReading() {
         try {
             const a = auth();
-            const u = a.currentUser || await new Promise(res => {
-                const off = a.onAuthStateChanged(x => { off(); res(x); });
-            });
+            const u = a.currentUser || await new Promise(res => { const off = a.onAuthStateChanged(x => { off(); res(x); }); });
             if (!u) return;
-
             const snap = await db().collection("users").doc(u.uid).collection("books").get();
             snap.forEach(doc => {
                 const data = doc.data() || {};
                 const book = { id: doc.id, ...data };
                 const root = cardRootForId(book.id);
                 if (!root) return;
-
                 const readBtn = findReadButton(root);
                 if (readBtn && (book.reading?.page || book.reading?.percent)) {
                     updateReadLabel(readBtn, book);
                 }
             });
-        } catch (e) {
-            console.warn("[Home] enhanceCardsWithReading failed:", e);
-        }
+        } catch (e) { console.warn("[Home] enhanceCardsWithReading failed:", e); }
     }
 
     // ---------- center heart icons ----------
@@ -161,34 +152,43 @@
         });
     }
 
-    // ---------- global friends badge ----------
-    function wireGlobalFriendsBadge() {
+    // ---------- split badges on Friends button (chat + requests) ----------
+    function wireGlobalFriendsBadgesSplit() {
         const hook = document.querySelector("#btnFriends,[data-action='friends']");
-        if (!hook) return; // nothing to attach to
-
-        function makeBadge(n) {
-            const b = document.createElement("span");
-            b.id = "homeFriendsBadge";
-            Object.assign(b.style, {
-                position: "absolute", top: "-6px", right: "-6px",
-                minWidth: "18px", height: "18px", borderRadius: "9px",
-                background: "var(--primary)", color: "#000",
-                display: "inline-grid", placeItems: "center",
-                fontSize: "12px", padding: "0 6px"
-            });
-            b.textContent = String(n);
-            return b;
-        }
+        if (!hook) return;
 
         hook.style.position = hook.style.position || "relative";
-        let badge = document.getElementById("homeFriendsBadge");
-        if (!badge) { badge = makeBadge(0); hook.appendChild(badge); }
+
+        const make = (id, bg, title) => {
+            let b = document.getElementById(id);
+            if (!b) {
+                b = document.createElement("span");
+                b.id = id;
+                Object.assign(b.style, {
+                    position: "absolute", top: "-6px",
+                    minWidth: "18px", height: "18px", borderRadius: "9px",
+                    display: "inline-grid", placeItems: "center",
+                    fontSize: "12px", padding: "0 6px", color: "#000",
+                    background: bg,
+                });
+                b.title = title;
+                hook.appendChild(b);
+            }
+            return b;
+        };
+
+        // plassér dem begge: chat til høyre, requests litt til venstre
+        const chatBadge = make("homeChatBadge", "var(--primary)", "Unread chats");
+        const reqBadge = make("homeRequestBadge", "#ffd166", "Pending friend requests");
+        chatBadge.style.right = "-6px";
+        reqBadge.style.right = "16px";
 
         (async () => {
             const a = auth();
             const u = a.currentUser || await new Promise(res => { const off = a.onAuthStateChanged(x => { off(); res(x); }); });
             if (!u) return;
 
+            // Chat-unreads
             db().collection("chats").where(`participants.${u.uid}`, "==", true)
                 .onSnapshot((snap) => {
                     let total = 0;
@@ -196,15 +196,23 @@
                         const d = doc.data() || {};
                         if ((d.read || {})[u.uid] === false) total += 1;
                     });
-                    badge.textContent = String(total);
-                    badge.style.display = total > 0 ? "inline-grid" : "none";
+                    chatBadge.textContent = String(total);
+                    chatBadge.style.display = total > 0 ? "inline-grid" : "none";
+                });
+
+            // Pending friend requests
+            db().collection("friend_requests")
+                .where("to", "==", u.uid).where("status", "==", "pending")
+                .onSnapshot((snap) => {
+                    const n = snap.size;
+                    reqBadge.textContent = String(n);
+                    reqBadge.style.display = n > 0 ? "inline-grid" : "none";
                 });
         })();
     }
 
     // ---------- boot ----------
     function boot() {
-        // Make sure Friends button goes to friends page
         setHref("#btnFriends,[data-action='friends']", "friends.html");
 
         hookBtn("#btnUpdateApp,[data-action='update']", doUpdate);
@@ -214,7 +222,7 @@
         initGreeting();
         enhanceCardsWithReading();
         centerHeartIcons();
-        wireGlobalFriendsBadge(); // 🔔
+        wireGlobalFriendsBadgesSplit(); // 🔔 split badges
     }
 
     if (document.readyState === "loading") {
