@@ -10,6 +10,8 @@
     <!-- Styles -->
     <link rel="stylesheet" href="style.css" />
     <link rel="stylesheet" href="auth.css" />
+    <!-- Font Awesome (for the eye icons) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -20,7 +22,7 @@
     <script src="firebase-init.js?v=dev-1"></script>
     <script src="profiles.js"></script>
 
-    <!-- Optional inline config (if you rely on it) -->
+    <!-- Inline config (kept as before) -->
     <script>
         window.__PB_FIREBASE = {
             apiKey: "AIzaSyCEV-dncbQSnP7q9AvF2_Re93l-VHN-2cg",
@@ -40,17 +42,21 @@
         <div class="auth-card glass" id="view-login" aria-hidden="false">
             <h1 class="auth-title">Log into your account</h1>
             <form class="auth-form" id="emailForm">
-                <label>Username or Email</label>
-                <!-- text type so @username works -->
-                <input id="emailOrUsername" placeholder="@yourname or you@example.com" required type="text"
-                    autocomplete="username" />
+                <label>Email</label>
+                <input id="email" type="email" placeholder="you@example.com" required autocomplete="email" />
 
                 <div class="row row-inline">
                     <label>Password</label>
                     <a id="forgotLink" class="link-muted" href="#" aria-label="Forgot password">Forgot?</a>
                 </div>
-                <input id="password" minlength="6" placeholder="••••••••" required type="password"
-                    autocomplete="current-password" />
+
+                <div class="input-wrap">
+                    <input id="password" type="password" minlength="6" placeholder="••••••••" required
+                        autocomplete="current-password" />
+                    <button type="button" class="pw-toggle" id="togglePassLogin" aria-label="Show password">
+                        <i class="fa-regular fa-eye"></i>
+                    </button>
+                </div>
 
                 <label class="chk">
                     <input id="remember" type="checkbox" />
@@ -76,15 +82,28 @@
 
             <form class="auth-form" id="createForm">
                 <label>Username</label>
-                <!-- was firstName; now username -->
-                <input id="username" placeholder="e.g. ariel_anderson" required type="text" autocomplete="username" />
+                <input id="username" type="text" placeholder="yourname" required autocomplete="username" />
 
                 <label>Email</label>
-                <input id="emailCreate" placeholder="you@example.com" required type="email" autocomplete="email" />
+                <input id="emailCreate" type="email" placeholder="you@example.com" required autocomplete="email" />
 
                 <label>Password</label>
-                <input id="passwordCreate" minlength="6" placeholder="At least 6 characters" required type="password"
-                    autocomplete="new-password" />
+                <div class="input-wrap">
+                    <input id="passwordCreate" type="password" minlength="6" placeholder="At least 6 characters"
+                        required autocomplete="new-password" />
+                    <button type="button" class="pw-toggle" id="togglePassCreate" aria-label="Show password">
+                        <i class="fa-regular fa-eye"></i>
+                    </button>
+                </div>
+
+                <label>Confirm password</label>
+                <div class="input-wrap">
+                    <input id="passwordCreateConfirm" type="password" minlength="6" placeholder="Repeat password"
+                        required autocomplete="new-password" />
+                    <button type="button" class="pw-toggle" id="togglePassCreate2" aria-label="Show password">
+                        <i class="fa-regular fa-eye"></i>
+                    </button>
+                </div>
 
                 <button class="btn btn-dark" type="submit">Continue</button>
             </form>

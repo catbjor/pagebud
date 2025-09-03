@@ -1,0 +1,24 @@
+/* firebase-messaging-sw.js */
+importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js');
+
+firebase.initializeApp({
+    apiKey: "AIzaSyCEV-dncbQSnP7q9AvF2_Re93l-VHN-2cg",
+    authDomain: "pagebud-cb6d9.firebaseapp.com",
+    projectId: "pagebud-cb6d9",
+    storageBucket: "pagebud-cb6d9.firebasestorage.app",
+    messagingSenderId: "974455288174",
+    appId: "1:974455288174:web:84d8a2e442ca193391d17f",
+    measurementId: "G-TK4VCBT1V9"
+});
+
+const messaging = firebase.messaging();
+
+messaging.onBackgroundMessage((payload) => {
+    const n = payload.notification || {};
+    self.registration.showNotification(n.title || "New message", {
+        body: n.body || "",
+        icon: n.icon || "/icons/icon-192.png",
+        data: payload.data || {}
+    });
+});

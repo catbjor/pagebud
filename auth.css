@@ -8,7 +8,6 @@
 }
 
 .auth-bg {
-    /* subtil gradient bakgrunn (holder seg innen temaet ditt) */
     background: linear-gradient(180deg, var(--background) 0%, rgba(0, 0, 0, 0.04) 100%);
 }
 
@@ -65,6 +64,33 @@
     margin-bottom: 8px;
     background: var(--background);
     color: var(--text);
+}
+
+/* NEW: eye button wrapper (no visual redesign) */
+.input-wrap {
+    position: relative;
+}
+
+.input-wrap>input {
+    padding-right: 44px;
+    /* leave space for eye icon */
+}
+
+.pw-toggle {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    color: var(--text-light);
+    padding: 6px;
+    border-radius: 8px;
+}
+
+.pw-toggle:focus {
+    outline: 2px solid var(--border);
 }
 
 .row {
@@ -157,7 +183,6 @@
     font-weight: 700;
     margin: 4px 0 8px;
     min-height: 24px;
-    /* reserver plass for å unngå layout-jump */
 }
 
 /* Small text reused */
