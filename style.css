@@ -453,12 +453,24 @@ input[type="text"] {
   width: 28px;
   height: 28px;
   border-radius: 999px;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: color-mix(in oklab, var(--card) 92%, transparent);
   border: 1px solid var(--border);
   color: var(--text);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, .12)
+  box-shadow: 0 4px 10px rgba(0, 0, 0, .12);
+  line-height: 1;
+  /* keeps icon vertically centered */
+  font-size: 14px;
+  /* tweak if you want it a bit smaller/larger */
+}
+
+.heart-btn i {
+  display: block;
+  line-height: 1;
+  margin: 0;
+  padding: 0;
 }
 
 .heart-btn.active {
