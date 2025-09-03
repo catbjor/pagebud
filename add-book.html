@@ -7,12 +7,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Add Book – PageBud</title>
 
+  <!-- Styles -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
   <link rel="stylesheet" href="style.css" />
-  <link rel="stylesheet" href="rating.css">
-  <link rel="stylesheet" href="file-chip.css">
-  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js"></script>
+  <link rel="stylesheet" href="rating.css" />
+  <link rel="stylesheet" href="file-chip.css" />
 
-  <!-- Firebase -->
+  <!-- Firebase (ORDER MATTERS: app -> auth -> firestore -> storage -> config/init) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -20,13 +21,16 @@
   <script src="firebase-config.js"></script>
   <script src="firebase-init.js"></script>
 
-  <!-- PDF/EPUB helpers -->
+  <!-- PDF/EPUB helpers (optional, for cover extraction/reader) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <script>pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";</script>
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  </script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.93/epub.min.js"></script>
 
   <style>
-    /* Kun for skjema-sider – ikke homepage */
+    /* Form-page tweaks (not homepage) */
     .form-page #genres,
     .form-page #moods,
     .form-page #tropes,
@@ -111,7 +115,9 @@
     <header class="header">
       <h1>Add Book</h1>
       <div class="header-actions">
-        <button class="back-fab" onclick="history.back()" title="Back"><i class="fa fa-chevron-left"></i></button>
+        <button class="back-fab" onclick="history.back()" title="Back" type="button">
+          <i class="fa fa-chevron-left"></i>
+        </button>
       </div>
     </header>
 
@@ -204,6 +210,7 @@
       </div>
     </div>
 
+    <!-- Static bottom nav for this page -->
     <nav class="bottom-nav">
       <div class="nav-item active"><i class="fas fa-book"></i> Library</div>
       <div class="nav-item" onclick="location.href='stats.html'"><i class="fas fa-chart-line"></i> Stats</div>
@@ -212,9 +219,11 @@
     </nav>
   </div>
 
+  <!-- App data + controls (order: constants before add-book.js) -->
   <script src="constants.js"></script>
   <script defer src="rating-controls.js"></script>
+  <script defer src="local-file-store.js"></script>
   <script defer src="add-book.js"></script>
 </body>
 
-</html>
+</html>g

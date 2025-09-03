@@ -1304,3 +1304,55 @@ input[type="file"]::file-selector-button:hover {
 #pb-timer-dock.timer-dock.open .timer-drawer {
   z-index: 2;
 }
+
+/* --- Bottom nav: force one row, equal widths, no wrap --- */
+.bottom-nav {
+  display: flex;
+  flex-wrap: nowrap;
+  /* never wrap to a 2nd line */
+  justify-content: space-between;
+  align-items: stretch;
+  gap: 0;
+  /* maximize available width */
+  padding: 6px 8px;
+}
+
+.bottom-nav .nav-item {
+  flex: 1 1 20%;
+  /* 5 items -> 20% each */
+  min-width: 0;
+  /* allow shrinking */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  white-space: nowrap;
+  /* keep label on one line */
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Slightly smaller labels/icons on narrow phones */
+@media (max-width: 390px) {
+  .bottom-nav .nav-item {
+    font-size: 12px;
+  }
+
+  .bottom-nav .nav-item i {
+    font-size: 18px;
+    margin-bottom: 2px;
+  }
+}
+
+/* Ultra-narrow fallback (e.g., 320px): show icons only */
+@media (max-width: 330px) {
+  .bottom-nav .nav-item {
+    font-size: 0;
+  }
+
+  /* hides label text */
+  .bottom-nav .nav-item i {
+    font-size: 20px;
+  }
+
+  /* keep icons readable */
+}

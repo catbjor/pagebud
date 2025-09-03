@@ -192,8 +192,9 @@
     ensureHidden(form, "format").value = data.format || "";
 
     // Optional cover preview
-    if (data.coverUrl && $("#coverPreview")) {
-      $("#coverPreview").src = data.coverUrl;
+    if ($("#coverPreview")) {
+      if (data.coverUrl) $("#coverPreview").src = data.coverUrl;
+      else if (data.coverDataUrl) $("#coverPreview").src = data.coverDataUrl; // local-only fallback
     }
 
     return data;
@@ -245,7 +246,7 @@
     });
   }
 
-  // ---------- File upload (isolated) ----------
+  // ---------- File upload (cloud) ----------
   async function uploadSelectedFileIfAny(fileInput, uid, bookId) {
     try {
       const file = fileInput?.files?.[0];
@@ -354,7 +355,29 @@
       await ref.set(data, { merge: true });
 
       // 2) Then, if a file was chosen, upload it and patch the doc.
-      const fileMeta = await uploadSelectedFileIfAny($("#bookFile"), uid, bookId);
+      const fileInputEl = $("#bookFile");
+      const f = fileInputEl?.files?.[0] || null;
+
+      let fileMeta = await uploadSelectedFileIfAny(fileInputEl, uid, bookId);
+
+      // --- local fallback if cloud upload didn't happen ---
+      if ((!fileMeta || (!fileMeta.fileUrl && !fileMeta.coverUrl)) && f && window.LocalFiles?.save) {
+        try {
+          // Try to reuse current preview as cover if it’s a blob:
+          let coverBlob = null;
+          try {
+            const img = $("#coverPreview");
+            if (img?.src?.startsWith("blob:")) {
+              const resp = await fetch(img.src);
+              coverBlob = await resp.blob();
+            }
+          } catch { }
+          fileMeta = await LocalFiles.save(uid, bookId, f, coverBlob);
+        } catch (e) {
+          console.warn("Local save failed:", e);
+        }
+      }
+
       if (fileMeta) {
         await ref.set({ ...fileMeta, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
       }
@@ -495,5 +518,47 @@
     document.addEventListener('DOMContentLoaded', wirePickFile);
   } else {
     wirePickFile();
+  }
+})();
+
+
+// --- Read Now button (edit page) ---
+// Creates a "Read" button beside the file picker and opens the reader for this book.
+// No changes to save/delete/chips.
+(() => {
+  function currentBookId() {
+    const form = document.querySelector('#editBookForm, #bookForm, form');
+    const qid = new URLSearchParams(location.search).get('id');
+    return qid || form?.dataset?.id || null;
+  }
+
+  function ensureReadNowBtn() {
+    const host = document.querySelector('.file-row') || document.getElementById('fileName')?.parentElement;
+    if (!host) return;
+
+    let btn = document.getElementById('readNowBtn');
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.id = 'readNowBtn';
+      btn.className = 'btn';
+      btn.type = 'button';
+      btn.textContent = 'Read';
+      btn.style.marginLeft = '8px';
+      host.appendChild(btn);
+    }
+
+    const id = currentBookId();
+    btn.disabled = !id;
+    btn.onclick = () => {
+      const bookId = currentBookId();
+      if (!bookId) return alert('Save first, then you can read.');
+      location.href = `reader.html?id=${encodeURIComponent(bookId)}`;
+    };
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', ensureReadNowBtn, { once: true });
+  } else {
+    ensureReadNowBtn();
   }
 })();

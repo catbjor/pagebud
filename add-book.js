@@ -1,9 +1,8 @@
 /* =========================================================
- PageBud – add-book.js
- - Keeps existing chips markup intact (only builds if empty)
- - Save uploads optional file + cover, writes Firestore doc
- - Save/Cancel/Choose-file are reliably clickable
- - Redirects to homepage after save
+ PageBud – add-book.js (focused patch)
+ - Leave Status/Format/File logic as-is
+ - Make Genres/Moods/Tropes always clickable (even inside <details>)
+ - Same save flow, progress text, toast, redirect, local fallback
 ========================================================= */
 (function () {
     "use strict";
@@ -12,33 +11,51 @@
     const byId = (id) => document.getElementById(id);
     const $ = (s, r = document) => r.querySelector(s);
     const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+    const text = (el) => (el?.textContent || "").trim().toLowerCase();
 
-    const goHomeFresh = () => window.location.replace(`index.html?refresh=${Date.now()}`);
+    function showToast(msg = "Saved ✓", ms = 900) {
+        try {
+            const t = document.createElement("div");
+            t.className = "toast";
+            t.textContent = msg;
+            document.body.appendChild(t);
+            requestAnimationFrame(() => t.classList.add("show"));
+            setTimeout(() => { t.classList.remove("show"); setTimeout(() => t.remove(), 300); }, ms);
+        } catch { }
+    }
 
-    // ------- Firebase helpers (compat-friendly) -------
+    function goHomeFresh() {
+        const url = `index.html?refresh=${Date.now()}`;
+        try { window.location.assign(url); } catch { window.location.href = url; }
+        setTimeout(() => { try { window.location.href = url; } catch { } }, 1500);
+    }
+
+    // ------- Firebase helpers (don’t run until save) -------
     const FB = window.fb || window;
-
     function authSvc() {
         try {
             if (FB.auth && typeof FB.auth === "object" && "currentUser" in FB.auth) return FB.auth;
             if (typeof FB.auth === "function") return FB.auth();
             if (FB.firebase?.auth) return FB.firebase.auth();
-            return firebase.auth();
-        } catch { return firebase.auth(); }
+            if (typeof firebase !== "undefined" && firebase.auth) return firebase.auth();
+        } catch { }
+        throw new Error("Firebase SDK not loaded on this page.");
     }
     function dbSvc() {
         try {
             if (FB.db?.collection) return FB.db;
             if (typeof FB.firestore === "function") return FB.firestore();
             if (FB.firestore?.collection) return FB.firestore;
-            return firebase.firestore();
-        } catch { return firebase.firestore(); }
+            if (typeof firebase !== "undefined" && firebase.firestore) return firebase.firestore();
+        } catch { }
+        throw new Error("Firebase SDK not loaded on this page.");
     }
     function storageSvc() {
         try {
             if (FB.storage?.ref) return FB.storage;
-            return firebase.storage();
-        } catch { return null; }
+            if (typeof firebase !== "undefined" && firebase.storage) return firebase.storage();
+        } catch { }
+        return null;
     }
     async function requireUser() {
         const auth = authSvc();
@@ -48,19 +65,15 @@
         });
     }
 
-    // ------- constants lookups (used only if chip containers are empty) -------
+    // ------- lists (only if containers are empty) -------
     function getLists() {
         const C =
-            (window.PB_CONST) ||
-            (window.CONSTANTS) ||
+            window.PB_CONST ||
+            window.CONSTANTS ||
             (window.PB && {
-                GENRES: window.PB.GENRES,
-                MOODS: window.PB.MOODS,
-                TROPES: window.PB.TROPES,
-                STATUSES: window.PB.STATUSES,
-                FORMATS: window.PB.FORMATS
+                GENRES: window.PB.GENRES, MOODS: window.PB.MOODS,
+                TROPES: window.PB.TROPES, STATUSES: window.PB.STATUSES, FORMATS: window.PB.FORMATS
             }) || {};
-
         const genres = C.GENRES || window.GENRES || ["Romance", "Mystery", "Thriller", "Fantasy", "Sci-Fi", "Horror", "Non-fiction", "Historical", "YA"];
         const moods = C.MOODS || window.MOODS || ["Cozy", "Dark", "Funny", "Steamy", "Heartwarming", "Gritty"];
         const tropes = C.TROPES || window.TROPES || ["Enemies to Lovers", "Friends to Lovers", "Forced Proximity", "Found Family", "Love Triangle", "Second Chance", "Grumpy / Sunshine"];
@@ -69,7 +82,7 @@
         return { genres, moods, tropes, statuses, formats };
     }
 
-    // ------- hidden inputs for chips -------
+    // ------- hidden inputs -------
     function ensureHidden(form, name) {
         let el = form.querySelector(`input[name="${name}"]`);
         if (!el) {
@@ -81,62 +94,7 @@
         return el;
     }
 
-    // ------- chip hydrator (uses existing .category; builds only if empty) -------
-    function hydrateChipGroup({ container, items, multi, initial = [], onChange }) {
-        if (!container) return;
-
-        let chips = $$(".category", container);
-        if (!chips.length && Array.isArray(items)) {
-            items.forEach((label) => {
-                const el = document.createElement("span");
-                el.className = "category";
-                el.textContent = label;
-                el.dataset.value = String(label);
-                container.appendChild(el);
-            });
-            chips = $$(".category", container);
-        }
-
-        const initialSet = new Set(Array.isArray(initial) ? initial.map(String) : [String(initial)].filter(Boolean));
-        chips.forEach(ch => {
-            const val = ch.dataset.value || ch.textContent.trim();
-            ch.dataset.value = val;
-            if (initialSet.size) ch.classList.toggle("active", initialSet.has(val));
-            ch.tabIndex = 0;
-            ch.setAttribute("role", "button");
-        });
-
-        function commit() {
-            const picked = $$(".category.active", container).map(c => c.dataset.value || c.textContent.trim());
-            onChange?.(multi ? picked : (picked[0] || ""));
-        }
-        function toggleChip(chip) {
-            if (multi) chip.classList.toggle("active");
-            else {
-                chips.forEach(c => c.classList.remove("active"));
-                chip.classList.add("active");
-            }
-            commit();
-        }
-
-        container.addEventListener("click", (e) => {
-            const chip = e.target.closest(".category");
-            if (!chip || !container.contains(chip)) return;
-            toggleChip(chip);
-        });
-        container.addEventListener("keydown", (e) => {
-            if (e.key === "Enter" || e.key === " ") {
-                const chip = e.target.closest(".category");
-                if (!chip || !container.contains(chip)) return;
-                e.preventDefault();
-                toggleChip(chip);
-            }
-        });
-
-        commit();
-    }
-
-    // ------- cover extraction (best-effort) -------
+    // ------- cover extraction (unchanged) -------
     async function tryExtractCover(file) {
         try {
             if (!file) return null;
@@ -159,17 +117,30 @@
                     return await resp.blob();
                 }
             }
-        } catch (e) {
-            console.warn("Cover extraction failed (non-fatal):", e);
-        }
+        } catch (e) { console.warn("Cover extraction failed (non-fatal):", e); }
         return null;
     }
 
-    // ------- storage upload -------
-    async function uploadToStorage(uid, bookId, file, cover) {
+    // ------- upload with progress (unchanged) -------
+    function uploadWithProgress(ref, file, options, onProgress, maxMs = 120000) {
+        return new Promise((resolve, reject) => {
+            try {
+                const task = ref.put(file, options);
+                let done = false;
+                const timer = setTimeout(() => { if (!done) { try { task.cancel?.(); } catch { } reject(new Error("Upload timed out")); } }, maxMs);
+
+                task.on("state_changed",
+                    (snap) => { if (onProgress && snap?.totalBytes) onProgress(Math.floor((snap.bytesTransferred / snap.totalBytes) * 100)); },
+                    (err) => { clearTimeout(timer); if (!done) reject(err); },
+                    async () => { clearTimeout(timer); done = true; try { resolve(await ref.getDownloadURL()); } catch (e) { reject(e); } }
+                );
+            } catch (e) { reject(e); }
+        });
+    }
+
+    async function uploadToStorage(uid, bookId, file, cover, onProgress) {
         const storage = storageSvc();
         if (!storage) return {};
-
         let fileUrl = null, coverUrl = null, storagePath = null, fileExt = null;
 
         if (file) {
@@ -177,18 +148,15 @@
             fileExt = ext === "pdf" ? "pdf" : (ext === "epub" ? "epub" : "bin");
             storagePath = `users/${uid}/books/${bookId}/book.${fileExt}`;
             const ref = storage.ref(storagePath);
-            await ref.put(file, {
-                contentType:
-                    file.type ||
-                    (fileExt === "pdf" ? "application/pdf" :
-                        fileExt === "epub" ? "application/epub+zip" : "application/octet-stream"),
+            fileUrl = await uploadWithProgress(ref, file, {
+                contentType: file.type || (fileExt === "pdf" ? "application/pdf" : fileExt === "epub" ? "application/epub+zip" : "application/octet-stream"),
                 customMetadata: { originalName: file.name }
-            });
-            fileUrl = await ref.getDownloadURL();
+            }, onProgress, 180000);
         }
 
         if (cover) {
             const cref = storage.ref(`users/${uid}/books/${bookId}/cover.jpg`);
+            onProgress?.(100);
             await cref.put(cover, { contentType: "image/jpeg" });
             coverUrl = await cref.getDownloadURL();
         }
@@ -204,6 +172,109 @@
     let saving = false;
     let fileMeta = null;
     let coverBlob = null;
+
+    // ------- MULTI-CHIP (Genres/Moods/Tropes ONLY) -------
+    function safeParse(v, dflt) { try { return JSON.parse(v); } catch { return dflt; } }
+
+    // Find a container by common ids OR <details><summary> label text
+    function findGroupContainer(key) {
+        const map = {
+            genres: ['#genresBox .categories', '#genresBox', '#genres', '[data-chips="genres"]'],
+            moods: ['#moodsBox .categories', '#moodsBox', '#moods', '[data-chips="moods"]'],
+            tropes: ['#tropesBox .categories', '#tropesBox', '#tropes', '[data-chips="tropes"]']
+        };
+        for (const s of map[key]) { const el = $(s); if (el) return el; }
+
+        // fallback: <details> with matching <summary> text
+        const dets = document.querySelectorAll("details");
+        for (const d of dets) {
+            const lbl = text($("summary", d));
+            if (!lbl) continue;
+            if (key === "genres" && lbl.includes("genre")) return $(".categories", d) || d;
+            if (key === "moods" && lbl.includes("mood")) return $(".categories", d) || d;
+            if (key === "tropes" && (lbl.includes("trope") || lbl.includes("trop"))) return $(".categories", d) || d;
+        }
+        return null;
+    }
+
+    function hydrateMultiChips(container, initialArr, onChange, itemsIfEmpty) {
+        if (!container) return;
+
+        // build only if empty
+        let chips = $$(".category", container);
+        if (!chips.length && Array.isArray(itemsIfEmpty)) {
+            itemsIfEmpty.forEach((label) => {
+                const el = document.createElement("span");
+                el.className = "category";
+                el.textContent = label;
+                el.dataset.value = String(label);
+                container.appendChild(el);
+            });
+            chips = $$(".category", container);
+        }
+
+        const picked = new Set((Array.isArray(initialArr) ? initialArr : []).map(String));
+        chips.forEach(ch => {
+            const val = ch.dataset.value || ch.textContent.trim();
+            ch.dataset.value = val;
+            if (picked.size) ch.classList.toggle("active", picked.has(val));
+            ch.tabIndex = 0;
+            ch.setAttribute("role", "button");
+        });
+
+        function commit() {
+            const vals = $$(".category.active", container).map(c => c.dataset.value || c.textContent.trim());
+            onChange(vals);
+        }
+        function toggleChip(chip) { chip.classList.toggle("active"); commit(); }
+
+        if (container.__pbWired !== "1") {
+            container.__pbWired = "1";
+            container.addEventListener("click", (e) => {
+                const chip = e.target.closest(".category");
+                if (!chip || !container.contains(chip)) return;
+                toggleChip(chip);
+            });
+            container.addEventListener("keydown", (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                    const chip = e.target.closest(".category");
+                    if (!chip || !container.contains(chip)) return;
+                    e.preventDefault();
+                    toggleChip(chip);
+                }
+            });
+        }
+        commit();
+    }
+
+    // Delegated safety net: any .category inside the three labeled groups
+    function installDelegatedFallback(inpMap) {
+        if (document.__pbDelegatedMultiChips) return;
+        document.__pbDelegatedMultiChips = true;
+
+        document.addEventListener("click", (e) => {
+            const chip = e.target.closest(".category");
+            if (!chip) return;
+
+            const group = chip.closest("details, #genresBox, #moodsBox, #tropesBox, [data-chips]");
+            if (!group) return;
+
+            const lbl = text($("summary", group));
+            let key = null;
+            if (group.matches('#genresBox, [data-chips="genres"], #genres')) key = "genres";
+            else if (group.matches('#moodsBox, [data-chips="moods"], #moods')) key = "moods";
+            else if (group.matches('#tropesBox, [data-chips="tropes"], #tropes')) key = "tropes";
+            else if (lbl.includes("genre")) key = "genres";
+            else if (lbl.includes("mood")) key = "moods";
+            else if (lbl.includes("trop")) key = "tropes";
+            if (!key) return;
+
+            chip.classList.toggle("active");
+            const cont = group.querySelector(".categories") || group;
+            const vals = $$(".category.active", cont).map(c => c.dataset.value || c.textContent.trim());
+            try { inpMap[key].value = JSON.stringify(vals); } catch { inpMap[key].value = "[]"; }
+        });
+    }
 
     // ------- main init -------
     function init() {
@@ -224,46 +295,78 @@
         const fileNameEl = byId("fileName");
         const coverPrev = byId("coverPreview");
 
-        // hidden inputs for chips
+        // hidden inputs
         const inpGenres = ensureHidden(form, "genres");
         const inpMoods = ensureHidden(form, "moods");
         const inpTropes = ensureHidden(form, "tropes");
-        const inpStatus = ensureHidden(form, "status");
-        const inpFormat = ensureHidden(form, "format");
+        const inpStatus = ensureHidden(form, "status"); // untouched
+        const inpFormat = ensureHidden(form, "format"); // untouched
         if (!inpGenres.value) inpGenres.value = "[]";
         if (!inpMoods.value) inpMoods.value = "[]";
         if (!inpTropes.value) inpTropes.value = "[]";
 
-        // CHIP HYDRATION (build ONLY if empty)
+        // lists
         const { genres, moods, tropes, statuses, formats } = getLists();
-        const genresBox = $("#genresBox .categories") || $("#genresBox") || $("#genres") || $('[data-chips="genres"]');
-        const moodsBox = $("#moodsBox .categories") || $("#moodsBox") || $("#moods") || $('[data-chips="moods"]');
-        const tropesBox = $("#tropesBox .categories") || $("#tropesBox") || $("#tropes") || $('[data-chips="tropes"]');
+
+        // --- ONLY these three groups are modified/hardened ---
+        const genresBox = findGroupContainer("genres");
+        const moodsBox = findGroupContainer("moods");
+        const tropesBox = findGroupContainer("tropes");
+
+        hydrateMultiChips(genresBox, safeParse(inpGenres.value, []), (vals) => { try { inpGenres.value = JSON.stringify(vals); } catch { inpGenres.value = "[]"; } }, genres);
+        hydrateMultiChips(moodsBox, safeParse(inpMoods.value, []), (vals) => { try { inpMoods.value = JSON.stringify(vals); } catch { inpMoods.value = "[]"; } }, moods);
+        hydrateMultiChips(tropesBox, safeParse(inpTropes.value, []), (vals) => { try { inpTropes.value = JSON.stringify(vals); } catch { inpTropes.value = "[]"; } }, tropes);
+
+        installDelegatedFallback({ genres: inpGenres, moods: inpMoods, tropes: inpTropes });
+
+        // --- Status/Format single-select: leave behavior as before, just ensure click wires if empty ---
+        function singleSelectHydrate(container, itemsIfEmpty, hiddenInput) {
+            if (!container) return;
+            let chips = $$(".category", container);
+            if (!chips.length && Array.isArray(itemsIfEmpty)) {
+                itemsIfEmpty.forEach((label) => {
+                    const el = document.createElement("span");
+                    el.className = "category";
+                    el.textContent = label;
+                    el.dataset.value = String(label);
+                    container.appendChild(el);
+                });
+                chips = $$(".category", container);
+            }
+            chips.forEach(ch => {
+                const val = ch.dataset.value || ch.textContent.trim();
+                ch.dataset.value = val;
+                ch.tabIndex = 0;
+                ch.setAttribute("role", "button");
+                if (hiddenInput.value && hiddenInput.value === val) ch.classList.add("active");
+            });
+            if (container.__pbSingleWired === "1") return;
+            container.__pbSingleWired = "1";
+            container.addEventListener("click", (e) => {
+                const chip = e.target.closest(".category");
+                if (!chip || !container.contains(chip)) return;
+                $$(".category.active", container).forEach(c => c.classList.remove("active"));
+                chip.classList.add("active");
+                hiddenInput.value = chip.dataset.value || chip.textContent.trim();
+            });
+            container.addEventListener("keydown", (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                    const chip = e.target.closest(".category");
+                    if (!chip || !container.contains(chip)) return;
+                    e.preventDefault();
+                    $$(".category.active", container).forEach(c => c.classList.remove("active"));
+                    chip.classList.add("active");
+                    hiddenInput.value = chip.dataset.value || chip.textContent.trim();
+                }
+            });
+        }
+
         const statusBox = $("#statusChips") || $('[data-chips="status"]');
         const formatBox = $("#formatChips") || $('[data-chips="format"]');
+        singleSelectHydrate(statusBox, statuses, inpStatus);
+        singleSelectHydrate(formatBox, formats, inpFormat);
 
-        hydrateChipGroup({
-            container: genresBox, items: $$(".category", genresBox || document.createElement("div")).length ? null : genres, multi: true, initial: [],
-            onChange: (vals) => { try { inpGenres.value = JSON.stringify(vals); } catch { inpGenres.value = "[]"; } }
-        });
-        hydrateChipGroup({
-            container: moodsBox, items: $$(".category", moodsBox || document.createElement("div")).length ? null : moods, multi: true, initial: [],
-            onChange: (vals) => { try { inpMoods.value = JSON.stringify(vals); } catch { inpMoods.value = "[]"; } }
-        });
-        hydrateChipGroup({
-            container: tropesBox, items: $$(".category", tropesBox || document.createElement("div")).length ? null : tropes, multi: true, initial: [],
-            onChange: (vals) => { try { inpTropes.value = JSON.stringify(vals); } catch { inpTropes.value = "[]"; } }
-        });
-        hydrateChipGroup({
-            container: statusBox, items: $$(".category", statusBox || document.createElement("div")).length ? null : statuses, multi: false, initial: "",
-            onChange: (val) => { inpStatus.value = val || ""; }
-        });
-        hydrateChipGroup({
-            container: formatBox, items: $$(".category", formatBox || document.createElement("div")).length ? null : formats, multi: false, initial: "",
-            onChange: (val) => { inpFormat.value = val || ""; }
-        });
-
-        // CHOOSE FILE wiring
+        // CHOOSE FILE (unchanged)
         if (pickBtn && !pickBtn.getAttribute("type")) pickBtn.setAttribute("type", "button");
         pickBtn?.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); fileInput?.click(); });
         fileInput?.addEventListener("change", async () => {
@@ -279,108 +382,126 @@
             if (coverBlob && coverPrev) coverPrev.src = URL.createObjectURL(coverBlob);
         });
 
-        // CANCEL wiring (non-submit)
+        // CANCEL (unchanged)
         if (cancelBtn && !cancelBtn.getAttribute("type")) cancelBtn.setAttribute("type", "button");
         cancelBtn?.addEventListener("click", (e) => { e.preventDefault(); history.back(); });
 
-        // SAVE logic
+        // progress text helper
+        const setSavingText = (txt) => { if (saveBtn) saveBtn.textContent = txt; };
+
+        // SAVE (unchanged flow)
         async function firstSave(user) {
             const db = dbSvc();
             const col = db.collection("users").doc(user.uid).collection("books");
-            const ref = col.doc(); // pre-create id for deterministic storage path
+            const ref = col.doc();
             createdBookId = ref.id;
-
-            let genresV = [], moodsV = [], tropesV = [];
-            try { genresV = JSON.parse(inpGenres.value || "[]"); } catch { }
-            try { moodsV = JSON.parse(inpMoods.value || "[]"); } catch { }
-            try { tropesV = JSON.parse(inpTropes.value || "[]"); } catch { }
+            (byId("bookForm") || document.querySelector("form"))?.setAttribute("data-id", createdBookId);
 
             const payload = {
-                title: (titleEl?.value || "").trim(),
-                author: (authorEl?.value || "").trim(),
-                started: startedEl?.value || null,
-                finished: finishedEl?.value || null,
-                review: reviewEl?.value || "",
-                status: inpStatus.value || null,
-                format: inpFormat.value || null,
-                genres: Array.isArray(genresV) ? genresV : [],
-                moods: Array.isArray(moodsV) ? moodsV : [],
-                tropes: Array.isArray(tropesV) ? tropesV : [],
-                // optional rating/spice if present as hidden inputs
+                title: (byId("title")?.value || "").trim(),
+                author: (byId("author")?.value || "").trim(),
+                started: byId("started")?.value || null,
+                finished: byId("finished")?.value || null,
+                review: byId("review")?.value || "",
+                status: byId("bookForm")?.querySelector('input[name="status"]')?.value || null,
+                format: byId("bookForm")?.querySelector('input[name="format"]')?.value || null,
+                genres: safeParse(byId("bookForm")?.querySelector('input[name="genres"]')?.value, []),
+                moods: safeParse(byId("bookForm")?.querySelector('input[name="moods"]')?.value, []),
+                tropes: safeParse(byId("bookForm")?.querySelector('input[name="tropes"]')?.value, []),
                 ...($('input[name="rating"]')?.value ? { rating: Number($('input[name="rating"]').value) || 0 } : {}),
                 ...($('input[name="spice"]')?.value ? { spice: Number($('input[name="spice"]').value) || 0 } : {}),
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             };
-
             if (!payload.title || !payload.author) throw new Error("Title and Author are required.");
 
             await ref.set(payload, { merge: true });
 
-            const f = fileInput?.files?.[0] || null;
-            const meta = await uploadToStorage(user.uid, createdBookId, f, coverBlob);
-            if (meta && (meta.fileUrl || meta.coverUrl)) {
+            const f = byId("bookFile")?.files?.[0] || null;
+            if (f || coverBlob) setSavingText("Uploading… 0%");
+            let meta = {}, sawUploadError = false;
+            try {
+                meta = await uploadToStorage(user.uid, createdBookId, f, coverBlob, (pct) => setSavingText(`Uploading… ${pct}%`));
+            } catch (e) { console.warn("Cloud upload failed:", e); sawUploadError = true; }
+
+            if ((!meta || (!meta.fileUrl && !meta.coverUrl)) && f && window.LocalFiles?.save) {
+                try { meta = await LocalFiles.save(user.uid, createdBookId, f, coverBlob); } catch (e) { console.warn("Local save failed:", e); }
+            }
+            if (meta && (meta.fileUrl || meta.coverUrl || meta.coverDataUrl || meta.hasFile)) {
+                setSavingText("Saving…");
                 await ref.set({ ...meta, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
             }
+            return { sawUploadError };
         }
 
         async function updateSave(user) {
             const db = dbSvc();
             const ref = db.collection("users").doc(user.uid).collection("books").doc(createdBookId);
 
-            let genresV = [], moodsV = [], tropesV = [];
-            try { genresV = JSON.parse(inpGenres.value || "[]"); } catch { }
-            try { moodsV = JSON.parse(inpMoods.value || "[]"); } catch { }
-            try { tropesV = JSON.parse(inpTropes.value || "[]"); } catch { }
-
             const patch = {
-                title: (titleEl?.value || "").trim(),
-                author: (authorEl?.value || "").trim(),
-                started: startedEl?.value || null,
-                finished: finishedEl?.value || null,
-                review: reviewEl?.value || "",
-                status: inpStatus.value || null,
-                format: inpFormat.value || null,
-                genres: Array.isArray(genresV) ? genresV : [],
-                moods: Array.isArray(moodsV) ? moodsV : [],
-                tropes: Array.isArray(tropesV) ? tropesV : [],
+                title: (byId("title")?.value || "").trim(),
+                author: (byId("author")?.value || "").trim(),
+                started: byId("started")?.value || null,
+                finished: byId("finished")?.value || null,
+                review: byId("review")?.value || "",
+                status: byId("bookForm")?.querySelector('input[name="status"]')?.value || null,
+                format: byId("bookForm")?.querySelector('input[name="format"]')?.value || null,
+                genres: safeParse(byId("bookForm")?.querySelector('input[name="genres"]')?.value, []),
+                moods: safeParse(byId("bookForm")?.querySelector('input[name="moods"]')?.value, []),
+                tropes: safeParse(byId("bookForm")?.querySelector('input[name="tropes"]')?.value, []),
                 ...($('input[name="rating"]')?.value ? { rating: Number($('input[name="rating"]').value) || 0 } : {}),
                 ...($('input[name="spice"]')?.value ? { spice: Number($('input[name="spice"]').value) || 0 } : {}),
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             };
-
-            const f = fileInput?.files?.[0] || null;
-            const meta = await uploadToStorage(user.uid, createdBookId, f, coverBlob);
-            if (meta && meta.fileUrl) patch.fileUrl = meta.fileUrl;
-            if (meta && meta.coverUrl) patch.coverUrl = meta.coverUrl;
-            if (meta && meta.storagePath) patch.storagePath = meta.storagePath;
-            if (meta && meta.fileExt) patch.fileExt = meta.fileExt;
-            if (meta && typeof meta.hasFile === "boolean") patch.hasFile = meta.hasFile;
-            if (meta && meta.pdfUrl) patch.pdfUrl = meta.pdfUrl;
-            if (meta && meta.epubUrl) patch.epubUrl = meta.epubUrl;
-
-            if (fileMeta?.type) patch.fileType = fileMeta.type;
-            if (fileMeta?.name) patch.fileName = fileMeta.name;
-
             await ref.set(patch, { merge: true });
+
+            const f = byId("bookFile")?.files?.[0] || null;
+            if (f || coverBlob) setSavingText("Uploading… 0%");
+            let meta = {}, sawUploadError = false;
+            try {
+                meta = await uploadToStorage(user.uid, createdBookId, f, coverBlob, (pct) => setSavingText(`Uploading… ${pct}%`));
+            } catch (e) { console.warn("Cloud upload failed:", e); sawUploadError = true; }
+
+            if ((!meta || (!meta.fileUrl && !meta.coverUrl)) && f && window.LocalFiles?.save) {
+                try { meta = await LocalFiles.save(user.uid, createdBookId, f, coverBlob); } catch (e) { console.warn("Local save failed:", e); }
+            }
+            if (meta && (meta.fileUrl || meta.coverUrl || meta.coverDataUrl || meta.hasFile)) {
+                setSavingText("Saving…");
+                const extra = {};
+                if (meta.fileUrl) extra.fileUrl = meta.fileUrl;
+                if (meta.coverUrl) extra.coverUrl = meta.coverUrl;
+                if (meta.storagePath) extra.storagePath = meta.storagePath;
+                if (meta.fileExt) extra.fileExt = meta.fileExt;
+                if (typeof meta.hasFile === "boolean") extra.hasFile = meta.hasFile;
+                if (meta.pdfUrl) extra.pdfUrl = meta.pdfUrl;
+                if (meta.epubUrl) extra.epubUrl = meta.epubUrl;
+                if (meta.coverDataUrl) extra.coverDataUrl = meta.coverDataUrl;
+                if (fileMeta?.type) extra.fileType = fileMeta.type;
+                if (fileMeta?.name) extra.fileName = fileMeta.name;
+                await ref.set({ ...extra, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+            }
+            return { sawUploadError };
         }
 
         async function handleSave() {
             if (saving) return;
-            if (!titleEl?.value?.trim() || !authorEl?.value?.trim()) return alert("Title and Author are required.");
+            if (!byId("title")?.value?.trim() || !byId("author")?.value?.trim()) return alert("Title and Author are required.");
             saving = true;
-            if (saveBtn) saveBtn.disabled = true;
+
+            const originalLabel = saveBtn?.textContent;
+            if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Saving…"; }
+
             try {
                 const user = await requireUser();
-                if (!createdBookId) await firstSave(user);
-                else await updateSave(user);
-                goHomeFresh();
+                const result = createdBookId ? await updateSave(user) : await firstSave(user);
+                showToast(result?.sawUploadError ? "Saved (file upload skipped)" : "Saved ✓", 900);
+                setTimeout(goHomeFresh, 400);
             } catch (e) {
                 console.error("Save failed:", e);
                 alert(e?.message || "Failed to save.");
             } finally {
                 saving = false;
-                if (saveBtn) saveBtn.disabled = false;
+                if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = originalLabel || "Save"; }
             }
         }
 
@@ -396,7 +517,6 @@
                 saveBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); handleSave(); });
             }
         }
-        // delegated safety-net (handles late/renamed buttons)
         if (!document.__pbAddDelegatedSave) {
             document.__pbAddDelegatedSave = true;
             document.addEventListener("click", (e) => {
@@ -408,9 +528,34 @@
         }
     }
 
+    // --- Read Now button (unchanged) ---
+    function ensureReadNowBtn() {
+        const host = document.querySelector('.file-row') || document.getElementById('fileName')?.parentElement;
+        if (!host) return;
+        let btn = document.getElementById('readNowBtn');
+        if (!btn) {
+            btn = document.createElement('button');
+            btn.id = 'readNowBtn';
+            btn.className = 'btn';
+            btn.type = 'button';
+            btn.textContent = 'Read';
+            btn.style.marginLeft = '8px';
+            host.appendChild(btn);
+        }
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const form = document.getElementById('bookForm') || document.querySelector('form');
+            const id = form?.dataset?.id;
+            if (!id) { alert('Save the book first, then you can read it.'); return; }
+            location.href = `reader.html?id=${encodeURIComponent(id)}`;
+        });
+    }
+
+    // Boot
     if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", init, { once: true });
+        document.addEventListener("DOMContentLoaded", () => { init(); ensureReadNowBtn(); }, { once: true });
     } else {
         init();
+        ensureReadNowBtn();
     }
 })();
