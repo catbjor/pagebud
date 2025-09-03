@@ -1356,3 +1356,11 @@ input[type="file"]::file-selector-button:hover {
 
   /* keep icons readable */
 }
+
+/* TIMER: make the circle clickable even when the drawer is open */
+#pb-timer-dock.timer-dock.open .timer-circle {
+  /* fjern blokkeringen – sirkel skal kunne klikkes for å kollapse */
+  pointer-events: auto;
+  /* var: none */
+  z-index: 1;
+}

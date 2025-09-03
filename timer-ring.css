@@ -1,7 +1,9 @@
+/* timer-ring.css — dock + collapsed ring + drawer */
+
 /* ========== Timer Dock base ========== */
 .timer-dock {
     position: fixed;
-    /* timer.js setter inline bottom dynamisk (placeDock) */
+    /* timer.js sets bottom/right/left inline (placeDock) */
     z-index: 2200;
 }
 
@@ -15,7 +17,7 @@
     right: auto;
 }
 
-/* Ikke deaktiver sirkelen når åpen – du skal kunne klikke sirkelen for å lukke */
+/* Keep circle clickable even when open (so you can close it) */
 .timer-dock.open .timer-circle {
     z-index: 2;
 }
@@ -35,12 +37,12 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, .2);
     z-index: 2;
     position: relative;
 }
 
-/* Idle ikon (inline-SVG) */
+/* Idle icon (inline SVG) */
 .timer-circle .clock-svg {
     width: 22px;
     height: 22px;
@@ -51,7 +53,7 @@
     fill: currentColor;
 }
 
-/* Running/paused (tid + ring i sirkelen) */
+/* Running/paused collapsed ring */
 .timer-circle .collapsed-ring {
     display: flex;
     align-items: center;
@@ -71,7 +73,7 @@
     transform: rotate(-90deg);
 }
 
-/* Progress-ring farger */
+/* Progress-ring colors */
 .ring-bg {
     fill: none;
     stroke: #ddd;
@@ -86,7 +88,7 @@
     transition: stroke-dashoffset .4s ease;
 }
 
-/* ========== Drawer (sirkel-boble) ========== */
+/* ========== Drawer (bubble) ========== */
 .timer-drawer {
     display: none;
     position: absolute;
@@ -95,27 +97,24 @@
     height: 160px;
     border-radius: 50%;
     background: var(--card, #fff);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .25);
     padding: 20px;
     box-sizing: border-box;
     z-index: 1;
 }
 
-/* fold ut fra sirkelen */
+/* fold out from the circle */
 .timer-dock.right .timer-drawer {
     right: 0;
     transform: translateX(-80px);
 }
 
-/* til venstre */
 .timer-dock.left .timer-drawer {
     left: 0;
     transform: translateX(80px);
 }
 
-/* til høyre */
-
-/* Åpen skuff */
+/* Open drawer */
 .timer-dock:not(.collapsed) .timer-drawer {
     display: flex;
     flex-direction: column;
@@ -124,7 +123,12 @@
     gap: 6px;
 }
 
-/* Innhold i skuffen */
+/* Hard guard: if collapsed, drawer must be hidden */
+.timer-dock.collapsed .timer-drawer {
+    display: none !important;
+}
+
+/* Drawer content */
 .timer-drawer .timer-time {
     font-weight: bold;
     margin-bottom: 4px;
