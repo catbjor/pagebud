@@ -224,12 +224,30 @@
       if (min > 0) {
         // The celebration is now handled in the loop. We just need to save the minutes.
         bumpLocalDay(min);
+        saveSessionToFirestore(min);
       }
     }
     clearState(); stopLoop(); drawTime(0);
     setButtonsState({ running: false, paused: false });
     updateCollapsedCircle();
     setCollapsed(true); // close drawer so only the circle shows
+  }
+
+  async function saveSessionToFirestore(minutes) {
+    try {
+      const user = auth().currentUser;
+      if (!user) return;
+      const todayStr = toDayStr(new Date());
+      const payload = {
+        uid: user.uid,
+        date: todayStr,
+        minutes: Number(minutes),
+        at: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      await db().collection("users").doc(user.uid).collection("sessions").add(payload);
+    } catch (e) {
+      console.warn("Failed to save reading session to Firestore", e);
+    }
   }
 
   // placement (always above the add-book FAB)

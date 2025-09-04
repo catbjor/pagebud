@@ -135,8 +135,11 @@
                 headerTitle.textContent = "My Profile";
             }
 
-            loadAndDisplayStats(profileUid);
-            calculateAndShowAchievements(profileUid);
+            // This will now correctly calculate and display the streak
+            const streak = await calculateStreak(profileUid); // New function call
+            loadAndDisplayStats(profileUid, streak); // Pass streak to stats
+            calculateAndShowAchievements(profileUid, streak); // Pass streak to achievements
+
             loadCurrentlyReading(profileUid, isMyProfile);
             loadFavoritesShelf(profileUid, isMyProfile);
             loadFinishedShelf(profileUid, isMyProfile);
@@ -443,6 +446,10 @@
                             <div class="stat-value">${favoriteGenre}</div>
                             <div class="stat-label">Favorite Genre</div>
                         </div>
+                        <div class="stat-item">
+                            <div class="stat-value">🔥 ${streak}</div>
+                            <div class="stat-label">Current Streak</div>
+                        </div>
                     </div>
                 `;
                 statsContainer.style.display = 'block';
@@ -633,7 +640,7 @@
             }
         }
 
-        async function calculateAndShowAchievements(uid) {
+        async function calculateAndShowAchievements(uid, streak) {
             const container = $("#achievementsSection");
             const grid = $("#achievementsGrid");
             if (!container || !grid) return;
@@ -644,6 +651,7 @@
             const achievements = [
                 { id: 'bookworm', title: 'Bookworm', desc: 'Read 10 books', icon: 'fa-book-open-reader', unlocked: books.filter(b => b.status === 'finished').length >= 10 },
                 { id: 'explorer', title: 'Genre Explorer', desc: 'Read from 5+ genres', icon: 'fa-compass', unlocked: new Set(books.flatMap(b => b.genres || [])).size >= 5 },
+                { id: 'streak', title: 'Streak Keeper', desc: 'Read for 7 days in a row', icon: 'fa-fire', unlocked: streak >= 7 },
                 { id: 'marathoner', title: 'The Marathoner', desc: 'Finish a 500+ page book', icon: 'fa-person-running', unlocked: books.some(b => b.status === 'finished' && b.pageCount >= 500) },
                 { id: 'critic', title: 'The Critic', desc: 'Rate 5 books', icon: 'fa-star', unlocked: books.filter(b => (b.rating || 0) > 0).length >= 5 },
             ];

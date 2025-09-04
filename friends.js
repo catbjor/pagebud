@@ -192,7 +192,7 @@
             current = null;
         };
         els.mBackdrop?.addEventListener("click", hide);
-        els.mProfile?.addEventListener("click", () => { if (current) location.href = `profiles.html?uid=${encodeURIComponent(current.uid)}`; });
+        els.mProfile?.addEventListener("click", () => { if (current) location.href = `profile.html?uid=${encodeURIComponent(current.uid)}`; });
         els.mChat?.addEventListener("click", () => { if (current) location.href = `chat.html?buddy=${encodeURIComponent(current.uid)}`; });
         return { show, hide };
     }
