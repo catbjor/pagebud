@@ -11,6 +11,16 @@
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#111111" />
   <link rel="stylesheet" href="style.css" />
+
+  <!-- Ensure nothing invisible blocks clicks on this page -->
+  <style>
+    .content-wrapper,
+    .card,
+    .btn,
+    select {
+      pointer-events: auto !important;
+    }
+  </style>
 </head>
 
 <body>
@@ -46,10 +56,10 @@
         </div>
 
         <div class="row between">
-          <button id="brCreateBtn" class="btn">
+          <button id="brCreateBtn" class="btn" type="button">
             <i class="fa-solid fa-user-plus"></i> Create group
           </button>
-          <button id="brInviteBtn" class="btn btn-secondary">
+          <button id="brInviteBtn" class="btn btn-secondary" type="button">
             <i class="fa-solid fa-user-group"></i> Invite friends
           </button>
         </div>
@@ -59,13 +69,15 @@
       <div class="card">
         <div class="card-head">
           <h2>My Buddy Groups</h2>
-          <button id="brRefreshBtn" class="btn btn-secondary"><i class="fa-solid fa-rotate"></i> Refresh</button>
+          <button id="brRefreshBtn" class="btn btn-secondary" type="button">
+            <i class="fa-solid fa-rotate"></i> Refresh
+          </button>
         </div>
         <div id="brGroupsList" class="chips" aria-live="polite">
           <span class="muted">No groups yet.</span>
         </div>
         <div class="row" style="margin-top:12px;">
-          <button id="brOpenChatBtn" class="btn" disabled>
+          <button id="brOpenChatBtn" class="btn" type="button" disabled>
             <i class="fa-solid fa-comments"></i> Open group chat
           </button>
         </div>
@@ -78,7 +90,7 @@
     </div>
   </div>
 
-  <!-- Firebase + auth (needed so the book dropdown can populate) -->
+  <!-- Firebase + auth -->
   <script src="firebase-config.js"></script>
   <script src="firebase-init.js"></script>
   <script src="auth.js"></script>

@@ -1,4 +1,5 @@
-// buddy-read.js — wire buttons, make choosing/creating/opening seamless (no design changes).
+// buddy-read.js — robust wiring: delegated clicks, lazy book load, live groups.
+// Visual design unchanged.
 (function () {
     "use strict";
 
@@ -11,20 +12,16 @@
     const els = {
         name: $("#brGroupName"),
         book: $("#brBookSelect"),
-        create: $("#brCreateBtn"),
-        invite: $("#brInviteBtn"),
-        refresh: $("#brRefreshBtn"),
         groups: $("#brGroupsList"),
         openChat: $("#brOpenChatBtn"),
         detailCard: $("#brGroupDetail"),
         detailText: $("#brDetailText"),
     };
 
-    const K = {
-        lastBook: "pb:lastPickedBookId",
-    };
+    const K = { lastBook: "pb:lastPickedBookId" };
+    let booksLoaded = false;
+    let unsubGroups = null;
 
-    // toast
     function toast(msg, ms = 1200) {
         try {
             const t = document.createElement("div");
@@ -44,52 +41,52 @@
     }
 
     // ---------- Books ----------
-    async function populateBooks() {
+    async function populateBooksIfNeeded(force = false) {
+        if (booksLoaded && !force) return;
         const u = await requireUser();
         const database = db();
         if (!database || !els.book) return;
 
-        // keep the first "Pick a book…" option
-        const first = els.book.querySelector("option[value='']");
-        els.book.innerHTML = ""; if (first) els.book.appendChild(first);
+        // keep the first placeholder option
+        const keepFirst = els.book.querySelector("option[value='']");
+        els.book.innerHTML = "";
+        if (keepFirst) els.book.appendChild(keepFirst);
 
-        const qs = await database
-            .collection("users").doc(u.uid)
-            .collection("books")
-            .orderBy("createdAt", "desc")
-            .limit(500)
-            .get();
+        try {
+            const qs = await database
+                .collection("users").doc(u.uid)
+                .collection("books")
+                .orderBy("createdAt", "desc")
+                .limit(500)
+                .get();
 
-        const frag = document.createDocumentFragment();
-        const all = [];
-        qs.forEach(doc => {
-            const d = doc.data() || {};
-            const opt = document.createElement("option");
-            opt.value = doc.id;
-            opt.textContent = d.title || "(Untitled)";
-            opt.dataset.author = d.author || "";
-            opt.dataset.cover = d.coverUrl || d.coverDataUrl || "";
-            frag.appendChild(opt);
-            all.push({ id: doc.id, title: d.title || "", author: d.author || "", cover: opt.dataset.cover });
-        });
-        els.book.appendChild(frag);
+            const frag = document.createDocumentFragment();
+            qs.forEach(doc => {
+                const d = doc.data() || {};
+                const opt = document.createElement("option");
+                opt.value = doc.id;
+                opt.textContent = d.title || "(Untitled)";
+                opt.dataset.author = d.author || "";
+                opt.dataset.cover = d.coverUrl || d.coverDataUrl || "";
+                frag.appendChild(opt);
+            });
+            els.book.appendChild(frag);
+            booksLoaded = true;
 
-        // preselect via URL or last used
-        const p = new URLSearchParams(location.search);
-        const urlBook = p.get("book");
-        const remembered = localStorage.getItem(K.lastBook);
-        const want = urlBook || remembered || "";
-        if (want && els.book.querySelector(`option[value="${CSS.escape(want)}"]`)) {
-            els.book.value = want;
-        } else if (all.length === 1) {
-            els.book.value = all[0].id;
+            // Preselect via URL or last picked, otherwise first real title
+            const p = new URLSearchParams(location.search);
+            const want = p.get("book") || localStorage.getItem(K.lastBook) || "";
+            const hasWant = want && els.book.querySelector(`option[value="${CSS.escape(want)}"]`);
+            if (hasWant) els.book.value = want;
+            else if (els.book.options.length > 1) els.book.selectedIndex = 1;
+
+            els.book.addEventListener("change", () => {
+                const id = els.book.value || "";
+                if (id) localStorage.setItem(K.lastBook, id);
+            }, { once: true });
+        } catch (e) {
+            console.warn("[buddy-read] populateBooks failed:", e);
         }
-
-        // remember selection
-        els.book.addEventListener("change", () => {
-            const id = els.book.value || "";
-            if (id) localStorage.setItem(K.lastBook, id);
-        });
     }
 
     // ---------- Groups ----------
@@ -113,68 +110,60 @@
             chip.textContent = g.name || "(Untitled group)";
             chip.dataset.id = g.id;
 
-            const pickThis = () => {
+            const pick = () => {
                 $$(".chip", els.groups).forEach(c => c.classList.remove("active"));
                 chip.classList.add("active");
                 selectGroupUI(g.id, chip.textContent);
             };
 
-            chip.addEventListener("click", pickThis);
-
-            // open on double-click or Enter
+            chip.addEventListener("click", pick);
             chip.addEventListener("dblclick", () => openChatForSelected(g.id));
             chip.tabIndex = 0;
-            chip.addEventListener("keydown", (e) => {
-                if (e.key === "Enter") openChatForSelected(g.id);
-            });
+            chip.addEventListener("keydown", (e) => { if (e.key === "Enter") openChatForSelected(g.id); });
 
             els.groups.appendChild(chip);
 
             if (!picked && (autoPickId ? g.id === autoPickId : true)) {
                 picked = true;
-                pickThis();
+                pick();
             }
         });
     }
 
-    async function loadGroups() {
+    async function subscribeGroups() {
         const u = await requireUser();
         const database = db();
-        if (!database) { renderGroups([]); return; }
+        unsubGroups && unsubGroups(); unsubGroups = null;
 
-        const p = new URLSearchParams(location.search);
-        const urlGroup = p.get("group") || "";
-
-        try {
-            const owned = await database
-                .collection("buddy_groups")
-                .where("owner", "==", u.uid)
-                .orderBy("createdAt", "desc")
-                .get();
-
-            const arr = owned.docs.map(d => ({ id: d.id, ...(d.data() || {}) }));
-            renderGroups(arr, { autoPickId: urlGroup || undefined });
-        } catch (e) {
-            console.warn("[buddy-read] loadGroups failed:", e);
-            renderGroups([]);
-        }
+        // Live list of groups you own (matching your earlier schema)
+        unsubGroups = database.collection("buddy_groups")
+            .where("owner", "==", u.uid)
+            .orderBy("createdAt", "desc")
+            .onSnapshot(
+                (snap) => {
+                    const arr = snap.docs.map(d => ({ id: d.id, ...(d.data() || {}) }));
+                    // Respect URL ?group=… on first load
+                    const p = new URLSearchParams(location.search);
+                    const urlGroup = p.get("group") || undefined;
+                    renderGroups(arr, { autoPickId: urlGroup });
+                },
+                (err) => { console.warn("[buddy-read] groups onSnapshot error:", err); renderGroups([]); }
+            );
     }
 
     async function createGroup() {
         const u = await requireUser();
         const database = db();
 
-        // book snapshot (optional but nice)
-        const bookId = els.book?.value || "";
-        let bookTitle = "", bookAuthor = "", bookCover = "";
-        if (bookId) {
-            const opt = els.book.querySelector(`option[value="${CSS.escape(bookId)}"]`);
-            bookTitle = opt?.textContent || "";
-            bookAuthor = opt?.dataset?.author || "";
-            bookCover = opt?.dataset?.cover || "";
-        }
+        // ensure books are loaded (user may press Create before opening dropdown)
+        await populateBooksIfNeeded();
 
-        // default name from input OR book title
+        const bookId = els.book?.value || "";
+        const opt = bookId ? els.book.querySelector(`option[value="${CSS.escape(bookId)}"]`) : null;
+        const bookTitle = opt?.textContent || "";
+        const bookAuthor = opt?.dataset?.author || "";
+        const bookCover = opt?.dataset?.cover || "";
+
         let name = (els.name?.value || "").trim();
         if (!name) name = bookTitle || "Buddy Read";
 
@@ -185,7 +174,6 @@
                 owner: u.uid,
                 members: { [u.uid]: true },
                 bookId: bookId || null,
-                // snapshot so the group can show the book even if you later edit your library card
                 ...(bookTitle ? { bookTitle } : {}),
                 ...(bookAuthor ? { bookAuthor } : {}),
                 ...(bookCover ? { bookCover } : {}),
@@ -193,7 +181,7 @@
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             }, { merge: true });
 
-            // Update UI quickly
+            // Put a chip instantly in UI for snappy feel
             const chip = document.createElement("span");
             chip.className = "chip active";
             chip.dataset.id = ref.id;
@@ -203,7 +191,7 @@
             els.groups.prepend(chip);
             selectGroupUI(ref.id, name);
 
-            // Jump straight to chat — fastest path
+            // Jump straight to chat
             openChatForSelected(ref.id);
         } catch (e) {
             console.warn("[buddy-read] create failed:", e);
@@ -214,20 +202,37 @@
     function openChatForSelected(forceId) {
         const gid = forceId || els.detailCard?.dataset?.id || "";
         if (!gid) return toast("Pick a group first.");
+        // Uses your existing buddy-chat.html + buddy-chat.js
         location.href = `buddy-chat.html?group=${encodeURIComponent(gid)}`;
     }
 
-    function wire() {
-        els.create?.addEventListener("click", (e) => { e.preventDefault(); createGroup(); });
-        els.invite?.addEventListener("click", (e) => { e.preventDefault(); location.href = "friends.html"; });
-        els.refresh?.addEventListener("click", (e) => { e.preventDefault(); loadGroups(); });
-        els.openChat?.addEventListener("click", (e) => { e.preventDefault(); openChatForSelected(); });
+    // ---------- Event wiring (delegated → always clickable) ----------
+    function wireDelegated() {
+        document.addEventListener("click", async (e) => {
+            const t = e.target.closest("#brCreateBtn, #brInviteBtn, #brRefreshBtn, #brOpenChatBtn, #brBookSelect");
+            if (!t) return;
+
+            if (t.id === "brCreateBtn") { e.preventDefault(); await createGroup(); return; }
+            if (t.id === "brInviteBtn") { e.preventDefault(); location.href = "friends.html"; return; }
+            if (t.id === "brRefreshBtn") { e.preventDefault(); await populateBooksIfNeeded(true); return; }
+            if (t.id === "brOpenChatBtn") { e.preventDefault(); openChatForSelected(); return; }
+            if (t.id === "brBookSelect") {
+                if (!booksLoaded) { e.preventDefault(); await populateBooksIfNeeded(true); }
+            }
+        });
+
+        // First focus on the select lazily loads books
+        els.book?.addEventListener("focus", () => { populateBooksIfNeeded(); }, { once: true });
     }
 
     async function boot() {
-        wire();
-        await populateBooks();
-        await loadGroups();
+        // Make absolutely sure no overlay blocks interaction here
+        document.body.style.pointerEvents = "auto";
+
+        wireDelegated();
+        // Load books/groups early so UI is ready
+        try { await populateBooksIfNeeded(); } catch (e) { console.warn(e); }
+        try { await subscribeGroups(); } catch (e) { console.warn(e); }
     }
 
     if (document.readyState === "loading") {

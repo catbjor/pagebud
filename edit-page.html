@@ -115,12 +115,20 @@
 
     <div class="content-wrapper form-page">
       <form class="card" id="bookForm" style="padding:16px; display:grid; gap:14px">
+        <!-- Cover -->
         <div class="form-row">
           <label>Cover</label>
-          <div class="cover-wrap" style="max-width:180px">
-            <img id="coverPreview" class="cover" alt="Cover preview" />
+          <div class="cover-wrap"
+            style="max-width:180px; display: flex; flex-direction: column; align-items: center; gap: 8px;">
+            <div id="coverPlaceholder" class="cover-placeholder">
+              Cover preview
+            </div>
+            <img id="coverPreview" class="cover" alt="Cover preview" style="display:none;" />
+            <input type="file" id="coverInput" accept="image/*" style="display:none;" />
+            <button id="btnUploadCover" type="button" class="btn btn-pink">Upload Cover</button>
           </div>
         </div>
+
 
         <div class="form-row" style="display:grid; gap:10px; grid-template-columns:1fr 1fr">
           <div><label>Title *</label><input id="title" type="text" required></div>

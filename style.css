@@ -1407,3 +1407,145 @@ input[type="file"]::file-selector-button:hover {
   /* var: none */
   z-index: 1;
 }
+
+.cover-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.cover-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 1rem;
+}
+
+.cover-preview-container {
+  position: relative;
+  width: 140px;
+  height: 200px;
+  background-color: #fce4ec;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cover {
+  max-width: 100%;
+  max-height: 100%;
+  display: none;
+  /* Hidden until image is set */
+  object-fit: contain;
+}
+
+.placeholder {
+  position: absolute;
+  color: #888;
+  font-size: 0.9rem;
+  text-align: center;
+  padding: 0 6px;
+}
+
+#btnPickFile {
+  padding: 6px 14px;
+  font-size: 0.9rem;
+  border-radius: 6px;
+  background-color: #f6d6dc;
+  border: none;
+  cursor: pointer;
+}
+
+#btnPickFile:hover {
+  background-color: #eec2cb;
+}
+
+.cover-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.cover-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #f3dce3;
+  border-radius: 8px;
+  background-color: #fff0f5;
+  width: fit-content;
+  margin: auto;
+}
+
+.cover {
+  width: 140px;
+  height: 200px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  background: #f8dce3;
+  display: block;
+}
+
+.placeholder {
+  position: absolute;
+  margin-top: -100px;
+  /* vertically center inside image */
+  color: #555;
+  font-size: 14px;
+  text-align: center;
+  pointer-events: none;
+  user-select: none;
+}
+
+.cover-wrap img:empty+.placeholder {
+  display: block;
+}
+
+.cover-wrap img:not([src])+.placeholder {
+  display: block;
+}
+
+.cover-wrap img[src]+.placeholder {
+  display: none;
+}
+
+.file-name {
+  font-size: 12px;
+  color: #555;
+  margin-top: 4px;
+}
+
+.category {
+  font-size: 0.85rem;
+  padding: 4px 10px;
+  margin: 4px;
+  border-radius: 999px;
+}
+
+.category {
+  font-size: 0.85rem;
+  padding: 4px 10px;
+  margin: 4px;
+  border-radius: 999px;
+}
+
+.cover-placeholder {
+  width: 120px;
+  height: 180px;
+  background-color: #fddfea;
+  color: #444;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 0.9rem;
+}

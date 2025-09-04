@@ -6,11 +6,9 @@
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
   const norm = v => String(v || "").trim().toLowerCase();
 
-  // --- Firebase helpers ---
   function auth() { return (window.fb?.auth) || (window.firebase?.auth?.()) || firebase.auth(); }
   function db() { return (window.fb?.db) || (window.firebase?.firestore?.()) || firebase.firestore(); }
 
-  // --- Lists (from your constants) ---
   function getLists() {
     const C = (window.PB_CONST) || (window.CONSTANTS) || (window.PB && {
       GENRES: window.PB.GENRES, MOODS: window.PB.MOODS, TROPES: window.PB.TROPES,
@@ -25,17 +23,15 @@
     };
   }
 
-  // --- Hidden input helper ---
   function ensureHidden(form, name) {
     let el = form.querySelector(`input[name="${name}"]`);
     if (!el) { el = document.createElement("input"); el.type = "hidden"; el.name = name; form.appendChild(el); }
     return el;
   }
 
-  // --- Chip building + value helpers ---
   function buildChipsIfMissing(container, items) {
     if (!container || !Array.isArray(items) || !items.length) return;
-    if (container.querySelector(".category")) return; // already present
+    if (container.querySelector(".category")) return;
     const frag = document.createDocumentFragment();
     items.forEach(label => {
       const el = document.createElement("span");
@@ -48,6 +44,7 @@
     });
     container.appendChild(frag);
   }
+
   const chipRaw = chip => (chip.dataset.value ?? chip.dataset.val ?? chip.textContent).trim();
   const chipKey = chip => norm(chipRaw(chip));
 
@@ -91,7 +88,6 @@
     });
   }
 
-  // --- Load book and hydrate form ---
   async function loadBook(form) {
     const a = auth();
     const u = a.currentUser || await new Promise(res => { const off = a.onAuthStateChanged(x => { off(); res(x); }); });
@@ -117,16 +113,16 @@
       if (d.coverUrl) $("#coverPreview").src = d.coverUrl;
       else if (d.coverDataUrl) $("#coverPreview").src = d.coverDataUrl;
     }
+
     if ($("#fileName")) {
       $("#fileName").textContent = (d.fileName || (d.storagePath ? String(d.fileName || "Existing file attached") : ""));
     }
 
-    // Hidden inputs mirror (raw, not lowercased)
     const inpGenres = ensureHidden(form, "genres");
     const inpMoods = ensureHidden(form, "moods");
     const inpTropes = ensureHidden(form, "tropes");
-    const inpStatus = ensureHidden(form, "status");     // legacy single
-    const inpStatuses = ensureHidden(form, "statuses");   // new array
+    const inpStatus = ensureHidden(form, "status");
+    const inpStatuses = ensureHidden(form, "statuses");
     const inpFormat = ensureHidden(form, "format");
 
     const genresArr = Array.isArray(d.genres) ? d.genres : [];
@@ -142,7 +138,6 @@
     inpStatus.value = d.status || (statusesArr[0] || "");
     inpFormat.value = formatStr;
 
-    // Rebuild chips if HTML didn’t have them, then activate
     const { genres, moods, tropes, statuses, formats } = getLists();
     const genresBox = $("#genresBox .categories") || $('[data-chips="genres"]');
     const moodsBox = $("#moodsBox .categories") || $('[data-chips="moods"]');
@@ -162,14 +157,13 @@
     activateChips(statusBox, statusesArr);
     activateChips(formatBox, [formatStr].filter(Boolean));
 
-    // Wire groups to keep hidden inputs up-to-date (store RAW labels)
     wireChipGroup(genresBox, { multi: true, onChange: vals => { inpGenres.value = JSON.stringify(vals); } });
     wireChipGroup(moodsBox, { multi: true, onChange: vals => { inpMoods.value = JSON.stringify(vals); } });
     wireChipGroup(tropesBox, { multi: true, onChange: vals => { inpTropes.value = JSON.stringify(vals); } });
     wireChipGroup(statusBox, {
       multi: true, onChange: vals => {
         inpStatuses.value = JSON.stringify(vals);
-        inpStatus.value = vals[0] || ""; // keep legacy single in sync
+        inpStatus.value = vals[0] || "";
       }
     });
     wireChipGroup(formatBox, { multi: false, onChange: val => { inpFormat.value = val || ""; } });
@@ -212,7 +206,6 @@
 
     await ref.set(payload, { merge: true });
 
-    // Tiny toast
     try {
       const t = document.createElement("div");
       t.className = "toast"; t.textContent = "Saved ✓";
@@ -221,7 +214,6 @@
       setTimeout(() => { t.classList.remove("show"); setTimeout(() => t.remove(), 300); }, 900);
     } catch { }
 
-    // Back to home with cache-bust
     setTimeout(() => location.replace(`index.html?refresh=${Date.now()}`), 120);
   }
 
@@ -245,6 +237,33 @@
       fileInp.addEventListener("change", () => {
         const f = fileInp.files?.[0];
         if (fileName) fileName.textContent = f ? f.name : (ctx?.data?.fileName || "");
+      });
+    }
+
+    const uploadBtn = document.getElementById("btnUploadCover");
+    const coverInput = document.getElementById("coverInput");
+    const coverPreview = document.getElementById("coverPreview");
+    const coverPlaceholder = document.getElementById("coverPlaceholder");
+
+    if (uploadBtn && coverInput) {
+      uploadBtn.addEventListener("click", () => {
+        coverInput.click();
+      });
+
+      coverInput.addEventListener("change", function (e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function (event) {
+          if (coverPreview && coverPlaceholder) {
+            coverPreview.src = event.target.result;
+            coverPreview.style.display = "block";
+            coverPlaceholder.style.display = "none";
+          }
+          window.selectedCoverDataUrl = event.target.result;
+        };
+        reader.readAsDataURL(file);
       });
     }
 

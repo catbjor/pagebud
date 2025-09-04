@@ -2,243 +2,251 @@
 <html lang="en">
 
 <head>
-  <script src="theme-init.js"></script>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Add Book – PageBud</title>
+    <script src="theme-init.js"></script>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Add Book – PageBud</title>
 
-  <!-- Styles -->
-  <link rel="stylesheet" href="style.css" />
-  <link rel="stylesheet" href="rating.css" />
-  <link rel="stylesheet" href="file-chip.css" />
-  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js"></script>
+    <!-- Styles -->
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="rating.css" />
+    <link rel="stylesheet" href="file-chip.css" />
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js"></script>
 
-  <!-- Firebase (compat) -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
-  <script src="firebase-config.js"></script>
-  <script src="firebase-init.js"></script>
+    <!-- Firebase (compat) -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+    <script src="firebase-config.js"></script>
+    <script src="firebase-init.js"></script>
 
-  <!-- PDF/EPUB helpers -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <script>
-    pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-  </script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.93/epub.min.js"></script>
+    <!-- PDF/EPUB helpers -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.93/epub.min.js"></script>
 
-  <style>
-    /* Local tweaks for this page only (does not change homepage) */
-    .form-page #genres,
-    .form-page #moods,
-    .form-page #tropes,
-    .form-page #statusChips,
-    .form-page #formatChips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
+    <style>
+        /* Local tweaks for this page only (does not change homepage) */
+        .form-page #genres,
+        .form-page #moods,
+        .form-page #tropes,
+        .form-page #statusChips,
+        .form-page #formatChips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
 
-    /* FIX: ensure chips inside <details> are clickable */
-    .form-page details.card,
-    .form-page details.card * {
-      pointer-events: auto !important;
-    }
+        /* FIX: ensure chips inside <details> are clickable */
+        .form-page details.card,
+        .form-page details.card * {
+            pointer-events: auto !important;
+        }
 
 
-    .form-page .categories .category {
-      min-width: auto;
-      width: auto;
-      height: auto;
-      padding: 10px 12px;
-      line-height: 1.2;
-      cursor: pointer;
-      user-select: none;
-    }
+        .form-page .categories .category {
+            min-width: auto;
+            width: auto;
+            height: auto;
+            padding: 10px 12px;
+            line-height: 1.2;
+            cursor: pointer;
+            user-select: none;
+        }
 
-    .form-actions-fixed {
-      position: sticky;
-      bottom: calc(var(--bottom-nav-h) + 10px);
-      display: flex;
-      gap: 8px;
-      justify-content: flex-end;
-      padding: 10px;
-      background: color-mix(in oklab, var(--card) 88%, transparent);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      margin-top: 12px;
-      z-index: 50;
-      pointer-events: auto;
-    }
+        .form-actions-fixed {
+            position: sticky;
+            bottom: calc(var(--bottom-nav-h) + 10px);
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+            padding: 10px;
+            background: color-mix(in oklab, var(--card) 88%, transparent);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            margin-top: 12px;
+            z-index: 50;
+            pointer-events: auto;
+        }
 
-    .form-actions-fixed .btn {
-      pointer-events: auto;
-    }
+        .form-actions-fixed .btn {
+            pointer-events: auto;
+        }
 
-    .cover {
-      width: 180px;
-      height: 260px;
-      object-fit: cover;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      background: var(--surface);
-      display: block;
-    }
+        .cover {
+            width: 180px;
+            height: 260px;
+            object-fit: cover;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            display: block;
+        }
 
-    .file-row {
-      position: relative;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-      z-index: 40;
-    }
+        .file-row {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            z-index: 40;
+        }
 
-    .file-row input[type=file] {
-      position: absolute;
-      left: -9999px;
-      top: auto;
-    }
+        .file-row input[type=file] {
+            position: absolute;
+            left: -9999px;
+            top: auto;
+        }
 
-    .file-row,
-    .file-row * {
-      pointer-events: auto !important;
-    }
+        .file-row,
+        .file-row * {
+            pointer-events: auto !important;
+        }
 
-    #readNowBtn {
-      margin-left: 8px;
-      pointer-events: auto;
-    }
-  </style>
+        #readNowBtn {
+            margin-left: 8px;
+            pointer-events: auto;
+        }
+    </style>
 </head>
 
 <body>
-  <div class="app-container">
-    <header class="header">
-      <h1>Add Book</h1>
-      <div class="header-actions">
-        <button class="back-fab" onclick="history.back()" title="Back">
-          <i class="fa fa-chevron-left"></i>
-        </button>
-      </div>
-    </header>
+    <div class="app-container">
+        <header class="header">
+            <h1>Add Book</h1>
+            <div class="header-actions">
+                <button class="back-fab" onclick="history.back()" title="Back">
+                    <i class="fa fa-chevron-left"></i>
+                </button>
+            </div>
+        </header>
 
-    <div class="content-wrapper form-page">
-      <form class="card" id="bookForm" style="padding:16px; display:grid; gap:14px">
-        <!-- Cover -->
-        <div class="form-row">
-          <label>Cover</label>
-          <div class="cover-wrap" style="max-width:180px">
-            <img id="coverPreview" class="cover" alt="Cover preview" />
-          </div>
+        <div class="content-wrapper form-page">
+            <form class="card" id="bookForm" style="padding:16px; display:grid; gap:14px">
+                <!-- Cover -->
+                <div class="form-row">
+                    <label>Cover</label>
+                    <div class="cover-wrap"
+                        style="max-width:180px; display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                        <div id="coverPlaceholder" class="cover-placeholder">
+                            Cover preview
+                        </div>
+                        <img id="coverPreview" class="cover" alt="Cover preview" style="display:none;" />
+                        <input type="file" id="coverInput" accept="image/*" style="display:none;" />
+                        <button id="btnUploadCover" type="button" class="btn btn-pink">Upload Cover</button>
+                    </div>
+                </div>
+                
+
+
+                <!-- Title & Author -->
+                <div class="form-row" style="display:grid; gap:10px; grid-template-columns:1fr 1fr">
+                    <div><label>Title *</label><input id="title" type="text" required></div>
+                    <div><label>Author *</label><input id="author" type="text" required></div>
+                </div>
+
+                <!-- Status (LEAVE AS IS) -->
+                <div class="form-row">
+                    <label>Status</label>
+                    <div class="categories" id="statusChips">
+                        <span class="category" data-val="reading">Reading</span>
+                        <span class="category" data-val="finished">Finished</span>
+                        <span class="category" data-val="tbr">TBR</span>
+                        <span class="category" data-val="dnf">DNF</span>
+                        <span class="category" data-val="owned">Books I Own</span>
+                        <span class="category" data-val="wishlist">Wish List</span>
+                    </div>
+                </div>
+
+                <!-- Dates -->
+                <div class="form-row" style="display:grid; gap:10px; grid-template-columns:1fr 1fr">
+                    <div><label>Started</label><input id="started" type="date"></div>
+                    <div><label>Finished</label><input id="finished" type="date"></div>
+                </div>
+
+                <!-- Format (LEAVE AS IS) -->
+                <div class="form-row">
+                    <label>Format</label>
+                    <div class="categories" id="formatChips">
+                        <span class="category" data-val="ebook">Ebook</span>
+                        <span class="category" data-val="paperback">Paperback</span>
+                        <span class="category" data-val="hardcover">Hardcover</span>
+                        <span class="category" data-val="audiobook">Audiobook</span>
+                    </div>
+                </div>
+
+                <!-- File picker (LEAVE AS IS) -->
+                <div class="form-row file-row">
+                    <label>UPLOAD / REPLACE (PDF/EPUB)</label>
+                    <input id="bookFile" type="file" accept=".pdf,.epub">
+                    <button type="button" id="btnPickFile" class="btn btn-file-chip">Choose file</button>
+                    <span id="fileName" class="file-name"></span>
+                    <!-- "Read" button gets injected by JS next to this row -->
+                </div>
+
+                <!-- Genres / Moods / Tropes (containers left empty; JS will build + wire) -->
+                <details class="card" id="genresBox" open>
+                    <summary style="font-weight:900">Genres</summary>
+                    <div class="categories" id="genres" style="margin-top:8px"></div>
+                </details>
+
+                <details class="card" id="moodsBox">
+                    <summary style="font-weight:900">Moods</summary>
+                    <div class="categories" id="moods" style="margin-top:8px"></div>
+                </details>
+
+                <details class="card" id="tropesBox">
+                    <summary style="font-weight:900">Tropes</summary>
+                    <div class="categories" id="tropes" style="margin-top:8px"></div>
+                </details>
+
+                <!-- Rating & Spice -->
+                <div class="form-row">
+                    <label>Rating</label>
+                    <div id="ratingBar" class="rating"></div>
+                    <label style="margin-top:8px">Spice</label>
+                    <div id="spiceBar" class="spice"></div>
+                </div>
+
+                <!-- Review -->
+                <div class="form-row">
+                    <label>Review</label>
+                    <textarea id="review" rows="4" placeholder="Write your review…"></textarea>
+                </div>
+
+                <!-- Hidden inputs (JS syncs values here; adding avoids layout shifts) -->
+                <input type="hidden" name="genres" />
+                <input type="hidden" name="moods" />
+                <input type="hidden" name="tropes" />
+                <input type="hidden" name="status" />
+                <input type="hidden" name="format" />
+            </form>
+
+            <!-- Sticky actions -->
+            <div class="form-actions-fixed">
+                <button type="button" class="btn btn-secondary" id="cancelBtn">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveBtn">Save Book</button>
+            </div>
         </div>
 
-        <!-- Title & Author -->
-        <div class="form-row" style="display:grid; gap:10px; grid-template-columns:1fr 1fr">
-          <div><label>Title *</label><input id="title" type="text" required></div>
-          <div><label>Author *</label><input id="author" type="text" required></div>
-        </div>
-
-        <!-- Status (LEAVE AS IS) -->
-        <div class="form-row">
-          <label>Status</label>
-          <div class="categories" id="statusChips">
-            <span class="category" data-val="reading">Reading</span>
-            <span class="category" data-val="finished">Finished</span>
-            <span class="category" data-val="tbr">TBR</span>
-            <span class="category" data-val="dnf">DNF</span>
-            <span class="category" data-val="owned">Books I Own</span>
-            <span class="category" data-val="wishlist">Wish List</span>
-          </div>
-        </div>
-
-        <!-- Dates -->
-        <div class="form-row" style="display:grid; gap:10px; grid-template-columns:1fr 1fr">
-          <div><label>Started</label><input id="started" type="date"></div>
-          <div><label>Finished</label><input id="finished" type="date"></div>
-        </div>
-
-        <!-- Format (LEAVE AS IS) -->
-        <div class="form-row">
-          <label>Format</label>
-          <div class="categories" id="formatChips">
-            <span class="category" data-val="ebook">Ebook</span>
-            <span class="category" data-val="paperback">Paperback</span>
-            <span class="category" data-val="hardcover">Hardcover</span>
-            <span class="category" data-val="audiobook">Audiobook</span>
-          </div>
-        </div>
-
-        <!-- File picker (LEAVE AS IS) -->
-        <div class="form-row file-row">
-          <label>UPLOAD / REPLACE (PDF/EPUB)</label>
-          <input id="bookFile" type="file" accept=".pdf,.epub">
-          <button type="button" id="btnPickFile" class="btn btn-file-chip">Choose file</button>
-          <span id="fileName" class="file-name"></span>
-          <!-- "Read" button gets injected by JS next to this row -->
-        </div>
-
-        <!-- Genres / Moods / Tropes (containers left empty; JS will build + wire) -->
-        <details class="card" id="genresBox" open>
-          <summary style="font-weight:900">Genres</summary>
-          <div class="categories" id="genres" style="margin-top:8px"></div>
-        </details>
-
-        <details class="card" id="moodsBox">
-          <summary style="font-weight:900">Moods</summary>
-          <div class="categories" id="moods" style="margin-top:8px"></div>
-        </details>
-
-        <details class="card" id="tropesBox">
-          <summary style="font-weight:900">Tropes</summary>
-          <div class="categories" id="tropes" style="margin-top:8px"></div>
-        </details>
-
-        <!-- Rating & Spice -->
-        <div class="form-row">
-          <label>Rating</label>
-          <div id="ratingBar" class="rating"></div>
-          <label style="margin-top:8px">Spice</label>
-          <div id="spiceBar" class="spice"></div>
-        </div>
-
-        <!-- Review -->
-        <div class="form-row">
-          <label>Review</label>
-          <textarea id="review" rows="4" placeholder="Write your review…"></textarea>
-        </div>
-
-        <!-- Hidden inputs (JS syncs values here; adding avoids layout shifts) -->
-        <input type="hidden" name="genres" />
-        <input type="hidden" name="moods" />
-        <input type="hidden" name="tropes" />
-        <input type="hidden" name="status" />
-        <input type="hidden" name="format" />
-      </form>
-
-      <!-- Sticky actions -->
-      <div class="form-actions-fixed">
-        <button type="button" class="btn btn-secondary" id="cancelBtn">Cancel</button>
-        <button type="button" class="btn btn-primary" id="saveBtn">Save Book</button>
-      </div>
+        <!-- Simple bottom nav (static) -->
+        <nav class="bottom-nav">
+            <div class="nav-item active"><i class="fas fa-book"></i> Library</div>
+            <div class="nav-item" onclick="location.href='stats.html'"><i class="fas fa-chart-line"></i> Stats</div>
+            <div class="nav-item" onclick="location.href='discover.html'"><i class="fas fa-compass"></i> Discover</div>
+            <div class="nav-item" onclick="location.href='settings.html'"><i class="fas fa-cog"></i> Settings</div>
+        </nav>
     </div>
 
-    <!-- Simple bottom nav (static) -->
-    <nav class="bottom-nav">
-      <div class="nav-item active"><i class="fas fa-book"></i> Library</div>
-      <div class="nav-item" onclick="location.href='stats.html'"><i class="fas fa-chart-line"></i> Stats</div>
-      <div class="nav-item" onclick="location.href='discover.html'"><i class="fas fa-compass"></i> Discover</div>
-      <div class="nav-item" onclick="location.href='settings.html'"><i class="fas fa-cog"></i> Settings</div>
-    </nav>
-  </div>
-
-  <!-- App constants + controls + local file fallback + page logic -->
-  <script src="constants.js"></script>
-  <script src="rating-controls.js" defer></script>
-  <script src="local-file-store.js" defer></script>
-  <script src="pb-filestore.js" defer></script>
-  <script src="add-book.js" defer></script>
+    <!-- App constants + controls + local file fallback + page logic -->
+    <script src="constants.js"></script>
+    <script src="rating-controls.js" defer></script>
+    <script src="local-file-store.js" defer></script>
+    <script src="pb-filestore.js" defer></script>
+    <script src="add-book.js" defer></script>
 </body>
 
 </html>

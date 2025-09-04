@@ -1,31 +1,27 @@
 /* =========================================================
- PageBud – add-book.js
- - Multiselect `statuses` (+ legacy `status` = første valgt)
- - Chips bygges automatisk hvis HTML mangler dem
- - Bevarer eksisterende design/layout
+ PageBud – add-book.js (OPPDATERT)
 ========================================================= */
 (function () {
     "use strict";
 
-    // ------- tiny utils -------
-    const byId = (id) => document.getElementById(id);
     const $ = (s, r = document) => r.querySelector(s);
     const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+    const byId = id => document.getElementById(id);
+    const safeParse = (v, d) => { try { return JSON.parse(v); } catch { return d; } };
+    const chipRaw = el => (el.dataset.value || el.dataset.val || el.textContent || "").trim();
 
     function showToast(msg = "Saved ✓", ms = 900) {
-        try {
-            const t = document.createElement("div");
-            t.className = "toast";
-            t.textContent = msg;
-            document.body.appendChild(t);
-            requestAnimationFrame(() => t.classList.add("show"));
-            setTimeout(() => { t.classList.remove("show"); setTimeout(() => t.remove(), 300); }, ms);
-        } catch { alert(msg); }
+        const t = document.createElement("div");
+        t.className = "toast";
+        t.textContent = msg;
+        document.body.appendChild(t);
+        requestAnimationFrame(() => t.classList.add("show"));
+        setTimeout(() => { t.classList.remove("show"); setTimeout(() => t.remove(), 300); }, ms);
     }
 
-    // ------- Firebase handles -------
-    function auth() { return (window.fb?.auth) || (window.firebase?.auth?.()) || firebase.auth(); }
-    function db() { return (window.fb?.db) || (window.firebase?.firestore?.()) || firebase.firestore(); }
+    function auth() { return firebase.auth(); }
+    function db() { return firebase.firestore(); }
+
     async function requireUser() {
         const a = auth();
         if (a.currentUser) return a.currentUser;
@@ -34,41 +30,36 @@
         });
     }
 
-    // ------- lists from constants -------
     function getLists() {
-        const C = (window.PB_CONST) || (window.CONSTANTS) || (window.PB && {
-            GENRES: window.PB.GENRES, MOODS: window.PB.MOODS, TROPES: window.PB.TROPES,
-            STATUSES: window.PB.STATUSES, FORMATS: window.PB.FORMATS
-        }) || {};
+        const C = window.PB_CONST || window.CONSTANTS || {};
         return {
-            genres: C.GENRES || window.GENRES || [],
-            moods: C.MOODS || window.MOODS || [],
-            tropes: C.TROPES || window.TROPES || [],
-            statuses: C.STATUSES || window.STATUSES || ["To Read", "Reading", "Finished", "DNF", "Owned", "Wishlist"],
-            formats: C.FORMATS || window.FORMATS || ["eBook", "Audiobook", "Paperback", "Hardcover"]
+            genres: C.GENRES || [],
+            moods: C.MOODS || [],
+            tropes: C.TROPES || [],
+            statuses: C.STATUSES || ["To Read", "Reading", "Finished", "DNF", "Owned", "Wishlist"],
+            formats: C.FORMATS || ["eBook", "Audiobook", "Paperback", "Hardcover"]
         };
     }
 
-    // ------- hidden inputs -------
     function ensureHidden(form, name) {
         let el = form.querySelector(`input[name="${name}"]`);
-        if (!el) { el = document.createElement("input"); el.type = "hidden"; el.name = name; form.appendChild(el); }
+        if (!el) {
+            el = document.createElement("input");
+            el.type = "hidden";
+            el.name = name;
+            form.appendChild(el);
+        }
         return el;
     }
 
-    // ------- chips helpers -------
-    function chipRaw(el) { return (el.dataset.value || el.dataset.val || el.textContent || "").trim(); }
-    function safeParse(v, d) { try { return JSON.parse(v); } catch { return d; } }
-
     function buildChipsIfMissing(container, items) {
-        if (!container || !Array.isArray(items) || !items.length) return;
-        if (container.querySelector(".category")) return;
+        if (!container || container.querySelector(".category")) return;
         const frag = document.createDocumentFragment();
         items.forEach(label => {
             const el = document.createElement("span");
             el.className = "category";
-            el.dataset.value = String(label);
-            el.textContent = String(label);
+            el.dataset.value = label;
+            el.textContent = label;
             el.tabIndex = 0;
             el.setAttribute("role", "button");
             frag.appendChild(el);
@@ -82,20 +73,24 @@
         const picked = new Set(safeParse(hiddenInput.value || "[]", []));
         $$(".category", container).forEach(ch => {
             ch.classList.toggle("active", picked.has(chipRaw(ch)));
-            ch.tabIndex = 0; ch.setAttribute("role", "button");
         });
         function commit() {
-            const vals = $$(".category.active", container).map(c => chipRaw(c));
-            try { hiddenInput.value = JSON.stringify(vals); } catch { hiddenInput.value = "[]"; }
+            const vals = $$(".category.active", container).map(chipRaw);
+            hiddenInput.value = JSON.stringify(vals);
         }
-        container.addEventListener("click", (e) => {
-            const chip = e.target.closest(".category"); if (!chip) return;
-            chip.classList.toggle("active"); commit();
+        container.addEventListener("click", e => {
+            const chip = e.target.closest(".category");
+            if (!chip) return;
+            chip.classList.toggle("active");
+            commit();
         });
-        container.addEventListener("keydown", (e) => {
+        container.addEventListener("keydown", e => {
             if (e.key !== "Enter" && e.key !== " ") return;
-            const chip = e.target.closest(".category"); if (!chip) return;
-            e.preventDefault(); chip.classList.toggle("active"); commit();
+            const chip = e.target.closest(".category");
+            if (!chip) return;
+            e.preventDefault();
+            chip.classList.toggle("active");
+            commit();
         });
         commit();
     }
@@ -103,18 +98,22 @@
     function hydrateSingle(container, items, hiddenInput) {
         if (!container) return;
         buildChipsIfMissing(container, items);
-        const active = hiddenInput.value || "";
+        const active = hiddenInput.value;
         const chips = $$(".category", container);
-        chips.forEach(ch => { ch.tabIndex = 0; ch.setAttribute("role", "button"); ch.classList.toggle("active", chipRaw(ch) === active); });
-        container.addEventListener("click", (e) => {
-            const chip = e.target.closest(".category"); if (!chip) return;
+        chips.forEach(ch => {
+            ch.classList.toggle("active", chipRaw(ch) === active);
+        });
+        container.addEventListener("click", e => {
+            const chip = e.target.closest(".category");
+            if (!chip) return;
             chips.forEach(c => c.classList.remove("active"));
             chip.classList.add("active");
             hiddenInput.value = chipRaw(chip);
         });
-        container.addEventListener("keydown", (e) => {
+        container.addEventListener("keydown", e => {
             if (e.key !== "Enter" && e.key !== " ") return;
-            const chip = e.target.closest(".category"); if (!chip) return;
+            const chip = e.target.closest(".category");
+            if (!chip) return;
             e.preventDefault();
             chips.forEach(c => c.classList.remove("active"));
             chip.classList.add("active");
@@ -122,7 +121,6 @@
         });
     }
 
-    // ------- cover extraction (optional; unchanged) -------
     async function tryExtractCover(file) {
         try {
             if (!file) return null;
@@ -132,12 +130,13 @@
                 const page = await pdf.getPage(1);
                 const vp = page.getViewport({ scale: 1.4 });
                 const canvas = document.createElement("canvas");
-                canvas.width = vp.width; canvas.height = vp.height;
+                canvas.width = vp.width;
+                canvas.height = vp.height;
                 await page.render({ canvasContext: canvas.getContext("2d"), viewport: vp }).promise;
                 return new Promise(res => canvas.toBlob(res, "image/jpeg", 0.9));
             }
             if (/\.epub$/i.test(file.name) && window.ePub) {
-                const book = ePub(file);
+                const book = await ePub(file);
                 const coverPath = await book.loaded.cover;
                 if (coverPath) {
                     const blobUrl = await book.archive.createUrl(coverPath);
@@ -145,145 +144,184 @@
                     return await resp.blob();
                 }
             }
-        } catch { }
+        } catch (e) {
+            console.warn("Cover extract failed:", e);
+        }
         return null;
     }
 
-    // ------- state -------
     let createdBookId = null;
     let coverBlob = null;
 
-    // ------- main -------
+    function updateCoverPreview(blobUrl) {
+        const preview = byId("coverPreview");
+        const placeholder = byId("coverPlaceholder");
+        if (!preview || !placeholder) return;
+
+        if (blobUrl) {
+            preview.src = blobUrl;
+            preview.style.display = "block";
+            placeholder.style.display = "none";
+        } else {
+            preview.src = "";
+            preview.style.display = "none";
+            placeholder.style.display = "flex";
+        }
+    }
+
     function init() {
-        const form = byId("bookForm") || $("form");
+        const form = byId("bookForm");
         if (!form) return;
 
-        const saveBtn = byId("saveBtn") || byId("save-book") || $('[data-action="save"]') || $('[data-role="save-book"]');
         const fileInput = byId("bookFile");
-        const pickBtn = byId("btnPickFile");
         const fileNameEl = byId("fileName");
+        const pickBtn = byId("btnPickFile");
+        const saveBtn = byId("saveBtn") || $('[data-role="save-book"]');
 
-        // hidden inputs
-        const inpGenres = ensureHidden(form, "genres"); if (!inpGenres.value) inpGenres.value = "[]";
-        const inpMoods = ensureHidden(form, "moods"); if (!inpMoods.value) inpMoods.value = "[]";
-        const inpTropes = ensureHidden(form, "tropes"); if (!inpTropes.value) inpTropes.value = "[]";
-        const inpStatus = ensureHidden(form, "status");   // legacy single
-        const inpStatuses = ensureHidden(form, "statuses"); if (!inpStatuses.value) inpStatuses.value = "[]";
+        const inpGenres = ensureHidden(form, "genres");
+        const inpMoods = ensureHidden(form, "moods");
+        const inpTropes = ensureHidden(form, "tropes");
+        const inpStatus = ensureHidden(form, "status");
+        const inpStatuses = ensureHidden(form, "statuses");
         const inpFormat = ensureHidden(form, "format");
 
         const { genres, moods, tropes, statuses, formats } = getLists();
 
-        // containers
-        const genresBox = $('#genresBox .categories') || $('[data-chips="genres"]');
-        const moodsBox = $('#moodsBox .categories') || $('[data-chips="moods"]');
-        const tropesBox = $('#tropesBox .categories') || $('[data-chips="tropes"]');
-        const statusBox = $('#statusChips') || $('[data-chips="status"]');
-        const formatBox = $('#formatChips') || $('[data-chips="format"]');
+        hydrateMulti($('#genresBox .categories'), genres, inpGenres);
+        hydrateMulti($('#moodsBox .categories'), moods, inpMoods);
+        hydrateMulti($('#tropesBox .categories'), tropes, inpTropes);
+        hydrateMulti($('#statusChips'), statuses, inpStatuses);
+        hydrateSingle($('#formatChips'), formats, inpFormat);
 
-        // chips
-        hydrateMulti(genresBox, genres, inpGenres);
-        hydrateMulti(moodsBox, moods, inpMoods);
-        hydrateMulti(tropesBox, tropes, inpTropes);
-
-        hydrateMulti(statusBox, statuses, inpStatuses);
-        try {
-            const arr = JSON.parse(inpStatuses.value || "[]");
-            inpStatus.value = arr[0] || "";
-        } catch { inpStatus.value = ""; }
-
-        hydrateSingle(formatBox, formats, inpFormat);
-
-        // file picker UI
-        if (pickBtn && fileInput && fileNameEl) {
-            if (!pickBtn.getAttribute("type")) pickBtn.setAttribute("type", "button");
-            pickBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); fileInput.click(); });
-            fileInput.addEventListener("change", () => {
-                const f = fileInput.files?.[0]; fileNameEl.textContent = f ? f.name : "";
+        if (pickBtn && fileInput) {
+            pickBtn.setAttribute("type", "button");
+            pickBtn.addEventListener("click", e => {
+                e.preventDefault();
+                fileInput.click();
             });
+
+            fileInput.addEventListener("change", async () => {
+                const f = fileInput.files?.[0];
+                fileNameEl.textContent = f?.name || "";
+                if (!f) return;
+
+                coverBlob = await tryExtractCover(f);
+                updateCoverPreview(coverBlob ? URL.createObjectURL(coverBlob) : null);
+
+                if (/\.epub$/i.test(f.name) && window.ePub) {
+                    try {
+                        const book = await ePub(f);
+                        const meta = await book.loaded.metadata;
+                        if (meta?.title && !$("#title").value) $("#title").value = meta.title;
+                        if (meta?.creator && !$("#author").value) $("#author").value = meta.creator;
+                    } catch (e) { console.warn("EPUB metadata error", e); }
+                }
+
+                if (/\.pdf$/i.test(f.name) && window.pdfjsLib) {
+                    try {
+                        const ab = await f.arrayBuffer();
+                        const pdf = await pdfjsLib.getDocument({ data: ab }).promise;
+                        const meta = await pdf.getMetadata();
+                        if (meta?.info?.Title && !$("#title").value) $("#title").value = meta.info.Title;
+                        if (meta?.info?.Author && !$("#author").value) $("#author").value = meta.info.Author;
+                    } catch (e) { console.warn("PDF metadata error", e); }
+                }
+            });
+
+            const uploadBtn = document.getElementById("btnUploadCover");
+            const coverInput = document.getElementById("coverInput");
+            const coverPreview = document.getElementById("coverPreview");
+            const coverPlaceholder = document.getElementById("coverPlaceholder");
+
+            if (uploadBtn && coverInput) {
+                uploadBtn.addEventListener("click", () => {
+                    coverInput.click();
+                });
+
+                coverInput.addEventListener("change", function (e) {
+                    const file = e.target.files[0];
+                    if (!file) return;
+
+                    const reader = new FileReader();
+                    reader.onload = function (event) {
+                        if (coverPreview && coverPlaceholder) {
+                            coverPreview.src = event.target.result;
+                            coverPreview.style.display = "block";
+                            coverPlaceholder.style.display = "none";
+                        }
+                        window.selectedCoverDataUrl = event.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                });
+            }
+
         }
 
         async function handleSave() {
-            const title = (byId("title")?.value || "").trim();
-            const author = (byId("author")?.value || "").trim();
-            if (!title) { alert("Title is required."); return; }
+            const title = $("#title")?.value?.trim() || "";
+            const author = $("#author")?.value?.trim() || "";
+            if (!title) return alert("Title is required.");
 
             const user = await requireUser();
-            const database = db();
-            const col = database.collection("users").doc(user.uid).collection("books");
-
-            // reserve id
-            const ref = createdBookId ? col.doc(createdBookId) : col.doc();
+            const ref = createdBookId
+                ? db().collection("users").doc(user.uid).collection("books").doc(createdBookId)
+                : db().collection("users").doc(user.uid).collection("books").doc();
             createdBookId = ref.id;
-            form.setAttribute("data-id", createdBookId);
 
-            const rating = $('input[name="rating"]')?.value;
-            const spice = $('input[name="spice"]')?.value;
-
-            let statusesArr = [];
-            try { statusesArr = JSON.parse(inpStatuses.value || "[]"); } catch { statusesArr = []; }
-            const primaryStatus = statusesArr[0] || (inpStatus.value || "") || null;
-
+            const statusesArr = safeParse(inpStatuses.value, []);
             const payload = {
                 title, author,
-                started: byId("started")?.value || null,
-                finished: byId("finished")?.value || null,
-                review: byId("review")?.value || "",
-                status: primaryStatus,            // legacy
-                statuses: statusesArr,              // multiselect
+                started: $("#started")?.value || null,
+                finished: $("#finished")?.value || null,
+                review: $("#review")?.value || "",
+                status: statusesArr[0] || "",
+                statuses: statusesArr,
                 format: inpFormat.value || null,
                 genres: safeParse(inpGenres.value, []),
                 moods: safeParse(inpMoods.value, []),
                 tropes: safeParse(inpTropes.value, []),
-                ...(rating ? { rating: Number(rating) || 0 } : {}),
-                ...(spice ? { spice: Number(spice) || 0 } : {}),
+                rating: Number($('input[name="rating"]')?.value || 0),
+                spice: Number($('input[name="spice"]')?.value || 0),
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
             };
 
-            // cover extract (optional)
-            const f = fileInput?.files?.[0] || null;
-            if (f && !coverBlob) { try { coverBlob = await tryExtractCover(f); } catch { } }
-            if (coverBlob && !payload.coverUrl && !payload.coverDataUrl) {
-                try { payload.coverDataUrl = URL.createObjectURL(coverBlob); } catch { }
+            const file = fileInput?.files?.[0];
+            if (file && !coverBlob) coverBlob = await tryExtractCover(file);
+
+            if (coverBlob) {
+                payload.coverDataUrl = URL.createObjectURL(coverBlob);
             }
 
             await ref.set(payload, { merge: true });
 
-            // local file save (optional PBFileStore / LocalFiles)
-            if (f && (window.PBFileStore?.save || window.LocalFiles?.save)) {
+            if (file && (window.PBFileStore?.save || window.LocalFiles?.save)) {
                 const saveFn = window.PBFileStore?.save
                     ? (args) => window.PBFileStore.save(args)
                     : ({ file, uid, bookId, coverBlob }) => window.LocalFiles.save(uid, bookId, file, coverBlob);
 
-                let coverBlob2 = coverBlob || null;
-                if (!coverBlob2 && byId("coverPreview")?.src?.startsWith("blob:")) {
-                    try { const resp = await fetch(byId("coverPreview").src); coverBlob2 = await resp.blob(); } catch { }
-                }
-                const fileMeta = await saveFn({ file: f, uid: user.uid, bookId: createdBookId, coverBlob: coverBlob2 });
+                const fileMeta = await saveFn({ file, uid: user.uid, bookId: createdBookId, coverBlob });
                 await ref.set({
                     hasFile: true,
-                    fileName: fileMeta?.name || f.name,
-                    fileSize: fileMeta?.size || f.size || null,
-                    fileType: fileMeta?.type || f.type || null,
+                    fileName: fileMeta?.name || file.name,
+                    fileSize: fileMeta?.size || file.size,
+                    fileType: fileMeta?.type || file.type,
                     storagePath: fileMeta?.path || null,
                     downloadURL: fileMeta?.url || null,
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 }, { merge: true });
-
-                try { window.PB?.logActivity?.({ action: "file_attached", targetId: createdBookId, meta: { name: f.name } }); } catch { }
             }
 
             showToast("Saved ✓");
-            try { window.PB?.logActivity?.({ action: "book_saved", targetId: createdBookId, meta: { title } }); } catch { }
-            setTimeout(() => { location.href = "index.html"; }, 150);
+            setTimeout(() => location.href = "index.html", 150);
         }
 
-        if (saveBtn) {
-            if (!saveBtn.getAttribute("type")) saveBtn.setAttribute("type", "button");
-            if (saveBtn.dataset.wiredSave !== "1") {
-                saveBtn.dataset.wiredSave = "1";
-                saveBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); handleSave(); });
-            }
+        if (saveBtn && !saveBtn.dataset.wired) {
+            saveBtn.dataset.wired = "1";
+            saveBtn.addEventListener("click", e => {
+                e.preventDefault();
+                handleSave();
+            });
         }
     }
 
@@ -292,4 +330,23 @@
     } else {
         init();
     }
+
 })();
+
+document.getElementById("coverInput")?.addEventListener("change", function (e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function (event) {
+        const preview = document.getElementById("coverPreview");
+        if (preview) {
+            preview.src = event.target.result;
+        }
+
+        // OPTIONAL: Store the result for saving later (depends on your existing logic)
+        window.selectedCoverDataUrl = event.target.result;
+    };
+    reader.readAsDataURL(file);
+});
+
