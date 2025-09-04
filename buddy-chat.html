@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <script src="theme-init.js"></script>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Buddy Chat – PageBud</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#111111" />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="chat.css" />
+</head>
+
+<body>
+    <div class="app-container">
+        <div class="header">
+            <h1>Buddy Chat</h1>
+            <div class="header-actions">
+                <a class="back-fab" href="buddy-read.html" title="Back to Buddy Read">
+                    <i class="fa-solid fa-arrow-left"></i>
+                </a>
+            </div>
+        </div>
+
+        <div class="content-wrapper">
+            <!-- group-detail gets data-id from URL so buddy-chat.js can bind -->
+            <div id="group-detail" class="card" data-id="">
+                <h2>Group</h2>
+                <div id="chat-messages" class="card" style="max-height: 50vh; overflow:auto;"></div>
+
+                <div class="row" style="margin-top:10px; gap:8px;">
+                    <button id="emoji-btn" class="btn btn-secondary" type="button" title="React">
+                        <i class="fa-regular fa-face-smile"></i>
+                    </button>
+                    <input id="chat-input" type="text" class="row-grow" placeholder="Message…" />
+                    <button id="send-btn" class="btn" type="button">
+                        <i class="fa-solid fa-paper-plane"></i> Send
+                    </button>
+                </div>
+
+                <!-- lightweight emoji grid -->
+                <div id="emoji-picker"
+                    style="display:none; margin-top:8px; grid-template-columns: repeat(8, 1fr); gap:8px;" class="card">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase (same as buddy-read so chat can persist) -->
+    <script src="firebase-config.js"></script>
+    <script src="firebase-init.js"></script>
+    <script src="auth.js"></script>
+
+    <!-- Set group id from URL for buddy-chat.js -->
+    <script>
+        (function () {
+            const params = new URLSearchParams(location.search);
+            const gid = params.get("group") || "";
+            const detail = document.getElementById("group-detail");
+            if (detail && gid) detail.setAttribute("data-id", gid);
+        })();
+    </script>
+
+    <!-- Your existing chat binder -->
+    <script src="buddy-chat.js"></script>
+
+    <!-- Bottom nav + timer -->
+    <script defer src="nav.js"></script>
+    <script defer src="timer.js"></script>
+</body>
+
+</html>

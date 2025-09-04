@@ -1,127 +1,94 @@
 <!DOCTYPE html>
-
 <html lang="en">
 
 <head>
   <script src="theme-init.js"></script>
   <meta charset="utf-8" />
-  <meta content="width=device-width, initial-scale=1" name="viewport" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Buddy Read – PageBud</title>
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet" />
-  <!-- Put this inline snippet in the <head> of EVERY page BEFORE style.css -->
 
-  <link href="style.css" rel="stylesheet" />
-  <link href="manifest.json" rel="manifest" />
-  <meta content="#111111" name="theme-color" />
-
-  <!-- Firebase compat SDKs -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
-  <script src="firebase-config.js"></script>
-  <script src="firebase-init.js?v=dev-1"></script>
-  <script src="profiles.js"></script>
-  <script>
-    window.__PB_FIREBASE = {
-      apiKey: "AIzaSyCEV-dncbQSnP7q9AvF2_Re93l-VHN-2cg",
-      authDomain: "pagebud-cb6d9.firebaseapp.com",
-      projectId: "pagebud-cb6d9",
-      storageBucket: "pagebud-cb6d9.firebasestorage.app",
-      messagingSenderId: "974455288174",
-      appId: "1:974455288174:web:84d8a2e442ca193391d17f",
-      measurementId: "G-TK4VCBT1V9"
-    };
-  </script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#111111" />
+  <link rel="stylesheet" href="style.css" />
 </head>
 
-<body class="no-bottom-nav">
+<body>
   <div class="app-container">
+    <!-- Header -->
     <div class="header">
       <h1>Buddy Read</h1>
-      <!-- header actions injiseres av nav.js -->
+      <div class="header-actions">
+        <a class="back-fab" href="index.html" title="Back to Library">
+          <i class="fa-solid fa-arrow-left"></i>
+        </a>
+      </div>
     </div>
+
+    <!-- Content -->
     <div class="content-wrapper">
+      <!-- Create / start group -->
       <div class="card group-creation">
-        <h2 style="margin-bottom:10px">Start a Buddy Read</h2>
-        <div class="form-group"><label>Group Name</label><input class="form-control" id="group-name" /></div>
-        <div class="form-group"><label>Select Book</label><select class="form-control" id="group-book"></select></div>
-        <div class="form-group"><label>Reading Schedule (optional)</label><input class="form-control"
-            id="group-schedule" placeholder="e.g., 20 pages per day" /></div>
-        <button class="btn btn-primary" id="create-btn">Create Group</button>
-        <button class="btn btn-secondary" id="refresh-btn" style="margin-top:8px">Refresh Books</button>
+        <div class="card-head">
+          <h2>Start a Buddy Read</h2>
+        </div>
+
+        <div class="row">
+          <label class="row-label">Group name</label>
+          <input id="brGroupName" class="row-grow" type="text" placeholder="e.g. Fall Fantasy Sprint" />
+        </div>
+
+        <div class="row">
+          <label class="row-label">Book</label>
+          <select id="brBookSelect" class="row-grow">
+            <option value="">Pick a book…</option>
+          </select>
+        </div>
+
+        <div class="row between">
+          <button id="brCreateBtn" class="btn">
+            <i class="fa-solid fa-user-plus"></i> Create group
+          </button>
+          <button id="brInviteBtn" class="btn btn-secondary">
+            <i class="fa-solid fa-user-group"></i> Invite friends
+          </button>
+        </div>
       </div>
+
+      <!-- My groups -->
       <div class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <h2 style="font-size:1.2rem">Your Reading Groups</h2>
-          <span class="muted">Demo list</span>
+        <div class="card-head">
+          <h2>My Buddy Groups</h2>
+          <button id="brRefreshBtn" class="btn btn-secondary"><i class="fa-solid fa-rotate"></i> Refresh</button>
         </div>
-        <div class="groups-list" id="groups-list"></div>
-        <div id="empty-groups" style="display:none;text-align:center;color:#6b6b6b;padding:14px">
-          <div style="font-size:2rem;opacity:.4;margin-bottom:6px">📚</div>No groups yet — create one above.
+        <div id="brGroupsList" class="chips" aria-live="polite">
+          <span class="muted">No groups yet.</span>
+        </div>
+        <div class="row" style="margin-top:12px;">
+          <button id="brOpenChatBtn" class="btn" disabled>
+            <i class="fa-solid fa-comments"></i> Open group chat
+          </button>
         </div>
       </div>
-      <div class="group-detail" id="group-detail" style="display:none">
-        <div class="card" id="detail-card">
-          <div style="display:flex;align-items:center;justify-content:space-between">
-            <h2 id="detail-name">Group</h2>
-            <div class="row" style="width:auto">
-              <button class="btn btn-danger" id="delete-group" style="width:auto;padding:8px 12px"><i
-                  class="fa fa-trash"></i></button>
-              <button class="btn btn-secondary" id="back-to-list" style="width:auto;padding:8px 12px">Back</button>
-            </div>
-          </div>
-          <div id="detail-members" style="margin-top:8px"></div>
-          <div class="group-book" style="margin-top:12px">
-            <div class="group-book-cover"><i class="fas fa-book"></i></div>
-            <div>
-              <div class="group-book-title" id="detail-book-title"></div>
-              <div class="muted" id="detail-book-author"></div>
-            </div>
-          </div>
-          <div style="margin-top:10px">
-            <div class="progress-bar">
-              <div class="progress-fill" id="detail-progress"></div>
-            </div>
-            <div class="muted" id="detail-progress-text" style="margin-top:4px">Group progress: 0%</div>
-          </div>
-        </div>
-        <div class="card chat-card">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <h3>Group Chat</h3><span class="muted" id="online-count">—</span>
-          </div>
-          <div aria-live="polite" class="chat-messages" id="chat-messages"></div>
-          <div class="chat-input">
-            <button aria-label="Emoji" class="btn" id="emoji-btn">😊</button>
-            <input id="chat-input" placeholder="Write a message…" />
-            <button class="send-btn" id="send-btn" title="Send"><i class="fas fa-paper-plane"></i></button>
-          </div>
-          <div class="emoji-picker" id="emoji-picker"></div>
-        </div>
-        <div class="card">
-          <h3 style="margin-bottom:8px">Reading Session</h3>
-          <div class="session-controls">
-            <div class="session-btn active" id="btnTogether"><i class="fas fa-book-open"></i> Read Together</div>
-            <div class="session-btn" id="btnSync"><i class="fas fa-user-friends"></i> Sync Reading</div>
-          </div>
-          <div class="muted" style="margin-bottom:8px"><b>Read Together</b>: everyone reads at own pace (chat-enabled).
-            <b>Sync Reading</b>: leader flips pages for everyone.
-          </div>
-          <button class="btn btn-primary" id="start-session"><i class="fas fa-play"></i> Start Reading Session</button>
-        </div>
+
+      <div class="card" id="brGroupDetail" data-id="">
+        <h2 style="margin-bottom:8px">Group details</h2>
+        <div class="muted" id="brDetailText">Select a group above to view details.</div>
       </div>
     </div>
-    <!-- bottom-nav er deaktivert pga .no-bottom-nav -->
   </div>
-  <!-- Page scripts -->
-  <script src="buddy-chat.js"></script>
-  <script defer="" src="nav.js"></script>
-  <script defer="" src="timer.js"></script>
-  <script>
-    requireAuth(async (user) => {
-      // init for buddy chat om ønskelig
-    });
-  </script>
+
+  <!-- Firebase + auth (needed so the book dropdown can populate) -->
+  <script src="firebase-config.js"></script>
+  <script src="firebase-init.js"></script>
+  <script src="auth.js"></script>
+
+  <!-- Page logic -->
+  <script src="buddy-read.js"></script>
+
+  <!-- Global UI bits -->
+  <script defer src="nav.js"></script>
+  <script defer src="timer.js"></script>
 </body>
 
 </html>
