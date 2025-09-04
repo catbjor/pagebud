@@ -586,114 +586,6 @@ input[type="text"] {
   font-size: 1rem
 }
 
-#ratingBar,
-#spiceBar {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  flex-wrap: wrap
-}
-
-/* stars */
-#ratingBar .icon-btn {
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  cursor: pointer
-}
-
-.icon-btn.star svg {
-  display: block
-}
-
-.icon-btn.star .outline {
-  stroke: #b18c00;
-  stroke-width: 2;
-  fill: none
-}
-
-.icon-btn.star .fill {
-  display: none;
-  fill: #f2c200
-}
-
-.icon-btn.on .fill.full {
-  display: block
-}
-
-.icon-btn.star.half-on .fill.half {
-  display: block
-}
-
-.icon-btn.star.half-on .fill.full {
-  display: none
-}
-
-.icon-btn.star.sixth .outline {
-  stroke: #7a5a00
-}
-
-.icon-btn.star.sixth .fill.full {
-  fill: #b88400
-}
-
-@keyframes starPulse {
-  0% {
-    transform: scale(1)
-  }
-
-  50% {
-    transform: scale(.9)
-  }
-
-  100% {
-    transform: scale(1)
-  }
-}
-
-.icon-btn.star.pulse {
-  animation: starPulse .25s ease-out
-}
-
-/* chilis */
-#spiceBar .icon-btn {
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  position: relative
-}
-
-#spiceBar .icon-btn img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  display: block;
-  pointer-events: none
-}
-
-.icon-btn.chili .outline {
-  opacity: 1
-}
-
-.icon-btn.chili .fill {
-  opacity: 0
-}
-
-.icon-btn.chili.active .outline {
-  opacity: 0
-}
-
-.icon-btn.chili.active .fill {
-  opacity: 1
-}
-
 /* ---------- Bottom nav ---------- */
 .bottom-nav {
   position: fixed;
@@ -1042,11 +934,6 @@ input[type="text"] {
   }
 }
 
-/* Add/Edit: sørg for at fixed action bar ikke overlapper innholdet */
-.content-wrapper {
-  padding-bottom: 120px;
-}
-
 /* (fra forrige runde) Chips i Genres/Moods/Tropes ligger pent i grid (duplikat ok) */
 #genresBox .categories,
 #moodsBox .categories,
@@ -1070,11 +957,6 @@ input[type="text"] {
   }
 }
 
-/* (ryddet vekk feilaktig <style>-tag som lå her i originalen) */
-.content-wrapper {
-  padding-bottom: 120px;
-}
-
 @media (max-width: 640px) {
   #quotesControls {
     flex-direction: column;
@@ -1091,18 +973,43 @@ input[type="text"] {
   min-height: 120px;
 }
 
+/* ===== Add/Edit Form Layout ===== */
+.app-container.form-page {
+  padding-left: 24px;
+  padding-right: 24px;
+}
+
+.form-content-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px;
+  margin-top: 16px; /* Space from header */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .05);
+}
+
+/* Reset margins on direct children since gap handles spacing */
+.form-content-wrapper > .form-row,
+.form-content-wrapper > details.card {
+  margin: 0;
+}
+
+/* On smaller screens, reduce padding and gap */
+@media (max-width: 720px) {
+  .form-content-wrapper {
+    padding: 16px;
+    gap: 20px;
+  }
+}
+
 /* ===== Add/Edit – mobile & overflow ===== */
 html,
 body,
 .app-container {
   overflow-x: hidden;
-}
-
-.content-wrapper.form-page {
-  max-width: var(--content-max);
-  margin: 0 auto;
-  padding: 16px;
-  padding-bottom: 140px;
 }
 
 .form-row.two-col {
@@ -1138,47 +1045,6 @@ textarea.big {
   width: 100%;
   min-height: 140px;
   resize: vertical;
-}
-
-/* Sticky action bar */
-.form-actions-fixed {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: calc(var(--bottom-nav-h) + 10px);
-  max-width: var(--content-max);
-  margin: 0 auto;
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
-  background: color-mix(in oklab, var(--card) 92%, transparent);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 10px 12px;
-  z-index: 2050;
-}
-
-/* Images never burst out */
-img,
-.cover,
-.thumb {
-  max-width: 100%;
-}
-
-/* Ensure bar is clickable and above */
-.form-actions-fixed {
-  position: sticky;
-  bottom: calc(var(--bottom-nav-h) + 12px);
-  background: color-mix(in oklab, var(--card) 96%, transparent);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 10px;
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-  z-index: 2200;
-  pointer-events: auto;
-  isolation: isolate;
 }
 
 /* Quotes box */
@@ -1243,6 +1109,18 @@ input[type="file"]::file-selector-button:hover {
 }
 
 #bookFile {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+#coverFile {
   position: absolute !important;
   width: 1px;
   height: 1px;
@@ -1408,26 +1286,88 @@ input[type="file"]::file-selector-button:hover {
   z-index: 1;
 }
 
-.cover-section {
+/* --- Cover upload block --- */
+.cover-block {
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-bottom: 24px;
+  /* centers both preview + button */
+  gap: 10px;
+  /* space between them */
 }
 
-.cover-wrap {
+#coverPreview {
+  display: block;
+  max-width: 200px;
+  /* pick a size you like */
+  width: 100%;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+#btnPickCover {
+  width: 100%;
+  /* same width as the preview */
+  max-width: 200px;
+  /* match the preview’s max-width */
+  text-align: center;
+}
+
+/* --- Cover upload block --- */
+.cover-block {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 1rem;
+  gap: 10px;
+  margin-bottom: 60px;
 }
 
-.cover-preview-container {
+/* Aspect ratio box (2:3 like a book) */
+.cover-preview-wrap {
   position: relative;
-  width: 140px;
-  height: 200px;
-  background-color: #fce4ec;
+  width: 100%;
+  max-width: 200px;
+  /* control max size */
+  aspect-ratio: 2 / 3;
+  /* keeps 2:3 ratio */
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+#coverPreview {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Upload button matches the preview width */
+#btnPickCover {
+  width: 100%;
+  max-width: 200px;
+  text-align: center;
+}
+
+
+/* --- Cover upload block --- */
+.cover-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Preview area */
+.cover-preview-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 180px;
+  aspect-ratio: 2 / 3;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 8px;
   overflow: hidden;
   display: flex;
@@ -1435,117 +1375,112 @@ input[type="file"]::file-selector-button:hover {
   justify-content: center;
 }
 
-.cover {
-  max-width: 100%;
-  max-height: 100%;
-  display: none;
-  /* Hidden until image is set */
-  object-fit: contain;
-}
-
-.placeholder {
-  position: absolute;
-  color: #888;
-  font-size: 0.9rem;
-  text-align: center;
-  padding: 0 6px;
-}
-
-#btnPickFile {
-  padding: 6px 14px;
-  font-size: 0.9rem;
-  border-radius: 6px;
-  background-color: #f6d6dc;
-  border: none;
-  cursor: pointer;
-}
-
-#btnPickFile:hover {
-  background-color: #eec2cb;
-}
-
-.cover-section {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-
-.cover-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 12px;
-  border: 1px solid #f3dce3;
-  border-radius: 8px;
-  background-color: #fff0f5;
-  width: fit-content;
-  margin: auto;
-}
-
-.cover {
-  width: 140px;
-  height: 200px;
+/* Image is hidden by default or if src is empty */
+#coverPreview {
+  width: 100%;
+  height: 100%;
   object-fit: cover;
-  border-radius: 6px;
-  border: 1px solid #ccc;
-  background: #f8dce3;
+}
+
+#coverPreview:not([src]),
+#coverPreview[src=""] {
+  display: none;
+}
+
+/* When image has a src, it becomes visible... */
+#coverPreview[src]:not([src=""]) {
   display: block;
 }
 
-.placeholder {
+/* ...and the placeholder text is hidden. */
+#coverPreview[src]:not([src=""])+.cover-placeholder {
+  display: none;
+}
+
+/* Placeholder text */
+.cover-placeholder {
   position: absolute;
-  margin-top: -100px;
-  /* vertically center inside image */
-  color: #555;
-  font-size: 14px;
+  color: var(--muted);
+  font-weight: 600;
   text-align: center;
   pointer-events: none;
+}
+
+/* Upload button */
+#btnPickCover {
+  width: 100%;
+  max-width: 180px;
+  text-align: center;
+}
+
+/* ===== Edit/Add overrides – compact, scrollable chip rows ===== */
+
+/* Genres / Moods / Tropes: back to small pills in a row */
+.form-page #genresBox .categories,
+.form-page #moodsBox .categories,
+.form-page #tropesBox .categories {
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 4px;
+  margin: 4px 0 0;
+  overflow-x: visible;
+  scroll-snap-type: none;
+  white-space: normal;
+}
+
+/* Small chip look */
+.form-page #genresBox .category,
+.form-page #moodsBox .category,
+.form-page #tropesBox .category,
+#statusChips .category,
+#formatChips .category {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-weight: 700;
+  cursor: pointer;
   user-select: none;
 }
 
-.cover-wrap img:empty+.placeholder {
-  display: block;
+/* Status & Format: a touch smaller */
+#statusChips .category,
+#formatChips .category {
+  padding: 10px 14px;
+  min-width: 0;
 }
 
-.cover-wrap img:not([src])+.placeholder {
-  display: block;
+/* Active state (same design system colors) */
+.form-page .category.active,
+#statusChips .category.active,
+#formatChips .category.active {
+  background: var(--primary);
+  color: var(--btn-text);
+  border-color: var(--primary);
 }
 
-.cover-wrap img[src]+.placeholder {
-  display: none;
-}
-
-.file-name {
-  font-size: 12px;
-  color: #555;
-  margin-top: 4px;
-}
-
-.category {
-  font-size: 0.85rem;
-  padding: 4px 10px;
-  margin: 4px;
-  border-radius: 999px;
-}
-
-.category {
-  font-size: 0.85rem;
-  padding: 4px 10px;
-  margin: 4px;
-  border-radius: 999px;
-}
-
-.cover-placeholder {
-  width: 120px;
-  height: 180px;
-  background-color: #fddfea;
-  color: #444;
-  display: flex;
+/* Make sure the “Choose file” chip is clickable and styled */
+#btnPickFile.btn-file-chip {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  text-align: center;
-  font-size: 0.9rem;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+
+#btnPickFile.btn-file-chip:hover {
+  background: var(--card);
+}
+
+/* Space under the cover block so Title/Author don’t crash into it */
+.cover-block {
+  margin-bottom: 20px;
 }

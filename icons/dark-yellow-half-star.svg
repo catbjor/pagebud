@@ -1,0 +1,9 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Half-filled dark star">
+  <title>Half-filled dark star</title>
+  <defs>
+    <polygon id="star-shape" points="50.0,5.0 61.2,34.6 92.8,36.1 68.1,55.9 76.5,86.4 50.0,69.0 23.5,86.4 31.9,55.9 7.2,36.1 38.8,34.6" />
+    <clipPath id="clip-left-half"><rect x="0" y="0" width="50" height="100" /></clipPath>
+  </defs>
+  <use href="#star-shape" fill="#b88400" stroke="#7a5a00" stroke-width="2" stroke-linejoin="round" clip-path="url(#clip-left-half)" />
+  <use href="#star-shape" fill="none" stroke="#7a5a00" stroke-width="3" stroke-linejoin="round" />
+</svg>

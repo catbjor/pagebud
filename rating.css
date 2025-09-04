@@ -1,13 +1,15 @@
-/* rating.css — overrides for star/chili widgets */
+/* rating.css — single source of truth for rating widgets */
 
-/* --- sizes on forms (Add/Edit) --- */
-.form-row .rating .icon-btn,
-.form-row .spice .icon-btn {
-    width: 32px;
-    height: 32px;
+/* --- Container on forms (Add/Edit) --- */
+#ratingBar,
+#spiceBar {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
 }
 
-/* Base button reset for icons */
+/* --- Base button reset for icons --- */
 .icon-btn {
     border: 0;
     padding: 0;
@@ -16,35 +18,30 @@
 }
 
 /* ===== STARS (SVG) ===== */
-/* Old .active/background-image rules are intentionally not present */
-.icon-btn.star .fill {
-    display: none;
+#ratingBar .icon-btn.star {
+    width: 32px;
+    height: 32px;
 }
 
-.icon-btn.star.on .fill.full {
+.icon-btn.star svg {
     display: block;
 }
 
-/* full star */
-.icon-btn.star.half-on .fill.half {
-    display: block;
-}
-
-/* left half */
-
-/* outline color for normal stars */
 .icon-btn.star .outline {
     stroke: #b18c00;
     stroke-width: 2;
     fill: none;
 }
 
-/* fill color for normal stars */
-.icon-btn.star .fill.full {
+.icon-btn.star .fill {
+    display: none;
     fill: #f2c200;
 }
 
-/* sixth star darker accent */
+.icon-btn.star.on .fill.full {
+    display: block;
+}
+
 .icon-btn.star.sixth .outline {
     stroke: #7a5a00;
 }
@@ -73,6 +70,22 @@
 }
 
 /* ===== CHILIS (two <img> inside each button) ===== */
+#spiceBar .icon-btn.chili {
+    width: 32px;
+    height: 32px;
+    position: relative;
+}
+
+.icon-btn.chili img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+    pointer-events: none;
+}
+
 .icon-btn.chili img.fill {
     display: none;
 }
@@ -87,12 +100,4 @@
 
 .icon-btn.chili.active img.outline {
     display: none;
-}
-
-/* keep the images crisp and contained */
-.icon-btn.chili img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    display: block;
 }

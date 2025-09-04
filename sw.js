@@ -1,5 +1,5 @@
 // sw.js
-const CACHE_NAME = "pagebud-v46"; // 🆕 bump version to bust old cache
+const CACHE_NAME = "pagebud-v47"; // 🆕 bump version to bust old cache
 const OFFLINE_URL = "/offline.html";
 
 // Only cache **safe static files**, never auth/index pages

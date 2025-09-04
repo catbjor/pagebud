@@ -47,65 +47,62 @@ function chilisRow(val) {
   return out;
 }
 
-function cardHTML(doc) {
-  const d = doc.data();
+function createCardElement(doc) {
+  const cardTemplate = document.getElementById('book-card-template');
+  if (!cardTemplate) {
+    throw new Error("Missing #book-card-template in HTML");
+  }
+
+  const card = cardTemplate.content.cloneNode(true).firstElementChild;
+  const d = doc.data() || {};
   const id = doc.id;
 
+  // Set data attributes for filtering
+  card.dataset.id = id;
+  card.dataset.status = (d.status || "").toLowerCase();
+  card.dataset.fav = d.favorite ? "1" : "0";
+  card.dataset.format = (d.format || "").toLowerCase();
+  card.dataset.rated = (d.rating || 0) > 0 ? "1" : "0";
+
+  // Populate content
   const cover = d.coverUrl || d.coverDataUrl || phCover;
   const title = d.title || "Untitled";
-  const author = d.author || "";
 
+  const thumb = card.querySelector('.thumb');
+  thumb.src = cover;
+  thumb.alt = `Cover for ${title}`;
+
+  card.querySelector('.title').textContent = title;
+  card.querySelector('.author').textContent = d.author || "";
+
+  // Conditional UI: Rating badge
   const rating = Number(d.rating || 0);
-  const spice = Number(d.spice || 0);
-  const status = (d.status || "").toLowerCase();
-  const favorite = !!d.favorite;
-  const format = (d.format || "").toLowerCase();
+  if (rating > 0) {
+    const ratingBadge = card.querySelector('.rated-badge');
+    const ratingLabel = Number.isInteger(rating) ? String(rating) : String(Math.round(rating * 10) / 10);
+    ratingBadge.title = `Rated ${ratingLabel}`;
+    ratingBadge.querySelector('.val').textContent = ratingLabel;
+    ratingBadge.style.display = ''; // Show the badge
+  }
 
-  const hasFile = !!(
-    d.fileUrl || d.pdfUrl || d.epubUrl || d.storagePath || d.filePath || d.hasFile
-  );
+  // Favorite button state
+  card.querySelector('.heart-btn').classList.toggle('active', !!d.favorite);
+  card.querySelector('.heart-btn').dataset.id = id;
 
-  // NEW: mark rated state and compute compact label (e.g., 4.5)
-  const ratingLabel = rating > 0
-    ? (Number.isInteger(rating) ? String(rating) : String(Math.round(rating * 10) / 10))
-    : "";
+  // Star/Chili rows (using existing helper functions)
+  card.querySelector('.rating-stars').innerHTML = starsRow(rating);
+  card.querySelector('.spice-chilis').innerHTML = chilisRow(Number(d.spice || 0));
 
-  const attrs = `data-id="${id}" data-status="${status}" data-fav="${favorite ? 1 : 0}" data-format="${format}" data-rated="${rating > 0 ? 1 : 0}"`;
+  // Actions: Edit button and conditional Read button
+  card.querySelector('[data-action="open"]').dataset.id = id;
+  const readBtn = card.querySelector('[data-action="read"]');
+  const hasFile = !!(d.fileUrl || d.pdfUrl || d.epubUrl || d.storagePath || d.filePath || d.hasFile);
+  if (hasFile) {
+    readBtn.dataset.id = id;
+    readBtn.style.display = ''; // Show the button
+  }
 
-  return `
-    <article class="book-card" ${attrs}>
-      <div class="thumb-wrap">
-        <img class="thumb" src="${cover}" alt="Cover for ${escapeHtml(title)}">
-
-        ${rating > 0 ? `
-        <span class="rated-badge" title="Rated ${ratingLabel}">
-          <img class="star" src="icons/yellow-star.svg" alt="" aria-hidden="true">
-          <span class="val">${ratingLabel}</span>
-        </span>` : ``}
-
-        <button type="button" class="heart-btn ${favorite ? 'active' : ''}" data-action="fav" data-id="${id}" title="Favorite">
-          <i class="fa-regular fa-heart"></i>
-        </button>
-      </div>
-
-      <div class="title">${escapeHtml(title)}</div>
-      <div class="author">${escapeHtml(author)}</div>
-
-      <div class="card-ratings">
-        <div class="card-row" aria-label="rating">${starsRow(rating)}</div>
-        <div class="card-row" aria-label="spice">${chilisRow(spice)}</div>
-      </div>
-
-      <div class="actions">
-        <button class="btn btn-secondary" data-action="open" data-id="${id}">
-          <i class="fa fa-pen"></i> Edit
-        </button>
-        ${hasFile ? `
-        <button class="btn" data-action="read" data-id="${id}">
-          <i class="fa fa-book-open"></i> Read
-        </button>` : ``}
-      </div>
-    </article>`;
+  return card;
 }
 
 function applyVisibility(card) {
@@ -119,25 +116,52 @@ async function loadAndRenderLibrary(user) {
   const empty = $("#empty-state");
   if (!db || !user || !grid) return;
 
-  const snap = await db.collection("users").doc(user.uid).collection("books").get();
-
-  const docs = snap.docs.slice().sort((a, b) => {
-    const da = a.data(), dbb = b.data();
-    const ta = da.createdAt?.toMillis?.()
-      ?? (da.createdAt ? new Date(da.createdAt).getTime() : 0);
-    const tb = dbb.createdAt?.toMillis?.()
-      ?? (dbb.createdAt ? new Date(dbb.createdAt).getTime() : 0);
-    return tb - ta;
-  });
-
-  if (!docs.length) {
-    if (empty) empty.style.display = "grid";
-    grid.innerHTML = "";
-    return;
-  }
+  // Add a loading state for better UX
+  grid.innerHTML = '<p class="muted" style="grid-column: 1 / -1;">Loading your library...</p>';
   if (empty) empty.style.display = "none";
 
-  grid.innerHTML = docs.map(cardHTML).join("");
+  try {
+    const snap = await db.collection("users").doc(user.uid).collection("books").get();
+
+    const docs = snap.docs.slice().sort((a, b) => {
+      const da = a.data(), dbb = b.data();
+      const ta = da.createdAt?.toMillis?.()
+        ?? (da.createdAt ? new Date(da.createdAt).getTime() : 0);
+      const tb = dbb.createdAt?.toMillis?.()
+        ?? (dbb.createdAt ? new Date(dbb.createdAt).getTime() : 0);
+      return tb - ta;
+    });
+
+    if (!docs.length) {
+      if (empty) empty.style.display = "grid";
+      grid.innerHTML = "";
+      return;
+    }
+    if (empty) empty.style.display = "none";
+
+    const fragment = document.createDocumentFragment();
+    docs.forEach(doc => {
+      try {
+        const cardElement = createCardElement(doc);
+        fragment.appendChild(cardElement);
+      } catch (error) {
+        console.error(`Failed to create card for book ${doc.id}:`, error);
+      }
+    });
+
+    grid.innerHTML = ""; // Clear loading message
+    grid.appendChild(fragment);
+
+    applyCurrentFilter();
+  } catch (error) {
+    console.error("Failed to load library:", error);
+    grid.innerHTML = '<p class="muted" style="color:red; grid-column: 1 / -1;">Could not load your library. Please try again later.</p>';
+  }
+}
+
+function initGridActions(user) {
+  const grid = $("#books-grid");
+  if (!grid) return;
 
   grid.addEventListener("click", async (e) => {
     const card = e.target.closest(".book-card");
@@ -190,7 +214,6 @@ async function loadAndRenderLibrary(user) {
   // Long-press to enter multi-select
   MS_attachLongPress(grid);
 
-  applyCurrentFilter();
 }
 
 function initSearch() {
@@ -284,12 +307,13 @@ document.addEventListener("DOMContentLoaded", () => {
     requireAuth(user => {
       CURRENT_USER = user;
       loadAndRenderLibrary(user);
+      initGridActions(user);
       window.startSocialFeedPreview?.(); // Initialize the friends feed preview
     });
   } else {
     const tryNow = setInterval(() => {
       const u = (firebase?.auth?.().currentUser) || (fb?.auth?.currentUser);
-      if (u) { clearInterval(tryNow); CURRENT_USER = u; loadAndRenderLibrary(u); }
+      if (u) { clearInterval(tryNow); CURRENT_USER = u; loadAndRenderLibrary(u); initGridActions(u); }
     }, 300);
   }
 });

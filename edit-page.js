@@ -1,13 +1,10 @@
-// edit-page.js — robust prefill + chips rebuilt when missing
+// edit-page.js — prefill chips + show/replace cover + existing file name.
+// Adds Upload Cover button support (#btnPickCover + #coverFile → coverDataUrl)
 (function () {
   "use strict";
 
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
-  const norm = v => String(v || "").trim().toLowerCase();
-
-  function auth() { return (window.fb?.auth) || (window.firebase?.auth?.()) || firebase.auth(); }
-  function db() { return (window.fb?.db) || (window.firebase?.firestore?.()) || firebase.firestore(); }
 
   function getLists() {
     const C = (window.PB_CONST) || (window.CONSTANTS) || (window.PB && {
@@ -18,9 +15,18 @@
       genres: C.GENRES || window.GENRES || [],
       moods: C.MOODS || window.MOODS || [],
       tropes: C.TROPES || window.TROPES || [],
-      statuses: C.STATUSES || window.STATUSES || ["To Read", "Reading", "Finished", "DNF", "Owned", "Wishlist"],
-      formats: C.FORMATS || window.FORMATS || ["eBook", "Audiobook", "Paperback", "Hardcover"],
+      statuses: C.STATUSES || window.STATUSES || [],
+      formats: C.FORMATS || window.FORMATS || []
     };
+  }
+
+  function populateChips(container, items) {
+    if (!container || container.querySelector('.category') || !Array.isArray(items)) return;
+    items.forEach((label) => {
+      const el = document.createElement("span");
+      el.className = "category"; el.textContent = label; el.dataset.value = String(label);
+      container.appendChild(el);
+    });
   }
 
   function ensureHidden(form, name) {
@@ -29,50 +35,30 @@
     return el;
   }
 
-  function buildChipsIfMissing(container, items) {
-    if (!container || !Array.isArray(items) || !items.length) return;
-    if (container.querySelector(".category")) return;
-    const frag = document.createDocumentFragment();
-    items.forEach(label => {
-      const el = document.createElement("span");
-      el.className = "category";
-      el.dataset.value = String(label);
-      el.textContent = String(label);
-      el.tabIndex = 0;
-      el.setAttribute("role", "button");
-      frag.appendChild(el);
-    });
-    container.appendChild(frag);
-  }
+  function auth() { return (window.fb?.auth) || (window.firebase?.auth?.()) || firebase.auth(); }
+  function db() { return (window.fb?.db) || (window.firebase?.firestore?.()) || firebase.firestore(); }
 
-  const chipRaw = chip => (chip.dataset.value ?? chip.dataset.val ?? chip.textContent).trim();
-  const chipKey = chip => norm(chipRaw(chip));
+  const norm = v => String(v || "").trim().toLowerCase();
+  function chipVal(chip) { return norm(chip.dataset.value ?? chip.dataset.val ?? chip.textContent); }
 
-  function activateChips(container, rawValuesArray) {
+  function activateChips(container, values) {
     if (!container) return;
-    const keys = new Set((rawValuesArray || []).map(norm));
-    $$(".category", container).forEach(ch => ch.classList.toggle("active", keys.has(chipKey(ch))));
+    const want = new Set((values || []).map(norm));
+    $$(".category", container).forEach(ch => ch.classList.toggle("active", want.has(chipVal(ch))));
   }
 
-  function getActiveChipsRaw(container) {
+  function getActiveChips(container) {
     if (!container) return [];
-    return $$(".category.active", container).map(chipRaw);
+    return $$(".category.active", container).map(chipVal);
   }
 
   function wireChipGroup(container, { multi, onChange }) {
     if (!container) return;
-    function commit() {
-      const picked = getActiveChipsRaw(container);
-      onChange(multi ? picked : (picked[0] || ""));
-    }
+    const commit = () => onChange(multi ? getActiveChips(container) : (getActiveChips(container)[0] || ""));
     container.addEventListener("click", (e) => {
       const chip = e.target.closest(".category"); if (!chip) return;
-      if (multi) {
-        chip.classList.toggle("active");
-      } else {
-        $$(".category", container).forEach(c => c.classList.remove("active"));
-        chip.classList.add("active");
-      }
+      if (multi) chip.classList.toggle("active");
+      else { $$(".category", container).forEach(c => c.classList.remove("active")); chip.classList.add("active"); }
       commit();
     });
     container.addEventListener("keydown", (e) => {
@@ -80,11 +66,18 @@
       const chip = e.target.closest(".category"); if (!chip) return;
       e.preventDefault();
       if (multi) chip.classList.toggle("active");
-      else {
-        $$(".category", container).forEach(c => c.classList.remove("active"));
-        chip.classList.add("active");
-      }
+      else { $$(".category", container).forEach(c => c.classList.remove("active")); chip.classList.add("active"); }
       commit();
+    });
+  }
+
+  // read image file → data URL
+  function readAsDataURL(file) {
+    return new Promise((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onload = () => resolve(String(fr.result || ""));
+      fr.onerror = reject;
+      fr.readAsDataURL(file);
     });
   }
 
@@ -103,75 +96,77 @@
     const d = snap.data() || {};
     form.dataset.id = id;
 
+    // Basic fields
     $("#title") && ($("#title").value = d.title || "");
     $("#author") && ($("#author").value = d.author || "");
     $("#started") && ($("#started").value = typeof d.started === "string" ? d.started : "");
     $("#finished") && ($("#finished").value = typeof d.finished === "string" ? d.finished : "");
     $("#review") && ($("#review").value = d.review || "");
 
+    // Pre-fill rating/spice hidden inputs so controls can pick them up
+    const inpRating = ensureHidden(form, "rating");
+    const inpSpice = ensureHidden(form, "spice");
+    inpRating.value = d.rating || "0";
+    inpSpice.value = d.spice || "0";
+
+    // Cover preview (existing)
     if ($("#coverPreview")) {
+      // CSS should handle hiding this if src is empty, and hiding placeholder if src is present
       if (d.coverUrl) $("#coverPreview").src = d.coverUrl;
       else if (d.coverDataUrl) $("#coverPreview").src = d.coverDataUrl;
+      else $("#coverPreview").removeAttribute("src");
     }
 
+    // Show existing file name
     if ($("#fileName")) {
-      $("#fileName").textContent = (d.fileName || (d.storagePath ? String(d.fileName || "Existing file attached") : ""));
+      const hasFile = d.fileName || d.storagePath || d.downloadURL;
+      $("#fileName").textContent = hasFile ? (d.fileName || "Existing file attached") : "";
     }
 
+    // Hidden inputs for chips
     const inpGenres = ensureHidden(form, "genres");
     const inpMoods = ensureHidden(form, "moods");
     const inpTropes = ensureHidden(form, "tropes");
-    const inpStatus = ensureHidden(form, "status");
-    const inpStatuses = ensureHidden(form, "statuses");
+    const inpStatus = ensureHidden(form, "status");     // legacy single
+    const inpStatuses = ensureHidden(form, "statuses");   // new array
     const inpFormat = ensureHidden(form, "format");
 
-    const genresArr = Array.isArray(d.genres) ? d.genres : [];
-    const moodsArr = Array.isArray(d.moods) ? d.moods : [];
-    const tropesArr = Array.isArray(d.tropes) ? d.tropes : [];
-    const statusesArr = Array.isArray(d.statuses) ? d.statuses : (d.status ? [d.status] : []);
-    const formatStr = d.format || "";
+    inpGenres.value = JSON.stringify(Array.isArray(d.genres) ? d.genres : []);
+    inpMoods.value = JSON.stringify(Array.isArray(d.moods) ? d.moods : []);
+    inpTropes.value = JSON.stringify(Array.isArray(d.tropes) ? d.tropes : []);
+    inpStatuses.value = JSON.stringify(Array.isArray(d.statuses) ? d.statuses : (d.status ? [d.status] : []));
+    inpStatus.value = d.status || "";
+    inpFormat.value = d.format || "";
 
-    inpGenres.value = JSON.stringify(genresArr);
-    inpMoods.value = JSON.stringify(moodsArr);
-    inpTropes.value = JSON.stringify(tropesArr);
-    inpStatuses.value = JSON.stringify(statusesArr);
-    inpStatus.value = d.status || (statusesArr[0] || "");
-    inpFormat.value = formatStr;
-
+    // Get chip definitions
     const { genres, moods, tropes, statuses, formats } = getLists();
-    const genresBox = $("#genresBox .categories") || $('[data-chips="genres"]');
-    const moodsBox = $("#moodsBox .categories") || $('[data-chips="moods"]');
-    const tropesBox = $("#tropesBox .categories") || $('[data-chips="tropes"]');
-    const statusBox = $("#statusChips") || $('[data-chips="status"]');
-    const formatBox = $("#formatChips") || $('[data-chips="format"]');
 
-    buildChipsIfMissing(genresBox, genres);
-    buildChipsIfMissing(moodsBox, moods);
-    buildChipsIfMissing(tropesBox, tropes);
-    buildChipsIfMissing(statusBox, statuses);
-    buildChipsIfMissing(formatBox, formats);
+    // Populate chip containers if they are empty
+    populateChips($("#genresBox .categories"), genres);
+    populateChips($("#moodsBox .categories"), moods);
+    populateChips($("#tropesBox .categories"), tropes);
 
-    activateChips(genresBox, genresArr);
-    activateChips(moodsBox, moodsArr);
-    activateChips(tropesBox, tropesArr);
-    activateChips(statusBox, statusesArr);
-    activateChips(formatBox, [formatStr].filter(Boolean));
+    // Activate chips visually
+    activateChips($("#genresBox .categories"), JSON.parse(inpGenres.value || "[]"));
+    activateChips($("#moodsBox  .categories"), JSON.parse(inpMoods.value || "[]"));
+    activateChips($("#tropesBox .categories"), JSON.parse(inpTropes.value || "[]"));
+    activateChips($("#statusChips"), JSON.parse(inpStatuses.value || "[]")); // multi
+    activateChips($("#formatChips"), [inpFormat.value].filter(Boolean)); // single
 
-    wireChipGroup(genresBox, { multi: true, onChange: vals => { inpGenres.value = JSON.stringify(vals); } });
-    wireChipGroup(moodsBox, { multi: true, onChange: vals => { inpMoods.value = JSON.stringify(vals); } });
-    wireChipGroup(tropesBox, { multi: true, onChange: vals => { inpTropes.value = JSON.stringify(vals); } });
-    wireChipGroup(statusBox, {
-      multi: true, onChange: vals => {
-        inpStatuses.value = JSON.stringify(vals);
-        inpStatus.value = vals[0] || "";
-      }
+    // Keep hidden inputs in sync
+    wireChipGroup($("#genresBox .categories"), { multi: true, onChange: vals => inpGenres.value = JSON.stringify(vals) });
+    wireChipGroup($("#moodsBox  .categories"), { multi: true, onChange: vals => inpMoods.value = JSON.stringify(vals) });
+    wireChipGroup($("#tropesBox .categories"), { multi: true, onChange: vals => inpTropes.value = JSON.stringify(vals) });
+    wireChipGroup($("#statusChips"), {
+      multi: true,
+      onChange: vals => { inpStatuses.value = JSON.stringify(vals); inpStatus.value = vals[0] || ""; }
     });
-    wireChipGroup(formatBox, { multi: false, onChange: val => { inpFormat.value = val || ""; } });
+    wireChipGroup($("#formatChips"), { multi: false, onChange: val => inpFormat.value = val || "" });
 
     return { ref, data: d, uid: u.uid };
   }
 
-  async function save(form) {
+  async function save(form, ctx, newCoverDataUrl, extractedCoverBlob) {
     const u = auth().currentUser;
     if (!u) return alert("Not signed in.");
     const id = new URLSearchParams(location.search).get("id") || form.dataset.id || "";
@@ -187,6 +182,7 @@
     const tropes = JSON.parse((form.querySelector('input[name="tropes"]')?.value || "[]"));
     const statuses = JSON.parse((form.querySelector('input[name="statuses"]')?.value || "[]"));
     const status = (form.querySelector('input[name="status"]')?.value || (statuses[0] || ""));
+
     const format = (form.querySelector('input[name="format"]')?.value || null);
 
     const ratingVal = $('input[name="rating"]')?.value ?? "";
@@ -204,8 +200,19 @@
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     };
 
+    if (newCoverDataUrl) {
+      payload.coverDataUrl = newCoverDataUrl;
+    } else if (extractedCoverBlob) {
+      try {
+        payload.coverDataUrl = await readAsDataURL(extractedCoverBlob);
+      } catch (e) {
+        console.warn("Failed to convert extracted cover blob to data URL", e);
+      }
+    }
+
     await ref.set(payload, { merge: true });
 
+    // Toast
     try {
       const t = document.createElement("div");
       t.className = "toast"; t.textContent = "Saved ✓";
@@ -217,65 +224,89 @@
     setTimeout(() => location.replace(`index.html?refresh=${Date.now()}`), 120);
   }
 
+  // --- Init -------------------------------------------------------
   async function init() {
     const form = $("#bookForm") || $("form");
     if (!form) return;
 
-    let ctx;
+    let ctx = null;
     try { ctx = await loadBook(form); }
     catch (e) { console.warn("[edit] load failed:", e); alert(e.message || "Could not load book."); return; }
 
-    const saveBtn = $("#saveBtn") || $('[data-role="save-book"]') || $('[data-action="save"]');
-    saveBtn?.addEventListener("click", (e) => { e.preventDefault(); save(form); });
+    // Wire header buttons
+    const delBtn = $("#deleteBtn");
+    const cancelBtn = form.closest(".app-container").querySelector('.header-actions .btn-secondary');
 
+    delBtn?.addEventListener("click", () => window.PB_Delete?.deleteBook?.(ctx.data.id, ctx.data.title));
+    cancelBtn?.addEventListener("click", () => history.back());
+
+    const saveBtn = $("#saveBtn") || $('[data-role="save-book"]') || $('[data-action="save"]');
+    let extractedCoverBlob = null;
+
+    // Book file UI (existing)
     const pickBtn = $("#btnPickFile");
     const fileInp = $("#bookFile");
     const fileName = $("#fileName");
+    const coverPrev = $("#coverPreview"); // need this for the handler
+    let newCoverDataUrl = ""; // defined here to be in scope for fileInp handler
+
     if (pickBtn && fileInp) {
       if (!pickBtn.getAttribute("type")) pickBtn.setAttribute("type", "button");
       pickBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); fileInp.click(); });
-      fileInp.addEventListener("change", () => {
+      fileInp.addEventListener("change", async () => {
         const f = fileInp.files?.[0];
         if (fileName) fileName.textContent = f ? f.name : (ctx?.data?.fileName || "");
+        if (!f) { extractedCoverBlob = null; return; }
+
+        const extractor = window.PB?.extractBookMetadata;
+        if (!extractor) {
+          console.warn("Metadata extractor not available.");
+          return;
+        }
+
+        const data = await extractor(f);
+
+        if (data.title && !$("#title").value) {
+          $("#title").value = data.title;
+        }
+        if (data.author && !$("#author").value) {
+          $("#author").value = data.author;
+        }
+
+        extractedCoverBlob = data.coverBlob;
+        if (extractedCoverBlob && !newCoverDataUrl && coverPrev) {
+          coverPrev.src = URL.createObjectURL(extractedCoverBlob);
+        }
       });
     }
 
-    const uploadBtn = document.getElementById("btnUploadCover");
-    const coverInput = document.getElementById("coverInput");
-    const coverPreview = document.getElementById("coverPreview");
-    const coverPlaceholder = document.getElementById("coverPlaceholder");
+    // NEW: Cover upload on Edit
+    const coverBtn = $("#btnPickCover");
+    const coverInp = $("#coverFile");
 
-    if (uploadBtn && coverInput) {
-      uploadBtn.addEventListener("click", () => {
-        coverInput.click();
-      });
-
-      coverInput.addEventListener("change", function (e) {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = function (event) {
-          if (coverPreview && coverPlaceholder) {
-            coverPreview.src = event.target.result;
-            coverPreview.style.display = "block";
-            coverPlaceholder.style.display = "none";
-          }
-          window.selectedCoverDataUrl = event.target.result;
-        };
-        reader.readAsDataURL(file);
+    if (coverBtn && coverInp) {
+      if (!coverBtn.getAttribute("type")) coverBtn.setAttribute("type", "button");
+      coverBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); coverInp.click(); });
+      coverInp.addEventListener("change", async () => {
+        const f = coverInp.files?.[0];
+        if (!f) return;
+        if (!/^image\//i.test(f.type)) { alert("Please choose an image file."); return; }
+        try {
+          newCoverDataUrl = await readAsDataURL(f);
+          if (coverPrev) coverPrev.src = newCoverDataUrl;
+          extractedCoverBlob = null; // User-picked cover takes priority
+        } catch (err) {
+          console.warn("Cover read failed", err);
+          alert("Could not read the cover image.");
+        }
       });
     }
 
-    const delBtn = $("#deleteBtn") || $("#deleteBookBtn") || $('[data-role="delete-book"]');
-    if (delBtn) {
-      delBtn.addEventListener("click", async (e) => {
-        e.preventDefault();
-        if (!confirm("Delete this book?")) return;
-        await ctx.ref.delete();
-        location.replace(`index.html?refresh=${Date.now()}`);
-      });
-    }
+    saveBtn?.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      save(form, ctx, newCoverDataUrl, extractedCoverBlob);
+    });
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init, { once: true });

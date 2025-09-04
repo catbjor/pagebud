@@ -1,27 +1,30 @@
+
 /* =========================================================
- PageBud – add-book.js (OPPDATERT)
+ PageBud – add-book.js (local-file first, no Firebase Storage)
+ + Adds "Upload cover" button via #btnPickCover + #coverFile → coverDataUrl
 ========================================================= */
 (function () {
     "use strict";
 
+    // ------- tiny utils -------
+    const byId = (id) => document.getElementById(id);
     const $ = (s, r = document) => r.querySelector(s);
     const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
-    const byId = id => document.getElementById(id);
-    const safeParse = (v, d) => { try { return JSON.parse(v); } catch { return d; } };
-    const chipRaw = el => (el.dataset.value || el.dataset.val || el.textContent || "").trim();
 
     function showToast(msg = "Saved ✓", ms = 900) {
-        const t = document.createElement("div");
-        t.className = "toast";
-        t.textContent = msg;
-        document.body.appendChild(t);
-        requestAnimationFrame(() => t.classList.add("show"));
-        setTimeout(() => { t.classList.remove("show"); setTimeout(() => t.remove(), 300); }, ms);
+        try {
+            const t = document.createElement("div");
+            t.className = "toast";
+            t.textContent = msg;
+            document.body.appendChild(t);
+            requestAnimationFrame(() => t.classList.add("show"));
+            setTimeout(() => { t.classList.remove("show"); setTimeout(() => t.remove(), 300); }, ms);
+        } catch { alert(msg); }
     }
 
-    function auth() { return firebase.auth(); }
-    function db() { return firebase.firestore(); }
-
+    // ------- Firebase handles -------
+    function auth() { return (window.fb?.auth) || (window.firebase?.auth?.()) || firebase.auth(); }
+    function db() { return (window.fb?.db) || (window.firebase?.firestore?.()) || firebase.firestore(); }
     async function requireUser() {
         const a = auth();
         if (a.currentUser) return a.currentUser;
@@ -30,282 +33,278 @@
         });
     }
 
+    // ------- lists from constants -------
     function getLists() {
-        const C = window.PB_CONST || window.CONSTANTS || {};
+        const C = (window.PB_CONST) || (window.CONSTANTS) || (window.PB && {
+            GENRES: window.PB.GENRES, MOODS: window.PB.MOODS, TROPES: window.PB.TROPES,
+            STATUSES: window.PB.STATUSES, FORMATS: window.PB.FORMATS
+        }) || {};
         return {
-            genres: C.GENRES || [],
-            moods: C.MOODS || [],
-            tropes: C.TROPES || [],
-            statuses: C.STATUSES || ["To Read", "Reading", "Finished", "DNF", "Owned", "Wishlist"],
-            formats: C.FORMATS || ["eBook", "Audiobook", "Paperback", "Hardcover"]
+            genres: C.GENRES || window.GENRES || [],
+            moods: C.MOODS || window.MOODS || [],
+            tropes: C.TROPES || window.TROPES || [],
+            statuses: C.STATUSES || window.STATUSES || [],
+            formats: C.FORMATS || window.FORMATS || []
         };
     }
 
+    // ------- hidden inputs -------
     function ensureHidden(form, name) {
         let el = form.querySelector(`input[name="${name}"]`);
-        if (!el) {
-            el = document.createElement("input");
-            el.type = "hidden";
-            el.name = name;
-            form.appendChild(el);
-        }
+        if (!el) { el = document.createElement("input"); el.type = "hidden"; el.name = name; form.appendChild(el); }
         return el;
     }
 
-    function buildChipsIfMissing(container, items) {
-        if (!container || container.querySelector(".category")) return;
-        const frag = document.createDocumentFragment();
-        items.forEach(label => {
-            const el = document.createElement("span");
-            el.className = "category";
-            el.dataset.value = label;
-            el.textContent = label;
-            el.tabIndex = 0;
-            el.setAttribute("role", "button");
-            frag.appendChild(el);
-        });
-        container.appendChild(frag);
-    }
+    // ------- chip helpers (keep existing markup) -------
+    function chipValue(el) { return el.dataset.value || el.dataset.val || el.textContent.trim(); }
+    function safeParse(v, d) { try { return JSON.parse(v); } catch { return d; } }
 
-    function hydrateMulti(container, items, hiddenInput) {
+    function hydrateMulti(container, items, hiddenInput, onChange) {
         if (!container) return;
-        buildChipsIfMissing(container, items);
-        const picked = new Set(safeParse(hiddenInput.value || "[]", []));
-        $$(".category", container).forEach(ch => {
-            ch.classList.toggle("active", picked.has(chipRaw(ch)));
-        });
-        function commit() {
-            const vals = $$(".category.active", container).map(chipRaw);
-            hiddenInput.value = JSON.stringify(vals);
+        let chips = $$(".category", container);
+        if (!chips.length && Array.isArray(items)) {
+            items.forEach((label) => {
+                const el = document.createElement("span");
+                el.className = "category";
+                el.textContent = label;
+                el.dataset.value = String(label);
+                container.appendChild(el);
+            });
+            chips = $$(".category", container);
         }
-        container.addEventListener("click", e => {
-            const chip = e.target.closest(".category");
-            if (!chip) return;
-            chip.classList.toggle("active");
-            commit();
+        chips.forEach(ch => { ch.tabIndex = 0; ch.setAttribute("role", "button"); });
+        const picked = new Set(safeParse(hiddenInput.value || "[]", []));
+        chips.forEach(ch => ch.classList.toggle("active", picked.has(chipValue(ch))));
+        function commit() {
+            const vals = $$(".category.active", container).map(c => chipValue(c));
+            try { hiddenInput.value = JSON.stringify(vals); } catch { hiddenInput.value = "[]"; }
+            if (onChange) onChange(vals);
+        }
+        container.addEventListener("click", (e) => {
+            const chip = e.target.closest(".category"); if (!chip) return;
+            chip.classList.toggle("active"); commit();
         });
-        container.addEventListener("keydown", e => {
+        container.addEventListener("keydown", (e) => {
             if (e.key !== "Enter" && e.key !== " ") return;
-            const chip = e.target.closest(".category");
-            if (!chip) return;
-            e.preventDefault();
-            chip.classList.toggle("active");
-            commit();
+            const chip = e.target.closest(".category"); if (!chip) return;
+            e.preventDefault(); chip.classList.toggle("active"); commit();
         });
         commit();
     }
 
     function hydrateSingle(container, items, hiddenInput) {
         if (!container) return;
-        buildChipsIfMissing(container, items);
-        const active = hiddenInput.value;
-        const chips = $$(".category", container);
-        chips.forEach(ch => {
-            ch.classList.toggle("active", chipRaw(ch) === active);
-        });
-        container.addEventListener("click", e => {
-            const chip = e.target.closest(".category");
-            if (!chip) return;
-            chips.forEach(c => c.classList.remove("active"));
-            chip.classList.add("active");
-            hiddenInput.value = chipRaw(chip);
-        });
-        container.addEventListener("keydown", e => {
-            if (e.key !== "Enter" && e.key !== " ") return;
-            const chip = e.target.closest(".category");
-            if (!chip) return;
-            e.preventDefault();
-            chips.forEach(c => c.classList.remove("active"));
-            chip.classList.add("active");
-            hiddenInput.value = chipRaw(chip);
-        });
-    }
-
-    async function tryExtractCover(file) {
-        try {
-            if (!file) return null;
-            if (/\.pdf$/i.test(file.name) && window.pdfjsLib) {
-                const ab = await file.arrayBuffer();
-                const pdf = await pdfjsLib.getDocument({ data: ab }).promise;
-                const page = await pdf.getPage(1);
-                const vp = page.getViewport({ scale: 1.4 });
-                const canvas = document.createElement("canvas");
-                canvas.width = vp.width;
-                canvas.height = vp.height;
-                await page.render({ canvasContext: canvas.getContext("2d"), viewport: vp }).promise;
-                return new Promise(res => canvas.toBlob(res, "image/jpeg", 0.9));
-            }
-            if (/\.epub$/i.test(file.name) && window.ePub) {
-                const book = await ePub(file);
-                const coverPath = await book.loaded.cover;
-                if (coverPath) {
-                    const blobUrl = await book.archive.createUrl(coverPath);
-                    const resp = await fetch(blobUrl);
-                    return await resp.blob();
-                }
-            }
-        } catch (e) {
-            console.warn("Cover extract failed:", e);
+        let chips = $$(".category", container);
+        if (!chips.length && Array.isArray(items)) {
+            items.forEach((label) => {
+                const el = document.createElement("span");
+                el.className = "category";
+                el.textContent = label;
+                el.dataset.value = String(label);
+                container.appendChild(el);
+            });
+            chips = $$(".category", container);
         }
-        return null;
+        chips.forEach(ch => { ch.tabIndex = 0; ch.setAttribute("role", "button"); });
+        const active = hiddenInput.value || "";
+        chips.forEach(ch => ch.classList.toggle("active", chipValue(ch) === active));
+        container.addEventListener("click", (e) => {
+            const chip = e.target.closest(".category"); if (!chip) return;
+            chips.forEach(c => c.classList.remove("active"));
+            chip.classList.add("active");
+            hiddenInput.value = chipValue(chip);
+        });
     }
 
+    // ------- state -------
     let createdBookId = null;
-    let coverBlob = null;
+    let coverBlob = null;          // extracted from book (optional)
+    let coverDataUrl = "";         // uploaded by user via #coverFile
 
-    function updateCoverPreview(blobUrl) {
-        const preview = byId("coverPreview");
-        const placeholder = byId("coverPlaceholder");
-        if (!preview || !placeholder) return;
-
-        if (blobUrl) {
-            preview.src = blobUrl;
-            preview.style.display = "block";
-            placeholder.style.display = "none";
-        } else {
-            preview.src = "";
-            preview.style.display = "none";
-            placeholder.style.display = "flex";
-        }
+    // helper: read file → data URL
+    function readAsDataURL(file) {
+        return new Promise((resolve, reject) => {
+            const fr = new FileReader();
+            fr.onload = () => resolve(String(fr.result || ""));
+            fr.onerror = reject;
+            fr.readAsDataURL(file);
+        });
     }
 
+    // ------- main -------
     function init() {
-        const form = byId("bookForm");
+        const form = byId("bookForm") || $("form");
         if (!form) return;
 
-        const fileInput = byId("bookFile");
-        const fileNameEl = byId("fileName");
-        const pickBtn = byId("btnPickFile");
-        const saveBtn = byId("saveBtn") || $('[data-role="save-book"]');
+        const saveBtn = byId("saveBtn") || byId("save-book") || $('[data-action="save"]') || $('[data-role="save-book"]');
+        const cancelBtn = byId("cancelBtn");
 
-        const inpGenres = ensureHidden(form, "genres");
-        const inpMoods = ensureHidden(form, "moods");
-        const inpTropes = ensureHidden(form, "tropes");
-        const inpStatus = ensureHidden(form, "status");
-        const inpStatuses = ensureHidden(form, "statuses");
+        const fileInput = byId("bookFile");
+        const pickBtn = byId("btnPickFile");
+        const fileNameEl = byId("fileName");
+
+        const coverPrev = byId("coverPreview");
+        const coverPickBtn = byId("btnPickCover");
+        const coverFileInp = byId("coverFile");
+
+        // hidden inputs
+        const inpGenres = ensureHidden(form, "genres"); if (!inpGenres.value) inpGenres.value = "[]";
+        const inpMoods = ensureHidden(form, "moods"); if (!inpMoods.value) inpMoods.value = "[]";
+        const inpTropes = ensureHidden(form, "tropes"); if (!inpTropes.value) inpTropes.value = "[]";
+        const inpStatus = ensureHidden(form, "status");     // legacy single
+        const inpStatuses = ensureHidden(form, "statuses");   // NEW: array
         const inpFormat = ensureHidden(form, "format");
 
         const { genres, moods, tropes, statuses, formats } = getLists();
 
-        hydrateMulti($('#genresBox .categories'), genres, inpGenres);
-        hydrateMulti($('#moodsBox .categories'), moods, inpMoods);
-        hydrateMulti($('#tropesBox .categories'), tropes, inpTropes);
-        hydrateMulti($('#statusChips'), statuses, inpStatuses);
-        hydrateSingle($('#formatChips'), formats, inpFormat);
+        // chips
+        hydrateMulti($('#genresBox .categories') || $('[data-chips="genres"]'), genres, inpGenres);
+        hydrateMulti($('#moodsBox  .categories') || $('[data-chips="moods"]'), moods, inpMoods);
+        hydrateMulti($('#tropesBox .categories') || $('[data-chips="tropes"]'), tropes, inpTropes);
 
-        if (pickBtn && fileInput) {
-            pickBtn.setAttribute("type", "button");
-            pickBtn.addEventListener("click", e => {
-                e.preventDefault();
-                fileInput.click();
-            });
+        // Status: MULTI (writes JSON array to `statuses` and first item to `status`)
+        hydrateMulti($('#statusChips') || $('[data-chips="status"]'), statuses, inpStatuses, (vals) => {
+            // also update legacy single-value 'status' field
+            inpStatus.value = vals[0] || "";
+        });
 
+        // Format (single)
+        hydrateSingle($('#formatChips') || $('[data-chips="format"]'), formats, inpFormat);
+
+        // file picker UI (book file)
+        if (pickBtn && fileInput && fileNameEl) {
+            if (!pickBtn.getAttribute("type")) pickBtn.setAttribute("type", "button");
+            pickBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); fileInput.click(); });
             fileInput.addEventListener("change", async () => {
                 const f = fileInput.files?.[0];
-                fileNameEl.textContent = f?.name || "";
-                if (!f) return;
+                fileNameEl.textContent = f ? f.name : "";
+                if (!f) { coverBlob = null; return; }
 
-                coverBlob = await tryExtractCover(f);
-                updateCoverPreview(coverBlob ? URL.createObjectURL(coverBlob) : null);
-
-                if (/\.epub$/i.test(f.name) && window.ePub) {
-                    try {
-                        const book = await ePub(f);
-                        const meta = await book.loaded.metadata;
-                        if (meta?.title && !$("#title").value) $("#title").value = meta.title;
-                        if (meta?.creator && !$("#author").value) $("#author").value = meta.creator;
-                    } catch (e) { console.warn("EPUB metadata error", e); }
+                const extractor = window.PB?.extractBookMetadata;
+                if (!extractor) {
+                    console.warn("Metadata extractor not available.");
+                    return;
                 }
 
-                if (/\.pdf$/i.test(f.name) && window.pdfjsLib) {
-                    try {
-                        const ab = await f.arrayBuffer();
-                        const pdf = await pdfjsLib.getDocument({ data: ab }).promise;
-                        const meta = await pdf.getMetadata();
-                        if (meta?.info?.Title && !$("#title").value) $("#title").value = meta.info.Title;
-                        if (meta?.info?.Author && !$("#author").value) $("#author").value = meta.info.Author;
-                    } catch (e) { console.warn("PDF metadata error", e); }
+                const data = await extractor(f);
+
+                if (data.title && !byId("title").value) {
+                    byId("title").value = data.title;
+                }
+                if (data.author && !byId("author").value) {
+                    byId("author").value = data.author;
+                }
+
+                coverBlob = data.coverBlob;
+                if (coverBlob && !coverDataUrl && coverPrev) {
+                    coverPrev.src = URL.createObjectURL(coverBlob);
                 }
             });
+        }
 
-            const uploadBtn = document.getElementById("btnUploadCover");
-            const coverInput = document.getElementById("coverInput");
-            const coverPreview = document.getElementById("coverPreview");
-            const coverPlaceholder = document.getElementById("coverPlaceholder");
-
-            if (uploadBtn && coverInput) {
-                uploadBtn.addEventListener("click", () => {
-                    coverInput.click();
-                });
-
-                coverInput.addEventListener("change", function (e) {
-                    const file = e.target.files[0];
-                    if (!file) return;
-
-                    const reader = new FileReader();
-                    reader.onload = function (event) {
-                        if (coverPreview && coverPlaceholder) {
-                            coverPreview.src = event.target.result;
-                            coverPreview.style.display = "block";
-                            coverPlaceholder.style.display = "none";
-                        }
-                        window.selectedCoverDataUrl = event.target.result;
-                    };
-                    reader.readAsDataURL(file);
-                });
-            }
-
+        // cover picker UI (NEW)
+        if (coverPickBtn && coverFileInp) {
+            if (!coverPickBtn.getAttribute("type")) coverPickBtn.setAttribute("type", "button");
+            coverPickBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); coverFileInp.click(); });
+            coverFileInp.addEventListener("change", async () => {
+                const f = coverFileInp.files?.[0];
+                if (!f) return;
+                if (!/^image\//i.test(f.type)) { alert("Please choose an image file."); return; }
+                try {
+                    coverDataUrl = await readAsDataURL(f);
+                    if (coverPrev) coverPrev.src = coverDataUrl;
+                } catch (err) {
+                    console.warn("Cover read failed", err);
+                    alert("Could not read the cover image.");
+                }
+            });
         }
 
         async function handleSave() {
-            const title = $("#title")?.value?.trim() || "";
-            const author = $("#author")?.value?.trim() || "";
-            if (!title) return alert("Title is required.");
+            const title = (byId("title")?.value || "").trim();
+            const author = (byId("author")?.value || "").trim();
+            if (!title) { alert("Title is required."); return; }
 
-            const user = await requireUser();
-            const ref = createdBookId
-                ? db().collection("users").doc(user.uid).collection("books").doc(createdBookId)
-                : db().collection("users").doc(user.uid).collection("books").doc();
-            createdBookId = ref.id;
-
-            const statusesArr = safeParse(inpStatuses.value, []);
-            const payload = {
-                title, author,
-                started: $("#started")?.value || null,
-                finished: $("#finished")?.value || null,
-                review: $("#review")?.value || "",
-                status: statusesArr[0] || "",
-                statuses: statusesArr,
-                format: inpFormat.value || null,
-                genres: safeParse(inpGenres.value, []),
-                moods: safeParse(inpMoods.value, []),
-                tropes: safeParse(inpTropes.value, []),
-                rating: Number($('input[name="rating"]')?.value || 0),
-                spice: Number($('input[name="spice"]')?.value || 0),
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            };
-
-            const file = fileInput?.files?.[0];
-            if (file && !coverBlob) coverBlob = await tryExtractCover(file);
-
-            if (coverBlob) {
-                payload.coverDataUrl = URL.createObjectURL(coverBlob);
+            let user;
+            try {
+                user = await requireUser();
+            } catch (err) {
+                alert("You must be signed in to save a book.");
+                return;
             }
 
+            const database = db();
+            const col = database.collection("users").doc(user.uid).collection("books");
+
+            // reserve id
+            const ref = createdBookId ? col.doc(createdBookId) : col.doc();
+            createdBookId = ref.id;
+            form.setAttribute("data-id", createdBookId);
+
+            // rating/spice from hidden inputs if present
+            const rating = $('input[name="rating"]')?.value;
+            const spice = $('input[name="spice"]')?.value;
+
+            // parse statuses
+            let statusesArr = [];
+            try { statusesArr = JSON.parse(inpStatuses.value || "[]"); } catch { statusesArr = []; }
+            const primaryStatus = statusesArr[0] || (inpStatus.value || "") || null;
+
+            const payload = {
+                title, author,
+                started: byId("started")?.value || null,
+                finished: byId("finished")?.value || null,
+                review: byId("review")?.value || "",
+                status: primaryStatus,                 // legacy
+                statuses: statusesArr,                 // array
+                format: inpFormat.value || null,
+                genres: JSON.parse(inpGenres.value || "[]"),
+                moods: JSON.parse(inpMoods.value || "[]"),
+                tropes: JSON.parse(inpTropes.value || "[]"),
+                ...(rating ? { rating: Number(rating) || 0 } : {}),
+                ...(spice ? { spice: Number(spice) || 0 } : {}),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+
+            // Cover priority:
+            // 1) User-chosen image (coverDataUrl)
+            // 2) Extracted from book file (coverBlob) → store as data URL
+            if (coverDataUrl) {
+                payload.coverDataUrl = coverDataUrl;
+            } else if (coverBlob) {
+                try {
+                    payload.coverDataUrl = await readAsDataURL(coverBlob);
+                } catch (e) {
+                    console.warn("Failed to convert extracted cover blob to data URL", e);
+                }
+            }
+
+            // Save base doc
             await ref.set(payload, { merge: true });
 
-            if (file && (window.PBFileStore?.save || window.LocalFiles?.save)) {
+            // If user also picked a book file, save it via local store (unchanged)
+            const f = fileInput?.files?.[0] || null;
+            if (f && (window.PBFileStore?.save || window.LocalFiles?.save)) {
                 const saveFn = window.PBFileStore?.save
                     ? (args) => window.PBFileStore.save(args)
                     : ({ file, uid, bookId, coverBlob }) => window.LocalFiles.save(uid, bookId, file, coverBlob);
 
-                const fileMeta = await saveFn({ file, uid: user.uid, bookId: createdBookId, coverBlob });
+                let coverBlob2 = null;
+                if (coverDataUrl) {
+                    try { const resp = await fetch(coverDataUrl); coverBlob2 = await resp.blob(); } catch { }
+                } else if (coverBlob) {
+                    coverBlob2 = coverBlob;
+                } else if (coverPrev?.src?.startsWith("blob:")) {
+                    try { const resp = await fetch(coverPrev.src); coverBlob2 = await resp.blob(); } catch { }
+                }
+
+                const fileMeta = await saveFn({ file: f, uid: user.uid, bookId: createdBookId, coverBlob: coverBlob2 });
                 await ref.set({
                     hasFile: true,
-                    fileName: fileMeta?.name || file.name,
-                    fileSize: fileMeta?.size || file.size,
-                    fileType: fileMeta?.type || file.type,
+                    fileName: fileMeta?.name || f.name,
+                    fileSize: fileMeta?.size || f.size || null,
+                    fileType: fileMeta?.type || f.type || null,
                     storagePath: fileMeta?.path || null,
                     downloadURL: fileMeta?.url || null,
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -313,14 +312,23 @@
             }
 
             showToast("Saved ✓");
-            setTimeout(() => location.href = "index.html", 150);
+            try { window.PB?.logActivity?.({ action: "book_saved", targetId: createdBookId, meta: { title } }); } catch { }
+            setTimeout(() => { location.replace(`index.html?refresh=${Date.now()}`); }, 150);
         }
 
-        if (saveBtn && !saveBtn.dataset.wired) {
-            saveBtn.dataset.wired = "1";
-            saveBtn.addEventListener("click", e => {
+        // actions
+        if (saveBtn) {
+            if (!saveBtn.getAttribute("type")) saveBtn.setAttribute("type", "button");
+            if (saveBtn.dataset.wiredSave !== "1") {
+                saveBtn.dataset.wiredSave = "1";
+                saveBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); handleSave(); });
+            }
+        }
+        if (cancelBtn) {
+            cancelBtn.addEventListener("click", (e) => {
                 e.preventDefault();
-                handleSave();
+                e.stopPropagation();
+                history.back();
             });
         }
     }
@@ -330,23 +338,4 @@
     } else {
         init();
     }
-
 })();
-
-document.getElementById("coverInput")?.addEventListener("change", function (e) {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = function (event) {
-        const preview = document.getElementById("coverPreview");
-        if (preview) {
-            preview.src = event.target.result;
-        }
-
-        // OPTIONAL: Store the result for saving later (depends on your existing logic)
-        window.selectedCoverDataUrl = event.target.result;
-    };
-    reader.readAsDataURL(file);
-});
-

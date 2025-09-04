@@ -69,6 +69,35 @@
         class="btn btn-danger" disabled>Delete</button>
     </div>
   </div> <!-- Scripts -->
+  <template id="book-card-template">
+    <article class="book-card">
+      <div class="thumb-wrap">
+        <img class="thumb" src="" alt="" />
+        <span class="rated-badge" style="display: none;">
+          <img class="star" src="icons/yellow-star.svg" alt="" aria-hidden="true" />
+          <span class="val"></span>
+        </span>
+        <button type="button" class="heart-btn" data-action="fav" title="Favorite">
+          <i class="fa-regular fa-heart"></i>
+        </button>
+      </div>
+      <div class="title"></div>
+      <div class="author"></div>
+      <div class="card-ratings">
+        <div class="card-row rating-stars" aria-label="rating"></div>
+        <div class="card-row spice-chilis" aria-label="spice"></div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-secondary" data-action="open">
+          <i class="fa fa-pen"></i> Edit
+        </button>
+        <button class="btn" data-action="read" style="display: none;">
+          <i class="fa fa-book-open"></i> Read
+        </button>
+      </div>
+    </article>
+  </template>
+
   <script src="reset-utils.js"></script>
   <script src="nav.js" defer></script>
   <script src="profiles.js" defer></script>
