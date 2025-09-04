@@ -3,6 +3,8 @@
 (function () {
   "use strict";
   const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+  const userCache = new Map();
 
   function toWhen(e) {
     if (e.createdAt?.toDate) return e.createdAt.toDate();
@@ -14,6 +16,32 @@
     return null;
   }
   function esc(s) { return (s || "").replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
+
+  const libraryCache = new Set();
+
+  // New function to populate the cache of books in the user's library
+  async function buildLibraryCache(uid) {
+    libraryCache.clear();
+    try {
+      const snap = await fb.db.collection("users").doc(uid).collection("books").get();
+      snap.forEach(doc => {
+        const title = doc.data()?.title?.toLowerCase();
+        if (title) libraryCache.add(title);
+      });
+    } catch (e) {
+      console.warn("Could not build library cache", e);
+    }
+  }
+
+  async function getUserInfo(uid) {
+    if (userCache.has(uid)) return userCache.get(uid);
+    try {
+      const doc = await fb.db.collection("users").doc(uid).get();
+      const data = doc.exists ? doc.data() : { displayName: "A user" };
+      userCache.set(uid, data);
+      return data;
+    } catch { return { displayName: "A user" }; }
+  }
 
   async function getFriendsUids(uid) {
     const out = new Set([uid]); // include self always
@@ -60,46 +88,135 @@
     if (type === "finished") return "fa-flag-checkered";
     if (type === "rated") return "fa-star";
     if (type === "note") return "fa-pen";
+    if (type === "profile_updated") return "fa-user-pen";
     return "fa-book";
   }
-  function lineFor(item) {
+  function lineFor(item, user) {
     const t = item.type || item.action;
     const title = item.title ? `“${esc(item.title)}”` : (item.meta?.title ? `“${esc(item.meta.title)}”` : "");
-    if (t === "book_saved") return `saved <b>${title || "a book"}</b>`;
-    if (t === "file_attached") return `attached a ${esc(item.meta?.kind || "file")} ${title}`;
+    const userName = `<b>${esc(user.displayName || 'A user')}</b>`;
+
+    if (t === "book_saved") return `${userName} saved ${title || "a book"}`;
+    if (t === "file_attached") return `${userName} attached a ${esc(item.meta?.kind || "file")} to ${title}`;
     if (t === "progress_updated") {
-      if (item.meta?.kind === "pdf" && item.meta.page) return `reading… page ${item.meta.page}`;
-      if (item.meta?.kind === "epub" && (item.meta.percent || item.meta.percent === 0)) return `reading… ${item.meta.percent}%`;
-      return `reading…`;
+      if (item.meta?.kind === "pdf" && item.meta.page) return `${userName} is reading ${title}… page ${item.meta.page}`;
+      if (item.meta?.kind === "epub" && (item.meta.percent || item.meta.percent === 0)) return `${userName} is reading ${title}… ${item.meta.percent}%`;
+      return `${userName} is reading ${title}`;
     }
-    if (t === "started") return `started <b>${title}</b>`;
-    if (t === "finished") return `finished <b>${title}</b>${item.rating ? ` — ${esc(String(item.rating))}★` : ""}`;
-    if (t === "rated") return `rated <b>${title}</b> ${esc(String(item.rating))}★`;
-    if (t === "note") return `wrote a note on <b>${title}</b>`;
-    return `updated <b>${title}</b>`;
+    if (t === "started") return `${userName} started ${title}`;
+    if (t === "finished") return `${userName} finished ${title}${item.rating ? ` — ${esc(String(item.rating))}★` : ""}`;
+    if (t === "rated") return `${userName} rated ${title} ${esc(String(item.rating))}★`;
+    if (t === "note") return `${userName} wrote a note on ${title}`;
+    if (t === "profile_updated") {
+      if (item.meta?.updated === 'photo') return `${userName} updated their profile picture`;
+      return `${userName} updated their profile`;
+    }
+    return `${userName} updated ${title}`;
   }
 
-  function itemHTML(it) {
+  async function itemHTML(it) {
+    const me = auth().currentUser;
+    const user = await getUserInfo(it.owner);
     const when = toWhen(it);
     const whenTxt = when ? when.toLocaleString() : "";
     const likeN = Number(it.likeCount || 0);
     const comN = Number(it.commentCount || 0);
+
+    // Check if the current user has liked this item
+    let isLiked = false;
+    if (me) {
+      try {
+        const likeSnap = await db().collection("users").doc(it.owner).collection("activity").doc(it.id).collection("likes").doc(me.uid).get();
+        isLiked = likeSnap.exists;
+      } catch (e) { /* ignore, assume not liked */ }
+    }
+
+    // Check if book is in library to conditionally show "Add" button
+    const bookTitle = it.meta?.title?.toLowerCase();
+    const inLibrary = bookTitle ? libraryCache.has(bookTitle) : false;
+
+    // Conditionally create the "Add to Library" button
+    let addToLibraryBtn = '';
+    const isBookActivity = it.action?.startsWith('book_') || it.type?.startsWith('book_');
+    if (isBookActivity && !inLibrary && it.owner !== me.uid) {
+      const bookData = JSON.stringify({
+        title: it.meta?.title || 'Unknown Title',
+        author: it.meta?.author || 'Unknown Author',
+      });
+      addToLibraryBtn = `<button class="btn btn-secondary btn-add-to-lib" data-book='${esc(bookData)}'><i class="fa-solid fa-plus"></i> Add to Library</button>`;
+    }
+
     return `
       <div class="feed-item" data-owner="${it.owner}" data-id="${it.id}"
-           style="display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border)">
+           style="display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--border)">
+        <img src="${user.photoURL || 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'}" alt="" style="width:40px;height:40px;border-radius:50%;object-fit:cover;background:var(--surface);">
         <div style="flex:1;min-width:0">
-          <div class="muted" style="font-size:.85rem"><i class="fa-solid ${iconFor(it.type || it.action)}"></i> ${whenTxt}</div>
-          <div style="font-weight:700;margin:2px 0">${lineFor(it)}</div>
+          <div style="font-weight:500;margin:2px 0">${lineFor(it, user)}</div>
+          <div class="muted" style="font-size:.85rem; margin-top: 4px;"><i class="fa-solid ${iconFor(it.type || it.action)}"></i> ${whenTxt}</div>
           <div class="row" style="display:flex;gap:8px;align-items:center;margin-top:8px">
-            <button class="btn btn-secondary btn-like"><i class="fa-solid fa-heart"></i> ${likeN}</button>
+            <button class="btn btn-secondary btn-like ${isLiked ? 'active' : ''}"><i class="fa-solid fa-heart"></i> ${likeN}</button>
             <button class="btn btn-secondary btn-comment"><i class="fa-solid fa-comment"></i> ${comN}</button>
+            ${addToLibraryBtn}
           </div>
-          <div class="comment-box" style="display:none;margin-top:8px">
-            <input class="comment-input" placeholder="Write a comment…" />
-            <button class="btn btn-primary btn-send" style="margin-left:6px">Send</button>
+          <div class="comments-section" style="display:none;margin-top:12px;">
+            <div class="comments-list"></div>
+            <div class="comment-box" style="margin-top:8px">
+              <input class="comment-input" placeholder="Write a comment…" />
+              <button class="btn btn-primary btn-send" style="margin-left:6px">Send</button>
+            </div>
           </div>
         </div>
       </div>`;
+  }
+
+  async function saveBookToLibrary(bookData) {
+    const user = auth().currentUser;
+    if (!user) throw new Error("Not signed in");
+    const payload = {
+      title: bookData.title,
+      author: bookData.author,
+      status: 'tbr', // Default to TBR
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    };
+    const col = db().collection("users").doc(user.uid).collection("books");
+    await col.add(payload);
+  }
+
+  async function loadAndRenderComments(rootEl) {
+    const owner = rootEl.dataset.owner;
+    const id = rootEl.dataset.id;
+    const listEl = rootEl.querySelector('.comments-list');
+    if (!listEl) return;
+
+    listEl.innerHTML = '<p class="muted small">Loading comments...</p>';
+
+    try {
+      const commentsSnap = await db().collection("users").doc(owner).collection("activity").doc(id).collection("comments").orderBy("at", "asc").get();
+      if (commentsSnap.empty) {
+        listEl.innerHTML = ''; // No comments yet
+        return;
+      }
+
+      let commentsHtml = '';
+      for (const doc of commentsSnap.docs) {
+        const comment = doc.data();
+        const commenter = await getUserInfo(comment.uid);
+        commentsHtml += `
+                <div class="comment-item">
+                    <img src="${commenter.photoURL || 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'}" class="comment-avatar" alt="">
+                    <div class="comment-body">
+                        <b>${esc(commenter.displayName || 'A user')}</b>
+                        <p>${esc(comment.text)}</p>
+                    </div>
+                </div>
+            `;
+      }
+      listEl.innerHTML = commentsHtml;
+    } catch (e) {
+      console.error("Failed to load comments:", e);
+      listEl.innerHTML = '<p class="muted small" style="color:red;">Could not load comments.</p>';
+    }
   }
 
   function bindActions(container) {
@@ -108,16 +225,23 @@
       const owner = root.dataset.owner, id = root.dataset.id;
 
       if (e.target.closest(".btn-like")) {
+        const btn = e.target.closest(".btn-like");
         try {
           const liked = await window.PBActivity?.like(owner, id);
-          const b = root.querySelector(".btn-like");
-          const n = Number((b.textContent || "0").replace(/\D/g, "")) || 0;
-          b.innerHTML = `<i class="fa-solid fa-heart"></i> ${liked ? n + 1 : Math.max(0, n - 1)}`;
+          const n = Number((btn.textContent || "0").replace(/\D/g, "")) || 0;
+          btn.innerHTML = `<i class="fa-solid fa-heart"></i> ${liked ? n + 1 : Math.max(0, n - 1)}`;
+          btn.classList.toggle('active', liked);
         } catch { /* noop */ }
       }
       if (e.target.closest(".btn-comment")) {
-        const box = root.querySelector(".comment-box");
-        if (box) box.style.display = box.style.display === "none" ? "" : "none";
+        const commentsSection = root.querySelector(".comments-section");
+        if (commentsSection) {
+          const isHidden = commentsSection.style.display === "none";
+          commentsSection.style.display = isHidden ? "block" : "none";
+          if (isHidden) {
+            loadAndRenderComments(root); // Load comments when shown
+          }
+        }
       }
       if (e.target.closest(".btn-send")) {
         const inp = root.querySelector(".comment-input");
@@ -132,6 +256,20 @@
           window.toast?.("Comment posted ✓");
         } catch { /* noop */ }
       }
+      if (e.target.closest(".btn-add-to-lib")) {
+        const btn = e.target.closest(".btn-add-to-lib");
+        const bookData = JSON.parse(btn.dataset.book);
+        btn.disabled = true;
+        try {
+          await saveBookToLibrary(bookData);
+          btn.textContent = 'Added ✓';
+          libraryCache.add(bookData.title.toLowerCase()); // Update cache
+        } catch (err) {
+          console.error("Failed to add book from feed:", err);
+          alert("Could not add book.");
+          btn.disabled = false;
+        }
+      }
     });
   }
 
@@ -140,13 +278,16 @@
     feed.innerHTML = `<div class="muted">Loading…</div>`;
 
     requireAuth(async (me) => {
+      userCache.clear();
+      await buildLibraryCache(me.uid);
       const uids = await getFriendsUids(me.uid);
       const items = await loadActivities(uids);
       if (!items.length) {
         feed.innerHTML = `<div class="muted">No recent activity yet.</div>`;
         return;
       }
-      feed.innerHTML = items.map(itemHTML).join("");
+      const htmlChunks = await Promise.all(items.map(itemHTML));
+      feed.innerHTML = htmlChunks.join("");
       bindActions(feed);
     });
   }

@@ -3,7 +3,7 @@
   "use strict";
 
   const $ = (s, r = document) => r.querySelector(s);
-  const K = { side: "pb:timer:side", coll: "pb:timer:collapsed", active: "pb:timer:active", goal: "pb:timer:goalMin" };
+  const K = { side: "pb:timer:side", coll: "pb:timer:collapsed", active: "pb:timer:active", goal: "pb:timer:goal" };
 
   const CLOCK_SVG = `
   <svg class="clock-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" aria-hidden="true">
@@ -63,6 +63,69 @@
     $("#pb-timer-stop").disabled = !running && !paused;
   }
 
+  // --- Goal Check (called during the timer loop) ---
+  function checkAndCelebrateGoal(sessionState) {
+    if (!sessionState || sessionState.pausedAt) return;
+
+    const todayStr = toDayStr(new Date());
+    const goalReachedKey = `pb:goal_reached:${todayStr}`;
+
+    // If we've already shown the celebration for today, do nothing.
+    if (sessionStorage.getItem(goalReachedKey)) {
+      return;
+    }
+
+    const goal = Math.max(1, Number(localStorage.getItem(K.goal) || "20"));
+    const minutesAlreadyReadToday = getMinutesToday();
+    const currentSessionMinutes = currentElapsedMs(sessionState) / 60000;
+
+    const totalMinutesSoFar = minutesAlreadyReadToday + currentSessionMinutes;
+
+    if (totalMinutesSoFar >= goal) {
+      showGoalCelebration();
+      // Mark that we've shown it for today so it doesn't pop up again during this session.
+      sessionStorage.setItem(goalReachedKey, 'true');
+    }
+  }
+
+  // --- Goal Celebration ---
+  function showGoalCelebration() {
+    let celebrationEl = document.getElementById('pb-goal-celebration');
+    if (!celebrationEl) {
+      celebrationEl = document.createElement('div');
+      celebrationEl.id = 'pb-goal-celebration';
+      celebrationEl.style.cssText = `
+            position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+            display: grid; place-items: center; z-index: 10000;
+            opacity: 0; transition: opacity 0.3s ease;
+        `;
+      celebrationEl.innerHTML = `
+            <div style="background: var(--card); color: var(--text); padding: 40px; border-radius: 16px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.2); transform: scale(0.8); transition: transform 0.3s ease; max-width: 90vw;">
+                <div style="font-size: 48px;">🎉</div>
+                <h2 style="margin-top: 16px; font-size: 1.5rem;">Goal Reached!</h2>
+                <p style="color: var(--muted); margin-top: 8px;">You've met your daily reading goal. Great job!</p>
+                <button id="pb-goal-celebration-close" style="margin-top: 24px; padding: 10px 20px; border: none; background: var(--primary); color: var(--btn-text); border-radius: 8px; cursor: pointer; font-weight: 700;">Continue</button>
+            </div>
+        `;
+      document.body.appendChild(celebrationEl);
+
+      celebrationEl.addEventListener('click', (e) => {
+        if (e.target === celebrationEl || e.target.closest('#pb-goal-celebration-close')) {
+          const inner = celebrationEl.querySelector('div');
+          inner.style.transform = 'scale(0.8)';
+          celebrationEl.style.opacity = '0';
+          setTimeout(() => { celebrationEl.style.display = 'none'; }, 300);
+        }
+      });
+    }
+
+    celebrationEl.style.display = 'grid';
+    requestAnimationFrame(() => {
+      celebrationEl.style.opacity = '1';
+      celebrationEl.querySelector('div').style.transform = 'scale(1)';
+    });
+  }
+
   // time + loop
   let tick = null;
   const drawTime = (ms) => { const el = $("#pb-timer-time"); if (el) el.textContent = fmt(ms / 1000); };
@@ -75,6 +138,10 @@
     const s = loadState();
     const elapsed = currentElapsedMs(s);
     drawTime(elapsed);
+
+    // New: Check for goal completion during the session
+    checkAndCelebrateGoal(s);
+
     updateCollapsedCircle();
     if (!s || s.pausedAt) stopLoop();
   }
@@ -154,7 +221,10 @@
     if (s) {
       const totalMs = s.pausedAt ? s.accumMs : currentElapsedMs(s);
       const min = Math.max(0, Math.round(totalMs / 60000));
-      if (min > 0) bumpLocalDay(min);
+      if (min > 0) {
+        // The celebration is now handled in the loop. We just need to save the minutes.
+        bumpLocalDay(min);
+      }
     }
     clearState(); stopLoop(); drawTime(0);
     setButtonsState({ running: false, paused: false });
@@ -224,6 +294,18 @@
     document.addEventListener("pb:nav-ready", placeDock);
     new MutationObserver(placeDock).observe(document.body, { childList: true, subtree: true });
   }
+
+  // --- Public API ---
+  window.PBTimer = {
+    applySettings: placeDock,
+    toggleDock: () => {
+      const dock = ensureDock();
+      const isCollapsed = dock.classList.contains("collapsed");
+      setCollapsed(!isCollapsed);
+    },
+    reset: stopAndPersist,
+    _getState: loadState, // Expose for debugging or advanced use
+  };
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bind, { once: true });
   else bind();

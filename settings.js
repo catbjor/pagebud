@@ -1,160 +1,163 @@
-/* ========== Settings logic (themes + timer + cache) ========== */
+// settings.js
 (function () {
+    "use strict";
+
     const $ = (s, r = document) => r.querySelector(s);
     const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 
-    /* -------- util: cross-page broadcast -------- */
-    function broadcast(payload) {
-        try { window.dispatchEvent(new CustomEvent("pb:settings:update", { detail: payload })); } catch { }
-    }
-    function toast(msg) {
-        const t = document.createElement("div");
-        t.className = "toast";
-        t.textContent = msg;
-        document.body.appendChild(t);
-        requestAnimationFrame(() => t.classList.add("show"));
-        setTimeout(() => t.classList.remove("show"), 1800);
-        setTimeout(() => t.remove(), 2200);
-    }
-
-    /* ---------- THEMES ---------- */
-    const THEMES = [
-        { id: "navy", name: "Navy & Teal", sw: ["#0b1220", "#0f766e", "#38bdf8", "#1f2937"] },
-        { id: "porcelain", name: "Soft Neutrals", sw: ["#f7f7fb", "#eceff6", "#cbd5e1", "#475569"] },
-        { id: "moss", name: "Moss Forest", sw: ["#0f172a", "#064e3b", "#34d399", "#1e293b"] },
-        { id: "blush", name: "Soft Blush", sw: ["#fff7f9", "#ffdce7", "#f472b6", "#6b7280"] },
-        { id: "sunset", name: "Sunset Pastel", sw: ["#0f0f12", "#fb7185", "#fca5a5", "#fde68a"] },
-        { id: "espresso-peony", name: "Espresso & Peony", sw: ["#14110f", "#854d0e", "#cc8899", "#f5e1e9"] },
-        { id: "glow", name: "Navy & Gold", sw: ["#0b1220", "#f59e0b", "#fde68a", "#111827"] },
-        { id: "bakery", name: "Bakery Pastels", sw: ["#fffdfa", "#ffd1dc", "#bde0fe", "#c1f0d9"] }
-    ];
-
-    const themeList = $("#themeList");
-    const currentThemeVal = $("#currentThemeVal");
-    const btnMatchSystem = $("#btnMatchSystem");
-
-    function applyTheme(key) {
-        localStorage.setItem("pb:theme", key);
-        // Re-apply on this tab
-        if (window.pbApplyTheme) window.pbApplyTheme();
-        currentThemeVal.textContent = key;
-        $$(".theme-preview").forEach(b => b.classList.toggle("active", b.dataset.theme === key));
-        // Tell other open pages
-        broadcast({ theme: { key } });
-        toast(`Theme set: ${key}`);
-    }
-
-    if (themeList) {
-        themeList.innerHTML = THEMES.map(t => `
-      <button class="theme-preview" data-theme="${t.id}">
-        <div class="theme-slab">
-          ${t.sw.map(c => `<span class="sw" style="background:${c}"></span>`).join("")}
-        </div>
-        <div class="theme-name">${t.name}</div>
-        <i class="fa fa-check check"></i>
-      </button>`).join("");
-
-        $$(".theme-preview", themeList).forEach(btn =>
-            btn.addEventListener("click", () => applyTheme(btn.dataset.theme))
-        );
-
-        btnMatchSystem?.addEventListener("click", () => applyTheme("system"));
-        applyTheme(localStorage.getItem("pb:theme") || "default");
-    }
-
-    /* ---------- READING TIMER ---------- */
-    const K = { goal: "pb:timer:goalMin", side: "pb:timer:side", coll: "pb:timer:collapsed", visible: "pb:timer:visible" };
-
-    const goalInput = $("#goalInput");
-    const goalVal = $("#goalVal");
-    const goalSave = $("#goalSave");
-
-    const dockLeft = $("#dockLeft");
-    const dockRight = $("#dockRight");
-    const startCollapsed = $("#startCollapsed");
-
-    const btnApplyNow = $("#btnApplyNow");
-    const btnShowDock = $("#btnShowDock");
-    const btnResetTimer = $("#btnResetTimer");
-
-    const st = {
-        goal: parseInt(localStorage.getItem(K.goal) || "20", 10),
-        side: localStorage.getItem(K.side) || "right",
-        coll: localStorage.getItem(K.coll) === "1"
-    };
-
-    if (goalInput) {
-        goalInput.value = st.goal;
-        goalVal.textContent = st.goal;
-        goalInput.addEventListener("input", () => (goalVal.textContent = goalInput.value));
-    }
-    if (dockLeft && dockRight) ((st.side === "right") ? dockRight : dockLeft).checked = true;
-    if (startCollapsed) startCollapsed.checked = !!st.coll;
-
-    // Save + broadcast each control
-    goalSave?.addEventListener("click", () => {
-        const v = parseInt(goalInput.value || "20", 10);
-        localStorage.setItem(K.goal, String(v));
-        broadcast({ timer: { goalMin: v } });
-        toast(`Daily goal saved: ${v}m`);
-    });
-
-    dockLeft?.addEventListener("change", () => {
-        if (dockLeft.checked) {
-            localStorage.setItem(K.side, "left");
-            broadcast({ timer: { side: "left" } });
-            toast("Dock set: left");
+    // Helper to show a generic "Saved" toast
+    function showSavedToast() {
+        if (window.toast) {
+            window.toast("Saved ✓");
+        } else {
+            alert("Saved ✓");
         }
-    });
-    dockRight?.addEventListener("change", () => {
-        if (dockRight.checked) {
-            localStorage.setItem(K.side, "right");
-            broadcast({ timer: { side: "right" } });
-            toast("Dock set: right");
-        }
-    });
+    }
 
-    startCollapsed?.addEventListener("change", () => {
-        const flag = startCollapsed.checked;
-        localStorage.setItem(K.coll, flag ? "1" : "0");
-        broadcast({ timer: { collapsed: flag } });
-        toast(flag ? "Starts collapsed" : "Starts expanded");
-    });
+    // --- Appearance / Themes ---
+    function initThemes() {
+        const container = $("#themeList");
+        const currentThemeEl = $("#currentThemeVal");
+        const btnMatchSystem = $("#btnMatchSystem");
+        if (!container || !currentThemeEl) return;
 
-    btnApplyNow?.addEventListener("click", () => {
-        broadcast({
-            timer: {
-                goalMin: parseInt(localStorage.getItem(K.goal) || "20", 10),
-                side: localStorage.getItem(K.side) || "right",
-                collapsed: localStorage.getItem(K.coll) === "1"
-            }
+        const themes = [
+            { id: "default", name: "Default" }, { id: "light", name: "Light" }, { id: "dark", name: "Dark" },
+            { id: "porcelain", name: "Porcelain" }, { id: "moss", name: "Moss" }, { id: "navy", name: "Navy & Teal" },
+            { id: "blush", name: "Soft Blush" }, { id: "sunset", name: "Sunset Pastel" }, { id: "espresso-peony", name: "Espresso & Peony" },
+            { id: "glow", name: "Navy & Gold" }, { id: "bakery", name: "Bakery Pastels" }
+        ];
+
+        const palettes = {
+            default: ['#2f4156', '#f6f7fb', '#fff', '#e6e8ee'], light: ['#2f4156', '#f6f7fb', '#fff', '#e5e7eb'],
+            dark: ['#38bdf8', '#0b1220', '#111827', '#263244'], porcelain: ['#475569', '#f7f7fb', '#fff', '#cbd5e1'],
+            moss: ['#34d399', '#0f172a', '#111827', '#223046'], navy: ['#0f766e', '#0b1220', '#111827', '#243041'],
+            blush: ['#f472b6', '#fff7f9', '#fff', '#f3cfe0'], sunset: ['#fb7185', '#0f0f12', '#111113', '#26262d'],
+            "espresso-peony": ['#854d0e', '#f5e1e9', '#fff', '#e5c9d5'], glow: ['#f59e0b', '#0b1220', ' #0f172a', '#223046'],
+            bakery: ['#bde0fe', '#fffdfa', '#fff', '#f0dce3']
+        };
+
+        let html = '';
+        themes.forEach(theme => {
+            const p = palettes[theme.id] || palettes.default;
+            html += `
+                <div class="theme-preview" data-theme-id="${theme.id}" role="button" tabindex="0" aria-label="Select ${theme.name} theme">
+                    <div class="theme-slab">
+                        <span class="sw" style="background:${p[0]}"></span><span class="sw" style="background:${p[1]}"></span>
+                        <span class="sw" style="background:${p[2]}"></span><span class="sw" style="background:${p[3]}"></span>
+                    </div>
+                    <div class="theme-name">${theme.name}</div>
+                    <i class="fa fa-check-circle check"></i>
+                </div>
+            `;
         });
-        toast("Timer settings applied now");
-    });
+        container.innerHTML = html;
 
-    btnShowDock?.addEventListener("click", () => {
-        const now = localStorage.getItem(K.visible) === "1";
-        const next = !now;
-        localStorage.setItem(K.visible, next ? "1" : "0");
-        broadcast({ timer: { toggleVisible: true } });
-        toast("Toggled dock visibility");
-    });
+        function updateActiveState() {
+            const currentTheme = localStorage.getItem("pb:theme") || "default";
+            $$(".theme-preview", container).forEach(el => {
+                el.classList.toggle("active", el.dataset.themeId === currentTheme);
+            });
+            const activeTheme = themes.find(t => t.id === currentTheme);
+            currentThemeEl.textContent = activeTheme ? activeTheme.name : (currentTheme === 'system' ? 'System' : 'Default');
+        }
 
-    btnResetTimer?.addEventListener("click", () => {
-        ["pb:timer:active", "pb:timer:queue"].forEach(k => localStorage.removeItem(k));
-        broadcast({ timer: { resetState: true } });
-        toast("Timer state reset");
-    });
+        container.addEventListener("click", (e) => {
+            const preview = e.target.closest(".theme-preview");
+            if (!preview) return;
 
-    /* ---------- RESET CACHE ---------- */
-    $("#btnResetKeep")?.addEventListener("click", () => {
-        Object.keys(localStorage).filter(k => k.startsWith("pb:")).forEach(k => localStorage.removeItem(k));
-        broadcast({ cache: { softReset: true } });
-        alert("Cache cleared (login kept)."); location.reload();
-    });
+            const themeId = preview.dataset.themeId;
+            localStorage.setItem("pb:theme", themeId);
+            window.dispatchEvent(new CustomEvent("pb:themeChanged"));
+            updateActiveState();
+            toast(`Theme set to ${preview.querySelector('.theme-name').textContent}`);
+        });
 
-    $("#btnFullReset")?.addEventListener("click", () => {
-        localStorage.clear(); broadcast({ cache: { hardReset: true } });
-        alert("Full reset. You may need to sign in again."); location.reload();
-    });
+        btnMatchSystem?.addEventListener("click", () => {
+            localStorage.setItem("pb:theme", "system");
+            window.dispatchEvent(new CustomEvent("pb:themeChanged"));
+            updateActiveState();
+            toast("Theme set to match system");
+        });
+
+        updateActiveState();
+    }
+
+    // --- Reading Timer Settings ---
+    function initTimerSettings() {
+        const goalInput = $("#goalInput");
+        const goalVal = $("#goalVal");
+        const goalSaveBtn = $("#goalSave");
+        const dockLeft = $("#dockLeft");
+        const dockRight = $("#dockRight");
+        const startCollapsed = $("#startCollapsed");
+
+        if (!goalInput) return;
+
+        const currentGoal = localStorage.getItem("pb:timer:goal") || "20";
+        goalInput.value = currentGoal;
+        goalVal.textContent = currentGoal;
+
+        const currentDock = localStorage.getItem("pb:timer:side") || "right";
+        if (currentDock === 'left') dockLeft.checked = true; else dockRight.checked = true;
+
+        startCollapsed.checked = localStorage.getItem("pb:timer:collapsed") === "true";
+
+        goalInput.addEventListener("input", () => { goalVal.textContent = goalInput.value; });
+
+        goalSaveBtn.addEventListener("click", () => {
+            localStorage.setItem("pb:timer:goal", goalInput.value);
+            showSavedToast();
+        });
+
+        const saveDockSettings = () => {
+            localStorage.setItem("pb:timer:side", dockLeft.checked ? "left" : "right");
+            localStorage.setItem("pb:timer:collapsed", startCollapsed.checked ? "true" : "false");
+            showSavedToast();
+            // Immediately apply the change to the visible timer dock
+            window.PBTimer?.applySettings?.();
+        };
+
+        dockLeft.addEventListener("change", saveDockSettings);
+        dockRight.addEventListener("change", saveDockSettings);
+        startCollapsed.addEventListener("change", saveDockSettings);
+
+        $("#btnShowDock")?.addEventListener("click", () => {
+            window.PBTimer?.toggleDock?.();
+            toast("Timer shown/hidden");
+        });
+        $("#btnResetTimer")?.addEventListener("click", () => { window.PBTimer?.reset?.(); toast("Timer state reset"); });
+    }
+
+    // --- App Actions (Update, Reset) ---
+    async function doUpdate() {
+        const ok = confirm("Update the app now? This will reload the page.");
+        if (!ok) return;
+        try {
+            window.toast?.("Updating…");
+            const reg = await navigator.serviceWorker?.getRegistration?.();
+            await reg?.update?.();
+            setTimeout(() => location.reload(), 400);
+        } catch { location.reload(); }
+    }
+
+    // --- Reset Buttons ---
+    function initAppActions() {
+        // Update
+        $("#btnUpdateApp")?.addEventListener("click", doUpdate);
+
+        // Reset
+        $("#btnResetKeep")?.addEventListener("click", () => window.pbResetCaches?.({ full: false }));
+        $("#btnFullReset")?.addEventListener("click", () => window.pbResetCaches?.({ full: true }));
+    }
+
+    function boot() {
+        initThemes();
+        initTimerSettings();
+        initAppActions();
+    }
+
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot, { once: true });
+    else boot();
+
 })();

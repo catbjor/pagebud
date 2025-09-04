@@ -6,7 +6,7 @@
     library: { href: "index.html", icon: "fa-book", label: "Library" },
     stats: { href: "stats.html", icon: "fa-chart-line", label: "Stats" },
     discover: { href: "discover.html", icon: "fa-compass", label: "Discover" },
-    buddyread: { href: "buddy-read.html", icon: "fa-user", label: "Buddy Read" },
+    friends: { href: "friends.html", icon: "fa-users", label: "Friends" },
     settings: { href: "settings.html", icon: "fa-cog", label: "Settings" }
   };
 
@@ -19,9 +19,10 @@
 
   function activeKey() {
     const here = location.pathname.split("/").pop() || "index.html";
+    if (samePath(here, "profile.html")) return null;
     if (samePath(here, PAGES.stats.href)) return "stats";
     if (samePath(here, PAGES.discover.href)) return "discover";
-    if (samePath(here, PAGES.buddyread.href)) return "buddyread";
+    if (samePath(here, PAGES.friends.href)) return "friends";
     if (samePath(here, PAGES.settings.href)) return "settings";
     return "library";
   }
@@ -51,7 +52,7 @@
     nav.appendChild(item("library"));
     nav.appendChild(item("stats"));
     nav.appendChild(item("discover"));
-    nav.appendChild(item("buddyread"));
+    nav.appendChild(item("friends"));
     nav.appendChild(item("settings"));
 
     (document.querySelector(".app-container") || document.body).appendChild(nav);

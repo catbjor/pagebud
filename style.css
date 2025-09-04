@@ -289,7 +289,32 @@ input[type="text"] {
 
 .header-actions {
   display: flex;
-  gap: 8px
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-header-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 16px;
+  text-decoration: none;
+  position: relative;
+  /* For badges */
+}
+
+.btn-header-icon:hover {
+  background: var(--hover);
+}
+
+.goal-badge-link {
+  display: block;
+  text-decoration: none;
 }
 
 .back-fab {
@@ -335,25 +360,31 @@ input[type="text"] {
 
 /* ---------- Toolbar ---------- */
 .toolbar {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  padding: 0 16px 12px
+  gap: 12px;
+  padding: 0 16px 12px;
+}
+
+.toolbar #search-input {
+  max-width: 450px;
+  width: 100%;
+  text-align: center;
 }
 
 .view-toggle {
   display: flex;
-  gap: 6px
+  gap: 8px;
 }
 
 .view-toggle .btn {
   background: var(--surface);
   color: var(--text);
   border-color: var(--border);
-  padding: .5rem .8rem;
-  border-radius: 12px;
-  font-weight: 800
+  padding: 6px 14px;
+  border-radius: 10px;
+  font-weight: 700;
 }
 
 .view-toggle .btn.active {
@@ -364,11 +395,7 @@ input[type="text"] {
 
 @media (max-width:560px) {
   .toolbar {
-    grid-template-columns: 1fr
-  }
-
-  .view-toggle {
-    justify-content: flex-start
+    /* The flex-column layout already works well on mobile, no changes needed. */
   }
 }
 
@@ -432,7 +459,7 @@ input[type="text"] {
 .thumb-wrap {
   position: relative;
   width: 100%;
-  height: 190px;
+  aspect-ratio: 2 / 3;
   border-radius: 10px;
   overflow: hidden;
   border: 1px solid var(--border);
@@ -987,13 +1014,14 @@ input[type="text"] {
   border: 1px solid var(--border);
   border-radius: 16px;
   padding: 24px;
-  margin-top: 16px; /* Space from header */
+  margin-top: 16px;
+  /* Space from header */
   box-shadow: 0 2px 8px rgba(0, 0, 0, .05);
 }
 
 /* Reset margins on direct children since gap handles spacing */
-.form-content-wrapper > .form-row,
-.form-content-wrapper > details.card {
+.form-content-wrapper>.form-row,
+.form-content-wrapper>details.card {
   margin: 0;
 }
 
@@ -1206,6 +1234,30 @@ input[type="file"]::file-selector-button:hover {
 .book-card.selected {
   transform: scale(0.96);
   box-shadow: 0 0 0 3px var(--primary);
+}
+.book-card::after {
+  content: "\f00c"; /* Font Awesome check icon */
+  font-family: "Font Awesome 6 Free";
+  font-weight: 900;
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 24px;
+  height: 24px;
+  background: var(--primary);
+  color: var(--btn-text);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  z-index: 3;
+  opacity: 0;
+  transform: scale(0.5);
+  transition: opacity .2s, transform .2s;
+}
+.book-card.selected::after {
+  opacity: 1;
+  transform: scale(1);
 }
 
 /* ---- Timer override: la timer-ring.css + timer.js bestemme plassering ---- */
@@ -1445,6 +1497,9 @@ input[type="file"]::file-selector-button:hover {
   font-weight: 700;
   cursor: pointer;
   user-select: none;
+  /* Responsive fix: prevent chips from shrinking and force them to wrap */
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 /* Status & Format: a touch smaller */
@@ -1483,4 +1538,86 @@ input[type="file"]::file-selector-button:hover {
 /* Space under the cover block so Title/Author don’t crash into it */
 .cover-block {
   margin-bottom: 20px;
+}
+
+/* --- Homepage Feed Preview --- */
+.feed-preview-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  text-decoration: none;
+  color: var(--text);
+}
+
+.feed-preview-item:last-child {
+  border-bottom: none;
+}
+
+.feed-preview-item .avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--surface);
+}
+
+.feed-preview-item .line-1 {
+  font-weight: 500;
+}
+
+/* --- Social Feed Interactive Elements --- */
+.btn-like.active {
+    background: #ffeded;
+    border-color: #ffb3b3;
+    color: #d12a2a;
+}
+
+.btn-add-to-lib {
+    padding: 6px 12px;
+    font-size: .85rem;
+}
+
+.comments-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 10px;
+}
+
+.comment-item {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+}
+
+.comment-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: var(--surface);
+}
+
+.comment-body {
+    background: var(--surface);
+    padding: 8px 12px;
+    border-radius: 12px;
+    flex: 1;
+}
+
+.comment-body p {
+    margin: 4px 0 0;
+    font-size: .95rem;
+    white-space: pre-wrap; /* Respect line breaks */
+    word-break: break-word;
+}
+
+.comment-box {
+    display: flex;
+}
+
+.comment-input {
+    flex: 1;
 }

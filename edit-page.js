@@ -100,6 +100,7 @@
     $("#title") && ($("#title").value = d.title || "");
     $("#author") && ($("#author").value = d.author || "");
     $("#started") && ($("#started").value = typeof d.started === "string" ? d.started : "");
+    $("#pageCount") && ($("#pageCount").value = d.pageCount || "");
     $("#finished") && ($("#finished").value = typeof d.finished === "string" ? d.finished : "");
     $("#review") && ($("#review").value = d.review || "");
 
@@ -191,6 +192,7 @@
     const payload = {
       title, author,
       started: $("#started")?.value || null,
+      pageCount: Number($("#pageCount")?.value) || null,
       finished: $("#finished")?.value || null,
       review: $("#review")?.value || "",
       genres, moods, tropes,

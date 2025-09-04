@@ -34,5 +34,13 @@
         "Secret Baby", "Secret Billionaire", "Secret Identity / Double Life", "Single Parent", "Slow Burn", "Small Town", "Strong Female Lead", "Teacher / Student", "Touch Her and You Die", "Time Travel", "Workplace Rivals", "Workplace Romance", "Young Love", "Zero-to-Hero",
     ];
 
-    window.PB_CONST = { GENRES, MOODS, TROPES };
+    // Reading Quirks (for profile page)
+    const QUIRKS = [
+        "Reads the last page first", "Dog-ears pages", "Reads multiple books at once",
+        "Only reads at night", "Never cracks the spine", "Listens to audiobooks at 2x speed",
+        "Has a dedicated reading nook", "Matches bookmarks to book covers",
+        "Cries over fictional characters", "Buys more books than they can read"
+    ];
+
+    window.PB_CONST = { GENRES, MOODS, TROPES, QUIRKS };
 })();

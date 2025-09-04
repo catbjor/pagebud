@@ -8,11 +8,12 @@
      * @returns {Promise<{title: string|null, author: string|null, coverBlob: Blob|null}>}
      */
     async function extractBookMetadata(file) {
-        if (!file) return { title: null, author: null, coverBlob: null };
+        if (!file) return { title: null, author: null, coverBlob: null, pageCount: null };
 
         let title = null;
         let author = null;
         let coverBlob = null;
+        let pageCount = null;
 
         // Handle EPUB
         if (/\.epub$/i.test(file.name) && window.ePub) {
@@ -39,6 +40,7 @@
                 const { info } = await pdf.getMetadata();
                 title = info.Title || null;
                 author = info.Author || null;
+                pageCount = pdf.numPages || null;
 
                 const page = await pdf.getPage(1);
                 const vp = page.getViewport({ scale: 1.4 });
@@ -51,7 +53,7 @@
             }
         }
 
-        return { title, author, coverBlob };
+        return { title, author, coverBlob, pageCount };
     }
 
     // Expose globally

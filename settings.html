@@ -30,20 +30,15 @@
             </div>
         </header>
 
-        <h2>Profile</h2>
-        <label>Name</label>
-        <input type="text" id="profileName" placeholder="Your name" />
-
-        <label>Photo</label>
-        <input type="file" id="profilePhoto" accept="image/*" />
-        <img id="photoPreview" alt="Preview" style="max-width: 120px;" />
-
-        <button id="saveProfile" class="btn">Save Profile</button>
-
-        <script src="profile.js"></script>
-
-
         <main class="container">
+            <!-- Profile link moved to the top -->
+            <section class="card">
+                <div class="card-head">
+                    <h2>My Profile</h2>
+                    <a href="profile.html" class="btn btn-secondary">View & Edit Profile</a>
+                </div>
+            </section>
+
             <!-- Appearance -->
             <section class="card">
                 <div class="card-head">
@@ -89,10 +84,20 @@
                     <div class="muted">Timer starts hidden and expands when you tap the clock.</div>
                 </div>
                 <div class="row wrap">
-                    <button class="btn" id="btnApplyNow">Apply now</button>
                     <button class="btn" id="btnShowDock">Show/Hide now</button>
                     <button class="btn" id="btnResetTimer">Reset timer state</button>
                 </div>
+            </section>
+
+            <!-- App Management -->
+            <section class="card">
+                <div class="card-head">
+                    <h2>App Management</h2>
+                </div>
+                <div class="row">
+                    <button id="btnUpdateApp" class="btn">Check for Updates</button>
+                </div>
+                <p class="muted small">Force the app to check for a new version.</p>
             </section>
 
             <!-- Language (EN / NO) -->
@@ -138,12 +143,12 @@
         </nav>
     </div>
 
+    <!-- Note: profiles.js is no longer needed on this page -->
     <!-- Dine eksisterende scripts -->
     <script src="toast.js" defer></script>
     <script src="push.js" defer></script>
     <script src="timer.js" defer></script>
     <script src="settings.js" defer></script>
-    <script src="settings-fix.js" defer></script>
     <script src="export-notes.js" defer></script>
 
     <!-- i18n og språkstyring -->

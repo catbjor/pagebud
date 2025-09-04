@@ -47,26 +47,6 @@
             onClick(e);
         });
     }
-    function setHref(selector, href) {
-        const el = document.querySelector(selector);
-        if (!el) return;
-        if (el.tagName === "A") {
-            el.setAttribute("href", href);
-        } else {
-            el.addEventListener("click", (e) => { e.preventDefault(); location.href = href; });
-            el.style.cursor = "pointer";
-        }
-    }
-    async function doUpdate() {
-        const ok = confirm("Update the app now? This will reload the page.");
-        if (!ok) return;
-        try {
-            window.toast?.("Updating…");
-            const reg = await navigator.serviceWorker?.getRegistration?.();
-            try { await reg?.update?.(); } catch { }
-            setTimeout(() => location.reload(), 400);
-        } catch { location.reload(); }
-    }
 
     // ---------- greeting ----------
     async function initGreeting() {
@@ -223,16 +203,9 @@
 
     // ---------- boot ----------
     function boot() {
-        setHref("#btnFriends,[data-action='friends']", "friends.html");
-
-        hookBtn("#btnUpdateApp,[data-action='update']", doUpdate);
-        setHref("#btnCalendar,[data-action='calendar']", "stats.html");
-        setHref("#goalBadge,[data-action='goal']", "stats.html");
-
         initGreeting();
         enhanceCardsWithReading();
         centerHeartIcons();
-        wireGlobalFriendsBadgesSplit(); // 🔔 split badges
     }
 
     if (document.readyState === "loading") {

@@ -253,6 +253,7 @@
             const payload = {
                 title, author,
                 started: byId("started")?.value || null,
+                pageCount: Number(byId("pageCount")?.value) || null,
                 finished: byId("finished")?.value || null,
                 review: byId("review")?.value || "",
                 status: primaryStatus,                 // legacy

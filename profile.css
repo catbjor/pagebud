@@ -1,0 +1,263 @@
+/* profile.css */
+
+.profile-content {
+    max-width: 700px;
+    margin: 24px auto;
+    padding: 0 16px;
+}
+
+.profile-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .06);
+}
+
+.profile-photo-wrap {
+    position: relative;
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    margin-bottom: 16px;
+    border: 4px solid var(--card);
+    box-shadow: 0 0 0 2px var(--border);
+}
+
+#profilePhoto {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+    background: var(--surface);
+}
+
+.btn-change-photo {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: var(--btn-text);
+    border: 2px solid var(--card);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+}
+
+#profileName {
+    margin: 0;
+    font-size: 1.8rem;
+}
+
+#profileUsername {
+    margin-top: 4px;
+    font-size: 1.1rem;
+}
+
+.bio-text {
+    margin-top: 16px;
+    max-width: 500px;
+    line-height: 1.6;
+    color: var(--muted);
+}
+
+.profile-actions {
+    margin-top: 24px;
+    display: flex;
+    gap: 12px;
+}
+
+#editProfileSection {
+    margin-top: 24px;
+}
+
+#editBio {
+    width: 100%;
+    min-height: 100px;
+    resize: vertical;
+}
+
+/* --- Reading Quirks --- */
+.quirks-container {
+    margin-top: 20px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+}
+
+.quirk-chip {
+    display: inline-block;
+    padding: 6px 12px;
+    border-radius: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    font-weight: 600;
+    font-size: .85rem;
+}
+
+/* --- Reading Stats --- */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 16px;
+}
+
+.stat-item {
+    text-align: center;
+}
+
+.stat-value {
+    font-size: 1.8rem;
+    font-weight: 900;
+    color: var(--primary);
+}
+
+.stat-label {
+    font-size: .9rem;
+    color: var(--muted);
+    font-weight: 600;
+}
+
+/* --- Profile Shelf --- */
+.profile-shelf {
+    margin-top: 24px;
+}
+
+.shelf-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 12px;
+    margin-top: 12px;
+}
+
+/* On wider screens, allow slightly larger cards */
+@media (min-width: 768px) {
+    .shelf-grid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    }
+}
+
+/* --- Achievements --- */
+.achievements-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-top: 12px;
+}
+
+.achievement-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+}
+
+.achievement-item.locked {
+    opacity: 0.6;
+}
+
+.achievement-icon {
+    font-size: 24px;
+    color: var(--primary);
+}
+
+.achievement-title {
+    font-weight: 800;
+}
+
+.achievement-desc {
+    font-size: .85rem;
+    color: var(--muted);
+}
+
+/* --- Achievements --- */
+.achievements-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+    margin-top: 12px;
+}
+
+.achievement-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+}
+
+.achievement-item.locked {
+    opacity: 0.6;
+}
+
+.achievement-icon {
+    font-size: 24px;
+    color: var(--primary);
+}
+
+.achievement-title {
+    font-weight: 800;
+}
+
+.achievement-desc {
+    font-size: .85rem;
+    color: var(--muted);
+}
+
+/* --- Compatibility Score --- */
+.compatibility-score {
+    margin-top: 24px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
+}
+
+.score-label {
+    font-weight: 700;
+    margin-bottom: 16px;
+    color: var(--muted);
+}
+
+.score-value-wrap {
+    margin-bottom: 16px;
+}
+
+.score-value {
+    font-size: 3rem;
+    font-weight: 900;
+    color: var(--primary);
+    line-height: 1;
+}
+
+.score-title {
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+.score-breakdown {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    font-size: .85rem;
+    color: var(--muted);
+}
+
+.breakdown-item {
+    font-weight: 600;
+}
+}

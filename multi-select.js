@@ -19,8 +19,9 @@
     const grid = $("#books-grid");
     const bar = $("#multiSelectBar");
     const countEl = $("#selectCount");
-    const cancelBtn = $("#btnCancelSelect");
-    const delBtn = $("#btnDeleteSelected");
+    const cancelBtn = $("#cancelSelectBtn");
+    const delBtn = $("#deleteSelectedBtn");
+    const selectAllBtn = $("#selectAllBtn");
 
     if (!grid || !bar || !countEl || !cancelBtn || !delBtn) {
         console.warn("[multi-select] Missing required DOM nodes");
@@ -34,6 +35,13 @@
     // --- helpers ---
     const getCard = (el) => el?.closest?.(".book-card");
     const getId = (card) => card?.getAttribute?.("data-id");
+
+    function getVisibleCards() {
+        // Selects only cards that are not hidden by a filter
+        return $$(".book-card", grid).filter(card => {
+            return card.style.display !== 'none';
+        });
+    }
 
     function updateBar() {
         const n = selected.size;
@@ -78,20 +86,25 @@
     // --- Long-press to enter mode ---
     let pressTimer = null;
     let pressedCard = null;
-    let pointerMoved = false;
+    let startX = 0;
+    let startY = 0;
     const LP_MS = 450;
+    const MOVE_THRESHOLD = 10; // How many pixels you can move before it's considered a drag
 
     function clearPressTimer() {
         if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
         pressedCard = null;
-        pointerMoved = false;
     }
 
     grid.addEventListener("pointerdown", (e) => {
         const card = getCard(e.target);
         if (!card) return;
+        if (active) return; // Don't start a new long-press if already in mode
+
         pressedCard = card;
-        pointerMoved = false;
+        startX = e.clientX;
+        startY = e.clientY;
+
         clearPressTimer();
         pressTimer = setTimeout(() => {
             // long press hit
@@ -102,15 +115,25 @@
 
     grid.addEventListener("pointermove", (e) => {
         if (!pressTimer) return;
-        // small move tolerance
-        if (e.movementX * e.movementX + e.movementY * e.movementY > 9) {
-            pointerMoved = true;
+        const dx = Math.abs(e.clientX - startX);
+        const dy = Math.abs(e.clientY - startY);
+        if (dx > MOVE_THRESHOLD || dy > MOVE_THRESHOLD) {
             clearPressTimer();
         }
     }, { passive: true });
 
     ["pointerup", "pointercancel", "pointerleave"].forEach(type => {
         grid.addEventListener(type, clearPressTimer, { passive: true });
+    });
+
+    // Desktop-friendly: right-click to enter mode
+    grid.addEventListener("contextmenu", (e) => {
+        const card = getCard(e.target);
+        if (!card) return;
+        if (!active) {
+            e.preventDefault();
+            enterMode(card);
+        }
     });
 
     // --- Click behavior in/out of mode ---
@@ -131,6 +154,23 @@
 
     // --- Bar actions ---
     cancelBtn.addEventListener("click", exitMode);
+
+    if (selectAllBtn) {
+        selectAllBtn.addEventListener("click", () => {
+            const visibleCards = getVisibleCards();
+            const allVisibleSelected = visibleCards.length > 0 && visibleCards.every(card => selected.has(getId(card)));
+
+            if (allVisibleSelected) {
+                // If all are selected, deselect them
+                visibleCards.forEach(card => toggleCard(card, false));
+            } else {
+                // Otherwise, select all visible
+                visibleCards.forEach(card => toggleCard(card, true));
+            }
+        });
+    } else {
+        console.warn("[multi-select] #selectAllBtn not found.");
+    }
 
     delBtn.addEventListener("click", async () => {
         const user = getUser();
@@ -185,5 +225,10 @@
         if (!active) return;
         if (e.key === "Escape") exitMode();
     });
+
+    // Expose state for other scripts to check
+    window.PB_MultiSelect = {
+        isActive: () => active
+    };
 
 })();

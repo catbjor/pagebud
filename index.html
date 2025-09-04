@@ -35,10 +35,11 @@
       <div class="category" data-filter="owned">Books I Own</div>
       <div class="category" data-filter="wishlist">Wishlist</div>
     </div>
-    <div class="row pad"> <input class="input" id="search-input" placeholder="Search by title or author..."
-        type="search" />
-      <div class="chip-group" id="viewToggle"> <button class="chip active" id="viewGrid" data-view="grid">Grid</button>
-        <button class="chip" id="viewList" data-view="list">List</button>
+    <div class="toolbar">
+      <input id="search-input" placeholder="Search by title or author..." type="search" />
+      <div class="view-toggle" id="viewToggle">
+        <button class="btn active" id="viewGrid" data-view="grid">Grid</button>
+        <button class="btn" id="viewList" data-view="list">List</button>
       </div>
     </div>
     <section class="pad">
@@ -62,11 +63,13 @@
         </div>
       </div>
     </section> <button aria-label="Add Book" class="add-book" id="add-book-btn" onclick="location.href='add-book.html'"
-      title="Add Book" type="button"><i class="fas fa-plus"></i></button> <!-- Multi-select Action Bar -->
-    <div id="multiSelectBar" class="multi-select-bar"> <button id="cancelSelectBtn"
-        class="btn btn-secondary">Cancel</button>
-      <div id="selectCount" class="select-count">0 books selected</div> <button id="deleteSelectedBtn"
-        class="btn btn-danger" disabled>Delete</button>
+      title="Add Book" type="button"><i class="fas fa-plus"></i></button>
+    <!-- Multi-select Action Bar -->
+    <div id="multiSelectBar" class="multi-select-bar">
+      <button id="cancelSelectBtn" class="btn btn-secondary">Cancel</button>
+      <div id="selectCount" class="select-count">0 books selected</div>
+      <button id="selectAllBtn" class="btn btn-secondary">Select All</button>
+      <button id="deleteSelectedBtn" class="btn btn-danger" disabled>Delete</button>
     </div>
   </div> <!-- Scripts -->
   <template id="book-card-template">
@@ -100,7 +103,6 @@
 
   <script src="reset-utils.js"></script>
   <script src="nav.js" defer></script>
-  <script src="profiles.js" defer></script>
   <script src="activity.js" defer></script>
   <script src="social-feed.js" defer></script>
   <script src="script.js" defer></script>

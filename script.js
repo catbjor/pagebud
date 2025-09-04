@@ -163,14 +163,12 @@ function initGridActions(user) {
   const grid = $("#books-grid");
   if (!grid) return;
 
+  // The multi-select click handler is now in multi-select.js.
+  // This listener will only handle normal actions.
   grid.addEventListener("click", async (e) => {
-    const card = e.target.closest(".book-card");
-
-    // ---- Multi-select toggle (the only click handler for cards while in mode) ----
-    if (MS_IN_MODE && card) {
-      e.preventDefault();
-      e.stopPropagation();
-      MS_toggleCard(card);
+    // If multi-select is active, do nothing and let its handler take over.
+    // This prevents accidental navigation when trying to select a card.
+    if (window.PB_MultiSelect?.isActive?.()) {
       return;
     }
 
@@ -210,9 +208,6 @@ function initGridActions(user) {
       }
     }
   });
-
-  // Long-press to enter multi-select
-  MS_attachLongPress(grid);
 
 }
 
@@ -303,6 +298,19 @@ document.addEventListener("DOMContentLoaded", () => {
   initSearch();
   initFilterChips();
 
+  // New logic to handle filter from URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const filterFromUrl = urlParams.get('filter');
+  if (filterFromUrl) {
+    const chips = $$("#filter-chips .category");
+    const targetChip = chips.find(c => c.dataset.filter === filterFromUrl);
+    if (targetChip) {
+      chips.forEach(c => c.classList.remove('active'));
+      targetChip.classList.add('active');
+      currentFilter = filterFromUrl;
+    }
+  }
+
   if (typeof requireAuth === "function") {
     requireAuth(user => {
       CURRENT_USER = user;
@@ -326,166 +334,3 @@ document.querySelectorAll("#langToggle [data-lang]").forEach(btn => {
     alert("Language switched to " + lang);
   });
 });
-
-/* =========================================================
-   Multi-select (long-press)
-========================================================= */
-
-let MS_IN_MODE = false;
-const MS_SELECTED = new Set();
-
-let MS_bar = null, MS_countEl = null, MS_cancelBtn = null, MS_deleteBtn = null;
-
-function MS_getId(card) {
-  return card?.dataset?.id || null;
-}
-
-function MS_ensureBar() {
-  if (MS_bar) return MS_bar;
-  MS_bar = document.createElement("div");
-  MS_bar.className = "multi-select-bar";
-  MS_bar.innerHTML = `
-    <button class="btn btn-secondary" id="msCancel" type="button">Cancel</button>
-    <div class="select-count" aria-live="polite"><span id="msCount">0</span> selected</div>
-    <button class="btn btn-danger" id="msDelete" type="button">Delete</button>
-  `;
-  document.body.appendChild(MS_bar);
-  MS_countEl = $("#msCount", MS_bar);
-  MS_cancelBtn = $("#msCancel", MS_bar);
-  MS_deleteBtn = $("#msDelete", MS_bar);
-
-  MS_cancelBtn.addEventListener("click", MS_exitMode);
-  MS_deleteBtn.addEventListener("click", MS_onDelete);
-  return MS_bar;
-}
-
-function MS_updateBar() {
-  MS_ensureBar();
-  MS_countEl.textContent = String(MS_SELECTED.size);
-  MS_bar.classList.toggle("show", MS_IN_MODE);
-  MS_deleteBtn.disabled = MS_SELECTED.size === 0;
-}
-
-function MS_selectCard(card, on) {
-  const id = MS_getId(card);
-  if (!id) return;
-  if (on) {
-    MS_SELECTED.add(id);
-    card.classList.add("selected");
-  } else {
-    MS_SELECTED.delete(id);
-    card.classList.remove("selected");
-  }
-  MS_updateBar();
-}
-
-function MS_toggleCard(card) {
-  const id = MS_getId(card);
-  if (!id) return;
-  MS_selectCard(card, !MS_SELECTED.has(id));
-}
-
-function MS_enterMode(initialCard) {
-  if (MS_IN_MODE) return;
-  MS_IN_MODE = true;
-  document.body.classList.add("multi-select-mode");
-  MS_ensureBar();
-  MS_bar.classList.add("show");
-
-  if (initialCard) MS_selectCard(initialCard, true);
-
-  document.addEventListener("keydown", MS_onKeyDown);
-
-  MS_updateBar();
-}
-
-function MS_exitMode() {
-  if (!MS_IN_MODE) return;
-  MS_IN_MODE = false;
-  document.body.classList.remove("multi-select-mode");
-  MS_bar?.classList.remove("show");
-  MS_SELECTED.clear();
-  $$(".book-card").forEach(c => c.classList.remove("selected"));
-
-  document.removeEventListener("keydown", MS_onKeyDown);
-  MS_updateBar();
-}
-
-function MS_onKeyDown(e) { if (e.key === "Escape") MS_exitMode(); }
-
-// ✅ OPPDATERT: ruter via PBSync.deleteBook
-async function MS_onDelete() {
-  if (!MS_SELECTED.size || !db || !CURRENT_USER) return;
-  const ids = Array.from(MS_SELECTED);
-
-  const ok = confirm(`Delete ${ids.length} selected book(s)?`);
-  if (!ok) return;
-
-  try {
-    for (const id of ids) {
-      if (window.PBSync?.deleteBook) {
-        await window.PBSync.deleteBook(id);           // ✅ riktig vei
-      } else {
-        await db.collection("users").doc(CURRENT_USER.uid).collection("books").doc(id).delete();
-      }
-
-      const grid = $("#books-grid");
-      if (grid) {
-        const node = grid.querySelector(`.book-card[data-id="${id}"]`);
-        if (node) node.remove();
-      }
-    }
-
-    MS_exitMode();
-    window.toast?.("Deleted");
-  } catch (err) {
-    console.error("Bulk delete failed:", err);
-    alert("Failed to delete some items. Please try again.");
-  }
-}
-
-function MS_attachLongPress(container) {
-  const LONG_MS = 450;
-  const MOVE_CANCEL = 10;
-  let timer = null, startX = 0, startY = 0, pressedCard = null;
-
-  function clearTimer() {
-    if (timer) { clearTimeout(timer); timer = null; }
-    pressedCard = null;
-  }
-
-  container.addEventListener("pointerdown", (e) => {
-    const card = e.target.closest(".book-card");
-    if (!card) return;
-
-    if (MS_IN_MODE) return;
-
-    pressedCard = card;
-    startX = e.clientX; startY = e.clientY;
-
-    timer = setTimeout(() => {
-      MS_enterMode(pressedCard);
-      clearTimer();
-    }, LONG_MS);
-  });
-
-  container.addEventListener("pointermove", (e) => {
-    if (!timer) return;
-    const dx = Math.abs(e.clientX - startX);
-    const dy = Math.abs(e.clientY - startY);
-    if (dx > MOVE_CANCEL || dy > MOVE_CANCEL) clearTimer();
-  });
-
-  ["pointerup", "pointercancel", "pointerleave"].forEach(type => {
-    container.addEventListener(type, clearTimer);
-  });
-
-  container.addEventListener("contextmenu", (e) => {
-    const card = e.target.closest(".book-card");
-    if (!card) return;
-    if (!MS_IN_MODE) {
-      e.preventDefault();
-      MS_enterMode(card);
-    }
-  });
-}
