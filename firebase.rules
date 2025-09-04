@@ -1,0 +1,137 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function authed() { return request.auth != null; }
+    function isOwner(uid) { return authed() && request.auth.uid == uid; }
+    function isFriend(uid) {
+      // Check if the requesting user has the target user in their friends subcollection.
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)/friends/$(uid));
+    }
+
+    // ------------ USERS ROOT ------------
+    match /users/{uid} {
+      // Read any user's public profile if signed in
+      allow read: if authed();
+
+      // Only the owner can create/update/delete their user doc
+      allow create, update, delete: if isOwner(uid);
+
+      // ---- Books ----
+      match /books/{bookId} {
+        // Allow any signed-in user to see book shelves on profiles
+        allow read: if authed();
+        allow create, update, delete: if isOwner(uid);
+      }
+
+      // ---- Friends (local mirror of friendships) ----
+      match /friends/{otherUid} {
+        allow read, create, update, delete: if isOwner(uid);
+      }
+
+      // ---- Notes ----
+      match /notes/{noteId} {
+        allow read, create, update, delete: if isOwner(uid);
+      }
+
+      // ---- Quotes ----
+      match /quotes/{quoteId} {
+        allow read, create, update, delete: if isOwner(uid);
+      }
+
+      // ---- Reading sessions (timer/stats) ----
+      match /sessions/{sessionId} {
+        allow read, create, update, delete: if isOwner(uid);
+      }
+
+      // ---- Goals (daily minute goals) ----
+      match /goals/{goalId} {
+        allow read, create, update, delete: if isOwner(uid);
+      }
+
+      // ---- Activity feed per user (PRIVATE) ----
+      match /activity/{itemId} {
+        // This is the private feed, only the owner should read it.
+        allow read: if isOwner(uid);
+        allow create, update, delete: if isOwner(uid);
+
+        // Likes on private activity items
+        match /likes/{likerUid} {
+          // Friends can see who liked a post. Only the liker can create/delete their own like.
+          allow read: if authed() && (isOwner(uid) || isFriend(uid));
+          allow create, delete: if isOwner(likerUid);
+        }
+
+        // Comments on private activity items
+        match /comments/{commentId} {
+          // Friends can read and create comments.
+          allow read: if authed() && (isOwner(uid) || isFriend(uid));
+          allow create: if authed() && (isOwner(uid) || isFriend(uid))
+            && request.resource.data.uid == request.auth.uid;
+          // Comments are immutable
+          allow update, delete: if false;
+        }
+      }
+
+      // ---- Public Activity Feed ----
+      match /public_activity/{itemId} {
+        allow read: if authed(); // Any signed-in user can read the public feed
+        allow create, update, delete: if isOwner(uid); // Only owner can write to their own feed
+      }
+
+      // ---- Push tokens (web push / FCM) ----
+      match /tokens/{tokenId} {
+        allow read, create, update, delete: if isOwner(uid);
+      }
+    }
+
+    // ------------ FRIEND REQUESTS ------------
+    // Document ID = sorted UIDs "uidA__uidB"
+    match /friend_requests/{rid} {
+      allow read: if authed();
+
+      // Create: sender creates pending
+      allow create: if authed()
+        && request.resource.data.keys().hasOnly(['from','to','status','createdAt','updatedAt'])
+        && request.resource.data.from == request.auth.uid
+        && request.resource.data.to is string
+        && request.resource.data.status == 'pending';
+
+      // Update: reply to pending OR allow sender to re-send after declined/cancelled
+      allow update: if authed()
+        && (resource.data.from == request.auth.uid || resource.data.to == request.auth.uid)
+        && request.resource.data.keys().hasOnly(['from','to','status','createdAt','updatedAt'])
+        && request.resource.data.from == resource.data.from
+        && request.resource.data.to == resource.data.to
+        && (
+          (resource.data.status == 'pending'
+             && request.resource.data.status in ['accepted','declined','cancelled'])
+          ||
+          (resource.data.status in ['declined','cancelled']
+             && request.resource.data.status == 'pending'
+             && request.auth.uid == resource.data.from)
+        );
+
+      // No client deletes (keep history)
+      allow delete: if false;
+    }
+
+    // ------------ USERNAMES ------------
+    // Document ID = usernameLower
+    match /usernames/{usernameLower} {
+      allow read: if true;
+
+      // Create once when available
+      allow create: if authed()
+        && !exists(/databases/$(database)/documents/usernames/$(usernameLower))
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys()
+           .hasOnly(['uid','displayName','displayNameLower','emailLower','photoURL','createdAt','updatedAt']);
+
+      // Locked afterwards
+      allow update, delete: if false;
+    }
+
+    // (Your other rules for chats, buddy_groups, etc. would go here if you have them)
+  }
+}
