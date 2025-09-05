@@ -1,100 +1,143 @@
-// profile-page.js
+// profile-page.js — shelf picker + per-card "Add to Shelf", photo save (no Storage)
 (function () {
     "use strict";
 
+    // ------------------ helpers ------------------
     const $ = (s, r = document) => r.querySelector(s);
-    function auth() { return (window.fb?.auth) || (window.firebase?.auth?.()) || firebase.auth(); }
-    function db() { return (window.fb?.db) || (window.firebase?.firestore?.()) || firebase.firestore(); }
-    function storage() { return (window.fb?.storage) || (window.firebase?.storage?.()) || firebase.storage(); }
+    const $$ = (s, r = document) => Array.from((r || document).querySelectorAll(s));
+    const phCover =
+        "data:image/svg+xml;utf8," +
+        encodeURIComponent(
+            `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600"><rect width="100%" height="100%" rx="12" fill="#e5e7eb"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-size="22" fill="#9aa3af" font-family="system-ui,-apple-system,Segoe UI,Roboto">No cover</text></svg>`
+        );
+    const esc = (s) => String(s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
 
+    function auth() {
+        if (window.fb?.auth) return window.fb.auth;
+        if (window.firebase?.auth) return window.firebase.auth();
+        return firebase.auth();
+    }
+    function db() {
+        if (window.fb?.db) return window.fb.db;
+        if (window.firebase?.firestore) return window.firebase.firestore();
+        return firebase.firestore();
+    }
 
-    // helper: read file -> data URL
-    function readAsDataURL(file) {
+    // file -> objectURL -> canvas compress -> dataURL (JPEG)
+    function fileToCompressedDataURL(file, maxW = 360, maxH = 360, quality = 0.85) {
         return new Promise((resolve, reject) => {
-            const fr = new FileReader();
-            fr.onload = () => resolve(String(fr.result || ""));
-            fr.onerror = reject;
-            fr.readAsDataURL(file);
+            try {
+                const img = new Image();
+                const url = URL.createObjectURL(file);
+                img.onload = () => {
+                    try {
+                        const ratio = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight, 1);
+                        const w = Math.max(1, Math.round(img.naturalWidth * ratio));
+                        const h = Math.max(1, Math.round(img.naturalHeight * ratio));
+                        const canvas = document.createElement("canvas");
+                        canvas.width = w;
+                        canvas.height = h;
+                        const ctx = canvas.getContext("2d");
+                        ctx.drawImage(img, 0, 0, w, h);
+                        const dataUrl = canvas.toDataURL("image/jpeg", quality);
+                        URL.revokeObjectURL(url);
+                        resolve(dataUrl);
+                    } catch (e) {
+                        URL.revokeObjectURL(url);
+                        reject(e);
+                    }
+                };
+                img.onerror = () => {
+                    URL.revokeObjectURL(url);
+                    reject(new Error("Image load failed"));
+                };
+                img.src = url;
+            } catch (e) {
+                reject(e);
+            }
         });
     }
 
-    // --- Card Rendering Helpers (from script.js) ---
-    const phCover = "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600"><rect width="100%" height="100%" rx="12" fill="#e5e7eb"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-size="22" fill="#9aa3af" font-family="system-ui,-apple-system,Segoe UI,Roboto">No cover</text></svg>`);
-
+    // ------------- card widgets -------------
     function starsRow(val) {
         const full = Math.floor(Number(val) || 0);
         let out = "";
-        for (let i = 1; i <= 6; i++) {
-            out += `<span class="${i <= full ? "card-star--on" : "card-star"}"></span>`;
-        }
+        for (let i = 1; i <= 6; i++) out += `<span class="${i <= full ? "card-star--on" : "card-star"}"></span>`;
         return out;
     }
-
     function chilisRow(val) {
         const full = Math.floor(Number(val) || 0);
         let out = "";
-        for (let i = 1; i <= 5; i++) {
-            out += `<span class="${i <= full ? "card-chili--on" : "card-chili"}"></span>`;
-        }
+        for (let i = 1; i <= 5; i++) out += `<span class="${i <= full ? "card-chili--on" : "card-chili"}"></span>`;
         return out;
     }
-
     function createCardElement(doc, isMyProfile) {
-        const cardTemplate = document.getElementById('book-card-template');
-        if (!cardTemplate) return null;
+        const tpl = document.getElementById("book-card-template");
+        if (!tpl) return null;
+        const card = tpl.content.cloneNode(true).firstElementChild;
 
-        const card = cardTemplate.content.cloneNode(true).firstElementChild;
-        const d = doc.data() || {};
-        const id = doc.id;
-
+        const d = doc.data ? (doc.data() || {}) : doc;
+        const id = doc.id || d.id;
         card.dataset.id = id;
+
         const cover = d.coverUrl || d.coverDataUrl || phCover;
         const title = d.title || "Untitled";
+        const author = d.author || "";
 
-        const thumb = card.querySelector('.thumb');
+        const thumb = card.querySelector(".thumb");
         thumb.src = cover;
         thumb.alt = `Cover for ${title}`;
 
-        card.querySelector('.title').textContent = title;
-        card.querySelector('.author').textContent = d.author || "";
+        card.querySelector(".title").textContent = title;
+        card.querySelector(".author").textContent = author;
 
         const rating = Number(d.rating || 0);
         if (rating > 0) {
-            const ratingBadge = card.querySelector('.rated-badge');
-            const ratingLabel = Number.isInteger(rating) ? String(rating) : String(Math.round(rating * 10) / 10);
-            ratingBadge.title = `Rated ${ratingLabel}`;
-            ratingBadge.querySelector('.val').textContent = ratingLabel;
-            ratingBadge.style.display = '';
+            const badge = card.querySelector(".rated-badge");
+            const label = Number.isInteger(rating) ? String(rating) : String(Math.round(rating * 10) / 10);
+            badge.title = `Rated ${label}`;
+            badge.querySelector(".val").textContent = label;
+            badge.style.display = "";
         }
 
-        const heartBtn = card.querySelector('.heart-btn');
-        heartBtn.classList.toggle('active', !!d.favorite);
+        const heartBtn = card.querySelector(".heart-btn");
+        heartBtn.classList.toggle("active", !!d.favorite);
         heartBtn.dataset.id = id;
 
-        card.querySelector('.rating-stars').innerHTML = starsRow(rating);
-        card.querySelector('.spice-chilis').innerHTML = chilisRow(Number(d.spice || 0));
+        card.querySelector(".rating-stars").innerHTML = starsRow(rating);
+        card.querySelector(".spice-chilis").innerHTML = chilisRow(Number(d.spice || 0));
 
         const editBtn = card.querySelector('[data-action="open"]');
-        if (isMyProfile) { editBtn.dataset.id = id; }
-        else { editBtn.style.display = 'none'; }
-
         const readBtn = card.querySelector('[data-action="read"]');
-        if (d.hasFile) { readBtn.dataset.id = id; readBtn.style.display = ''; }
+        const addBtn = card.querySelector('[data-action="addtoshelf"]');
+
+        if (isMyProfile) {
+            editBtn.dataset.id = id;
+            addBtn.dataset.id = id;
+            addBtn.style.display = "";
+        } else {
+            editBtn.style.display = "none";
+            addBtn.style.display = "none";
+        }
+        if (d.hasFile) {
+            readBtn.dataset.id = id;
+            readBtn.style.display = "";
+        }
 
         return card;
     }
 
+    // ------------------ init ------------------
     async function init(me) {
         const urlParams = new URLSearchParams(window.location.search);
-        const profileUid = urlParams.get('uid') || me.uid;
+        const profileUid = urlParams.get("uid") || me.uid;
         const isMyProfile = profileUid === me.uid;
 
-        // --- DOM Elements ---
+        // DOM
         const photoEl = $("#profilePhoto");
         const nameEl = $("#profileName");
         const usernameEl = $("#profileUsername");
         const bioEl = $("#profileBio");
-        const quirksContainer = $("#quirksContainer");
         const btnEditProfile = $("#btnEditProfile");
         const otherUserActions = $("#otherUserActions");
         const editProfileSection = $("#editProfileSection");
@@ -102,546 +145,1026 @@
         const btnChangePhoto = $("#btnChangePhoto");
         const photoInput = $("#photoInput");
         const editName = $("#editName");
-        const editQuirksContainer = $("#editQuirks");
         const editBio = $("#editBio");
-        const btnSaveChanges = $("#btnSaveChanges");
         const headerTitle = $("#profileHeaderTitle");
         const btnAddFriend = $("#btnAddFriend");
         const btnMessage = $("#btnMessage");
         const btnMoreOptions = $("#btnMoreOptions");
+        const btnSaveChanges = $("#btnSaveChanges");
 
-        // --- Load Profile Data ---
+        // Add "Save Photo" button dynamically
+        let btnSavePhoto = $("#btnSavePhoto");
+        if (!btnSavePhoto) {
+            btnSavePhoto = document.createElement("button");
+            btnSavePhoto.id = "btnSavePhoto";
+            btnSavePhoto.className = "btn btn-primary small";
+            btnSavePhoto.style.display = "none";
+            btnSavePhoto.style.marginTop = "10px";
+            btnSavePhoto.innerHTML = `<i class="fa-solid fa-floppy-disk"></i> Save Photo`;
+            const photoWrap = $(".profile-photo-wrap");
+            (photoWrap?.parentElement || $(".profile-card"))?.insertBefore(
+                btnSavePhoto,
+                photoWrap?.nextSibling || null
+            );
+        }
+
         let profileData = null;
+
         try {
             const userDoc = await db().collection("users").doc(profileUid).get();
             if (!userDoc.exists) {
                 nameEl.textContent = "User not found";
                 return;
             }
-            profileData = userDoc.data();
+            profileData = userDoc.data() || {};
+            profileData.uid = profileUid;
 
-            // Also get username from the dedicated collection
             try {
-                const usernameSnap = await db().collection("usernames").where("uid", "==", profileUid).limit(1).get();
-                if (!usernameSnap.empty) {
-                    profileData.username = usernameSnap.docs[0].id;
-                }
+                const uSnap = await db().collection("usernames").where("uid", "==", profileUid).limit(1).get();
+                if (!uSnap.empty) profileData.username = uSnap.docs[0].id;
             } catch (e) {
-                console.warn("Could not fetch username, possibly missing index:", e);
-                // Continue without the username, don't crash the page.
+                console.warn("Username lookup skipped:", e);
             }
 
-            // --- Populate UI ---
             nameEl.textContent = profileData.displayName || "No name";
-            usernameEl.textContent = profileData.username ? `@${profileData.username}` : '';
-            photoEl.src = profileData.photoURL || 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; // Placeholder
-            bioEl.textContent = profileData.bio || (isMyProfile ? "You haven't written a bio yet. Click 'Edit Profile' to add one." : "This user hasn't written a bio yet.");
+            usernameEl.textContent = profileData.username ? `@${profileData.username}` : "";
+            photoEl.src =
+                profileData.photoURL ||
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+            bioEl.textContent =
+                profileData.bio ||
+                (isMyProfile
+                    ? "You haven't written a bio yet. Click 'Edit Profile' to add one."
+                    : "This user hasn't written a bio yet.");
             renderQuirks(profileData.quirks || []);
+            if (isMyProfile) headerTitle.textContent = "My Profile";
+
+            const streak = await calculateStreak(profileUid);
+            await calculateAndShowAchievements(profileUid, streak);
+            await loadAndDisplayBadges(profileUid);
+
+            await Promise.all([
+                loadCurrentlyReading(profileUid, isMyProfile),
+                loadFavoritesShelf(profileUid, isMyProfile),
+                loadFinishedShelf(profileUid, isMyProfile),
+                loadWishlistShelf(profileUid, isMyProfile),
+                loadAndRenderCustomShelves(profileUid, isMyProfile),
+            ]);
+
             if (isMyProfile) {
-                headerTitle.textContent = "My Profile";
+                await loadNotesAndQuotes(me.uid);
+            } else {
+                await checkFriendshipAndShowActions(me.uid, profileUid);
+                await calculateAndShowCompatibility(me, profileData);
             }
-
-            const streak = await calculateStreak(profileUid); // This function was missing
-            calculateAndShowAchievements(profileUid, streak);
-            loadAndDisplayBadges(profileUid); // New function call
-
-            loadCurrentlyReading(profileUid, isMyProfile);
-            loadFavoritesShelf(profileUid, isMyProfile);
-            loadFinishedShelf(profileUid, isMyProfile);
-            loadWishlistShelf(profileUid, isMyProfile);
-            loadAndRenderCustomShelves(profileUid, isMyProfile);
-            if (isMyProfile) loadNotesAndQuotes(me.uid); // Load notes for own profile
-
-            if (!isMyProfile) {
-                checkFriendshipAndShowActions(me.uid, profileUid);
-                calculateAndShowCompatibility(me, profileData);
-            }
-
         } catch (error) {
             console.error("Failed to load profile:", error);
             nameEl.textContent = "Error loading profile";
-            return; // Stop execution if the main profile doc fails to load
+            return;
         }
 
-        // --- Conditional UI ---
+        // --------- own profile controls ---------
+        let pendingPhotoDataURL = null;
+
         if (isMyProfile) {
-            btnEditProfile.style.display = 'inline-flex';
-            btnCreateShelf.style.display = 'inline-flex';
-            btnChangePhoto.style.display = 'grid';
-            editName.value = profileData.displayName || '';
+            btnEditProfile.style.display = "inline-flex";
+            btnCreateShelf.style.display = "inline-flex";
+            btnChangePhoto.style.display = "grid";
+
+            editName.value = profileData.displayName || "";
             wireUpQuirksEditor(profileData.quirks || []);
-            editBio.value = profileData.bio || '';
+            editBio.value = profileData.bio || "";
 
-            // Wire up edit controls
-            btnEditProfile.addEventListener('click', () => {
-                const isHidden = editProfileSection.style.display === 'none';
-                editProfileSection.style.display = isHidden ? 'block' : 'none';
+            btnEditProfile.addEventListener("click", () => {
+                const cur = editProfileSection.style.display;
+                editProfileSection.style.display = cur === "none" || !cur ? "block" : "none";
             });
-            btnChangePhoto.addEventListener('click', () => photoInput.click());
-            photoInput.addEventListener('change', handlePhotoUpload);
-            btnSaveChanges.addEventListener('click', saveChanges);
-            btnCreateShelf.addEventListener('click', createNewShelf);
 
+            btnChangePhoto.addEventListener("click", () => photoInput.click());
+            photoInput.addEventListener("change", async () => {
+                const file = photoInput.files?.[0];
+                if (!file) return;
+                try {
+                    pendingPhotoDataURL = await fileToCompressedDataURL(file, 360, 360, 0.85);
+                    photoEl.src = pendingPhotoDataURL;
+                    btnSavePhoto.style.display = "";
+                } catch (e) {
+                    console.error(e);
+                    alert("Could not prepare the photo. Try a different image.");
+                    pendingPhotoDataURL = null;
+                    btnSavePhoto.style.display = "none";
+                }
+            });
+
+            btnSavePhoto.addEventListener("click", async () => {
+                if (!pendingPhotoDataURL) return;
+                btnSavePhoto.disabled = true;
+                btnSavePhoto.innerHTML = `<i class="fa fa-spinner fa-spin"></i> Saving...`;
+                try {
+                    await db()
+                        .collection("users")
+                        .doc(me.uid)
+                        .set(
+                            {
+                                photoURL: pendingPhotoDataURL,
+                                photoUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            },
+                            { merge: true }
+                        );
+                    alert("Profile photo saved!");
+                    pendingPhotoDataURL = null;
+                    btnSavePhoto.style.display = "none";
+                } catch (e) {
+                    console.error("Photo save failed:", e);
+                    alert("Could not save the photo. Try another photo.");
+                } finally {
+                    btnSavePhoto.disabled = false;
+                    btnSavePhoto.innerHTML = `<i class="fa-solid fa-floppy-disk"></i> Save Photo`;
+                }
+            });
+
+            btnSaveChanges.addEventListener("click", saveChanges);
+            btnCreateShelf.addEventListener("click", createNewShelf);
         } else {
-            otherUserActions.style.display = 'flex';
-            btnMoreOptions.addEventListener('click', () => showMoreOptions(profileUid, profileData.displayName));
+            otherUserActions.style.display = "flex";
+            btnMoreOptions.addEventListener("click", () =>
+                showMoreOptions(profileData.uid, profileData.displayName || "this user")
+            );
+            btnMessage.addEventListener("click", () => (location.href = `chat.html?buddy=${profileData.uid}`));
         }
 
-        // --- Functions for editing ---
-        async function handlePhotoUpload() {
-            const file = photoInput.files?.[0];
-            if (!file) return;
-
-            // Optimistic UI: show the selected photo immediately using a local URL.
-            const localUrl = URL.createObjectURL(file);
-            photoEl.src = localUrl;
-
-            btnChangePhoto.disabled = true;
-            btnChangePhoto.querySelector('i').className = 'fa fa-spinner fa-spin';
-
-            try {
-                // Convert file to data URL and save to Firestore/Auth
-                const dataUrl = await readAsDataURL(file);
-
-                await me.updateProfile({ photoURL: dataUrl });
-                await db().collection("users").doc(me.uid).set({ photoURL: dataUrl }, { merge: true });
-                try { window.PB?.logActivity?.({ action: "profile_updated", meta: { updated: 'photo' } }); } catch (e) { console.warn(e); }
-
-                // The image is already showing the local version. We can now point to the permanent URL.
-                photoEl.src = dataUrl;
-                URL.revokeObjectURL(localUrl); // Clean up the local URL
-                alert("Profile photo updated!");
-            } catch (error) {
-                console.error("Photo upload failed:", error);
-                alert("Could not save photo. The file might be too large.");
-                // Revert to the original photo on failure
-                photoEl.src = profileData.photoURL || 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-            } finally {
-                btnChangePhoto.disabled = false;
-                btnChangePhoto.querySelector('i').className = 'fa fa-camera';
-            }
-        }
-
+        // ---------- save profile fields ----------
         async function saveChanges() {
-            const newName = editName.value.trim();
+            const newName = (editName.value || "").trim();
             const newQuirks = getSelectedQuirks();
-            const newBio = editBio.value.trim();
+            const newBio = (editBio.value || "").trim();
+
             btnSaveChanges.disabled = true;
-            btnSaveChanges.textContent = 'Saving...';
+            btnSaveChanges.textContent = "Saving...";
 
             try {
                 const updates = {
                     displayName: newName,
                     quirks: newQuirks,
                     bio: newBio,
-                    displayName_lower: newName.toLowerCase()
+                    displayName_lower: (newName || "").toLowerCase(),
                 };
                 await db().collection("users").doc(me.uid).set(updates, { merge: true });
-                await me.updateProfile({ displayName: newName });
-                try { window.PB?.logActivity?.({ action: "profile_updated", meta: { updated: 'details' } }); } catch { }
+
                 nameEl.textContent = newName || "No name";
                 renderQuirks(newQuirks);
                 bioEl.textContent = newBio || "You haven't written a bio yet. Click 'Edit Profile' to add one.";
                 alert("Profile saved!");
             } catch (error) {
-                console.error("Failed to save bio:", error);
-                alert("Could not save bio. Please try again.");
+                console.error("Failed to save profile:", error);
+                alert("Could not save. Please try again.");
             } finally {
                 btnSaveChanges.disabled = false;
-                btnSaveChanges.textContent = 'Save Changes';
+                btnSaveChanges.textContent = "Save Changes";
             }
         }
 
+        // ---------- shelves (create + render custom) ----------
         async function createNewShelf() {
-            const shelfName = prompt("Enter a name for your new shelf:", "");
-            if (!shelfName || shelfName.trim().length === 0) {
-                return;
-            }
-
+            const shelfName = prompt("Name your new shelf:", "");
+            if (!shelfName || !shelfName.trim()) return;
             try {
                 await db().collection("users").doc(me.uid).collection("shelves").add({
                     name: shelfName.trim(),
                     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    bookIds: []
+                    bookIds: [],
                 });
-                // Simple refresh to show the new shelf
-                location.reload();
+                await loadAndRenderCustomShelves(me.uid, true);
             } catch (error) {
                 console.error("Failed to create shelf:", error);
                 alert("Could not create the shelf. Please try again.");
             }
         }
 
-
-        async function addFriend(fromUid, toUid) {
-            // This logic is now aligned with friends.js and your security rules,
-            // using the top-level /friend_requests collection.
-            const reqId = [fromUid, toUid].sort().join("__");
-            const ref = db().collection("friend_requests").doc(reqId);
-            const snap = await ref.get();
-
-            if (snap.exists) {
-                const cur = snap.data() || {};
-                if (cur.status === "accepted") { alert("You’re already friends."); return; }
-                if (cur.status === "pending") { alert("Request already pending."); return; }
-            }
-
-            try {
-                await ref.set({
-                    from: fromUid,
-                    to: toUid,
-                    status: "pending",
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                }, { merge: true });
-                btnAddFriend.textContent = 'Request Sent ✓';
-                btnAddFriend.disabled = true;
-            } catch (error) {
-                console.error("Failed to send friend request:", error);
-                alert("Could not send friend request.");
-            }
-        }
-
-        function showMoreOptions(theirUid, theirName) {
-            // In a real app, this would open a proper menu. For now, we'll use a simple prompt.
-            const action = prompt(`More options for ${theirName}:\n\nType "block" to block this user.`, "");
-            if (action?.toLowerCase() === 'block') {
-                blockUser(me.uid, theirUid, theirName);
-            }
-        }
-
-        async function blockUser(myUid, theirUid, theirName) {
-            if (!confirm(`Are you sure you want to block ${theirName}? You will no longer see each other's profiles or activity.`)) {
-                return;
-            }
-            try {
-                await db().collection("users").doc(myUid).collection("blocked").doc(theirUid).set({ at: new Date() });
-                alert(`${theirName} has been blocked.`);
-                location.href = 'index.html'; // Redirect away from their profile
-            } catch (error) {
-                alert("Could not block user. Please try again.");
-            }
-        }
-
-        async function checkFriendshipAndShowActions(myUid, theirUid) {
-            const friendDoc = await db().collection("users").doc(myUid).collection("friends").doc(theirUid).get();
-            const isFriend = friendDoc.exists && friendDoc.data().status === 'accepted';
-
-            btnMessage.addEventListener('click', () => location.href = `chat.html?buddy=${theirUid}`);
-
-            if (isFriend) {
-                btnAddFriend.textContent = 'Friends ✓';
-                btnAddFriend.disabled = true; // Disable if already friends
-                // Optionally, add an unfriend button if desired
-                // btnAddFriend.onclick = () => unfriend(myUid, theirUid);
-            } else {
-                // Check the top-level collection for a pending request
-                const reqId = [myUid, theirUid].sort().join("__");
-                const reqDoc = await db().collection("friend_requests").doc(reqId).get();
-                if (reqDoc.exists && reqDoc.data().status === 'pending') {
-                    btnAddFriend.textContent = 'Request Pending...';
-                    btnAddFriend.disabled = true;
-                } else {
-                    btnAddFriend.textContent = 'Add Friend';
-                    btnAddFriend.onclick = () => addFriend(myUid, theirUid);
-                }
-            }
-        }
-
-        async function unfriend(myUid, theirUid) {
-            if (!confirm("Are you sure you want to remove this friend?")) return;
-            try {
-                const batch = db().batch();
-                batch.delete(db().collection("users").doc(myUid).collection("friends").doc(theirUid));
-                batch.delete(db().collection("users").doc(theirUid).collection("friends").doc(myUid));
-                await batch.commit();
-                btnAddFriend.textContent = 'Add Friend';
-                btnAddFriend.onclick = () => addFriend(myUid, theirUid);
-                alert("Friend removed.");
-            } catch (error) {
-                console.error("Unfriend failed:", error);
-                alert("Could not remove friend.");
-            }
-        }
-
-        async function calculateAndShowCompatibility(me, them) {
-            const container = $("#compatibilityScore");
+        async function loadAndRenderCustomShelves(uid, isMy) {
+            const container = $("#customShelvesContainer");
             if (!container) return;
+            container.innerHTML = "";
 
-            const [myBooksSnap, theirBooksSnap] = await Promise.all([
-                db().collection("users").doc(me.uid).collection("books").get(),
-                db().collection("users").doc(them.uid).collection("books").get()
-            ]);
+            try {
+                const snap = await db()
+                    .collection("users")
+                    .doc(uid)
+                    .collection("shelves")
+                    .orderBy("createdAt", "desc")
+                    .get();
+                if (snap.empty) return;
 
-            const myBooks = myBooksSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-            const theirBooks = theirBooksSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+                for (const shelfDoc of snap.docs) {
+                    const shelf = shelfDoc.data() || {};
+                    const shelfId = shelfDoc.id;
+                    const name = shelf.name || "Untitled Shelf";
+                    const bookIds = Array.isArray(shelf.bookIds) ? shelf.bookIds.slice(0, 24) : [];
 
-            if (myBooks.length === 0 || theirBooks.length === 0) return;
+                    const sec = document.createElement("section");
+                    sec.className = "profile-shelf card";
+                    sec.dataset.shelfId = shelfId;
 
-            // --- Calculations ---
-            // 1. Shared Books (40 points)
-            const myTitles = new Set(myBooks.map(b => b.title.toLowerCase()));
-            const sharedBooks = theirBooks.filter(b => myTitles.has(b.title.toLowerCase()));
-            const sharedBooksScore = Math.min(40, (sharedBooks.length / 5) * 40); // Max score at 5 shared books
+                    const head = document.createElement("div");
+                    head.className = "card-head";
+                    head.innerHTML = `<h3>${esc(name)}</h3>`;
 
-            // 2. Genre Overlap (40 points)
-            const getTopGenres = (books) => {
-                const counts = books.flatMap(b => b.genres || []).reduce((acc, genre) => {
-                    acc[genre] = (acc[genre] || 0) + 1;
-                    return acc;
-                }, {});
-                return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(e => e[0]);
-            };
-            const myTopGenres = new Set(getTopGenres(myBooks));
-            const theirTopGenres = getTopGenres(theirBooks);
-            const genreOverlapCount = theirTopGenres.filter(g => myTopGenres.has(g)).length;
-            const genreScore = (genreOverlapCount / 5) * 40;
+                    if (isMy) {
+                        const actions = document.createElement("div");
+                        actions.className = "shelf-actions";
+                        actions.innerHTML = `
+              <button class="btn btn-secondary small" data-rename="${shelfId}"><i class="fa fa-pen"></i> Rename</button>
+              <button class="btn btn-secondary small" data-manage="${shelfId}"><i class="fa fa-plus"></i> Add/Remove Books</button>
+              <button class="btn btn-icon" title="Delete shelf" data-delete="${shelfId}"><i class="fa fa-trash"></i></button>
+            `;
+                        head.appendChild(actions);
+                    }
 
-            // 3. Rating Similarity (20 points)
-            const myRatedBooks = new Map(myBooks.filter(b => b.rating > 0).map(b => [b.title.toLowerCase(), b.rating]));
-            let totalRatingDiff = 0;
-            let ratedSharedCount = 0;
-            theirBooks.forEach(b => {
-                if (b.rating > 0 && myRatedBooks.has(b.title.toLowerCase())) {
-                    totalRatingDiff += Math.abs(b.rating - myRatedBooks.get(b.title.toLowerCase()));
-                    ratedSharedCount++;
+                    const grid = document.createElement("div");
+                    grid.className = "shelf-grid";
+                    sec.appendChild(head);
+                    sec.appendChild(grid);
+                    container.appendChild(sec);
+
+                    if (bookIds.length) {
+                        const refs = bookIds.map((id) =>
+                            db().collection("users").doc(uid).collection("books").doc(id).get()
+                        );
+                        const bookSnaps = await Promise.all(refs);
+                        const frag = document.createDocumentFragment();
+                        bookSnaps.forEach((bs) => {
+                            if (!bs.exists) return;
+                            const card = createCardElement(bs, isMy);
+                            if (card) frag.appendChild(card);
+                        });
+                        grid.appendChild(frag);
+                        wireShelfGridActions(grid, isMy, "customShelf");
+                    } else {
+                        grid.innerHTML = `<div class="muted">No books yet.</div>`;
+                    }
                 }
-            });
-            const avgDiff = ratedSharedCount > 0 ? totalRatingDiff / ratedSharedCount : 4; // Max diff is 4 (5-1)
-            const ratingScore = Math.max(0, (1 - avgDiff / 4)) * 20;
 
-            const finalScore = Math.round(sharedBooksScore + genreScore + ratingScore);
+                container.onclick = async (e) => {
+                    const renameBtn = e.target.closest("[data-rename]");
+                    const delBtn = e.target.closest("[data-delete]");
+                    const manageBtn = e.target.closest("[data-manage]");
 
-            // --- Render ---
-            $("#compFriendName").textContent = them.displayName.split(' ')[0];
-            container.querySelector(".score-value").textContent = `${finalScore}%`;
-            const breakdownEl = container.querySelector(".score-breakdown");
-            let breakdownText = [];
-            if (sharedBooks.length > 0) breakdownText.push(`📚 ${sharedBooks.length} shared books`);
-            if (genreOverlapCount > 0) breakdownText.push(`🎨 ${genreOverlapCount} shared genres`);
-            if (ratedSharedCount > 0) breakdownText.push(`⭐ Similar ratings`);
-
-            if (breakdownText.length > 0) {
-                breakdownEl.innerHTML = breakdownText.map(t => `<span class="breakdown-item">${t}</span>`).join(' • ');
-            } else {
-                breakdownEl.innerHTML = `<span class="breakdown-item">Discover your shared tastes!</span>`;
+                    if (renameBtn) {
+                        const id = renameBtn.getAttribute("data-rename");
+                        const newName = prompt("New shelf name:");
+                        if (!newName || !newName.trim()) return;
+                        await db().collection("users").doc(uid).collection("shelves").doc(id).set(
+                            { name: newName.trim() },
+                            { merge: true }
+                        );
+                        await loadAndRenderCustomShelves(uid, isMy);
+                    }
+                    if (delBtn) {
+                        const id = delBtn.getAttribute("data-delete");
+                        if (!confirm("Delete this shelf? This does NOT delete your books.")) return;
+                        await db().collection("users").doc(uid).collection("shelves").doc(id).delete();
+                        await loadAndRenderCustomShelves(uid, isMy);
+                    }
+                    if (manageBtn) {
+                        const id = manageBtn.getAttribute("data-manage");
+                        const name =
+                            manageBtn.closest("section")?.querySelector(".card-head h3")?.textContent || "Shelf";
+                        await openShelfPicker(uid, id, name);
+                        await loadAndRenderCustomShelves(uid, isMy);
+                    }
+                };
+            } catch (e) {
+                console.warn("Custom shelves failed:", e);
             }
-
-            container.style.display = 'block';
         }
 
-        // --- Notes & Quotes Section ---
-        let allQuotes = []; // Cache for search functionality
+        // ---------- Shelf Picker (manage one shelf’s books) ----------
+        async function openShelfPicker(uid, shelfId, shelfName = "Shelf") {
+            const modal = $("#shelfPickerModal");
+            const nameEl = $("#spShelfName");
+            const listEl = $("#spList");
+            const searchEl = $("#spSearch");
+            const countEl = $("#spCount");
+            const btnSave = $("#spSave");
+            const btnCancel = $("#spCancel");
 
-        function renderNotes(quotesToRender) {
+            if (!modal) return;
+
+            // Open modal & basic bindings FIRST so you can cancel even if loading fails
+            nameEl.textContent = shelfName;
+            listEl.innerHTML = `<div class="muted">Loading your books…</div>`;
+            countEl.textContent = "0";
+            modal.style.display = "flex";
+
+            const close = () => (modal.style.display = "none");
+            btnCancel.onclick = close;
+            // Close on backdrop click (outside sheet)
+            modal.onclick = (e) => {
+                if (e.target === modal) close();
+            };
+            // Close on Esc
+            const escHandler = (e) => {
+                if (e.key === "Escape") close();
+            };
+            document.addEventListener("keydown", escHandler, { once: true });
+
+            try {
+                const shelfRef = db().collection("users").doc(uid).collection("shelves").doc(shelfId);
+                const shelfSnap = await shelfRef.get();
+                const selected = new Set(
+                    shelfSnap.exists && Array.isArray(shelfSnap.data().bookIds) ? shelfSnap.data().bookIds : []
+                );
+
+                // Try orderBy(createdAt) first; fall back to plain get() if it errors
+                let booksSnap;
+                try {
+                    booksSnap = await db()
+                        .collection("users")
+                        .doc(uid)
+                        .collection("books")
+                        .orderBy("createdAt", "desc")
+                        .limit(300)
+                        .get();
+                } catch (err) {
+                    console.warn("orderBy(createdAt) failed — falling back to unordered get()", err);
+                    booksSnap = await db().collection("users").doc(uid).collection("books").get();
+                }
+
+                const books = booksSnap.docs.map((d) => {
+                    const b = d.data() || {};
+                    return {
+                        id: d.id,
+                        title: b.title || "Untitled",
+                        author: b.author || "",
+                        cover: b.coverUrl || b.coverDataUrl || "",
+                        search: ((b.title || "") + " " + (b.author || "")).toLowerCase(),
+                    };
+                });
+
+                function render(items) {
+                    if (!items.length) {
+                        listEl.innerHTML = `<div class="muted">No books found.</div>`;
+                        countEl.textContent = String(selected.size);
+                        return;
+                    }
+                    listEl.innerHTML = items
+                        .map(
+                            (b) => `
+              <div class="shelf-picker-item ${selected.has(b.id) ? "selected" : ""}"
+                   data-id="${esc(b.id)}" data-search="${esc(b.search)}"
+                   title="${esc(b.title)} — ${esc(b.author)}">
+                <img class="cover" src="${esc(b.cover)}" onerror="this.src='';this.style.background='#eee'">
+                <div class="col">
+                  <div class="t">${esc(b.title)}</div>
+                  <div class="a">${esc(b.author)}</div>
+                </div>
+                <div class="check" aria-hidden="true"></div>
+              </div>`
+                        )
+                        .join("");
+                    countEl.textContent = String(selected.size);
+                }
+                render(books);
+
+                listEl.onclick = (e) => {
+                    const item = e.target.closest(".shelf-picker-item");
+                    if (!item) return;
+                    const id = item.getAttribute("data-id");
+                    if (selected.has(id)) {
+                        selected.delete(id);
+                        item.classList.remove("selected");
+                    } else {
+                        selected.add(id);
+                        item.classList.add("selected");
+                    }
+                    countEl.textContent = String(selected.size);
+                };
+
+                searchEl.oninput = (e) => {
+                    const q = (e.target.value || "").toLowerCase().trim();
+                    if (!q) return render(books);
+                    render(books.filter((b) => b.search.includes(q)));
+                };
+
+                btnSave.onclick = async () => {
+                    btnSave.disabled = true;
+                    btnSave.textContent = "Saving…";
+                    try {
+                        await shelfRef.set(
+                            {
+                                name: shelfName,
+                                bookIds: Array.from(selected),
+                                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            },
+                            { merge: true }
+                        );
+                        close();
+                    } catch (e) {
+                        console.warn(e);
+                        alert("Could not save shelf.");
+                    } finally {
+                        btnSave.disabled = false;
+                        btnSave.textContent = "Save to Shelf";
+                    }
+                };
+            } catch (e) {
+                console.error("Shelf picker failed:", e);
+                $("#spList").innerHTML =
+                    `<div class="muted">Could not load your books. Try again.</div>`;
+            }
+        }
+
+        // ---------- Quick chooser: add a single book to shelves ----------
+        async function openAddToShelfForBook(uid, bookId, bookTitle) {
+            const modal = $("#shelfChooserModal");
+            const listEl = $("#scList");
+            const titleEl = $("#scBookTitle");
+            const newNameInput = $("#scNewName");
+            const btnCreate = $("#scCreate");
+            const btnCancel = $("#scCancel");
+            const btnSave = $("#scSave");
+
+            if (!modal) return;
+
+            const close = () => (modal.style.display = "none");
+            titleEl.textContent = `“${bookTitle}”`;
+            newNameInput.value = "";
+            modal.style.display = "flex";
+            modal.onclick = (e) => { if (e.target === modal) close(); };
+            const escHandler = (e) => { if (e.key === "Escape") close(); };
+            document.addEventListener("keydown", escHandler, { once: true });
+            btnCancel.onclick = close;
+
+            // load shelves (fallback if order fails)
+            let shelvesSnap;
+            try {
+                shelvesSnap = await db().collection("users").doc(uid).collection("shelves")
+                    .orderBy("createdAt", "desc").get();
+            } catch {
+                shelvesSnap = await db().collection("users").doc(uid).collection("shelves").get();
+            }
+            const shelves = shelvesSnap.docs.map((d) => ({ id: d.id, ...(d.data() || {}) }));
+            const membership = new Set(
+                shelves.filter((s) => Array.isArray(s.bookIds) && s.bookIds.includes(bookId)).map((s) => s.id)
+            );
+
+            function render() {
+                if (!shelves.length) {
+                    listEl.innerHTML = `<div class="muted">No shelves yet. Create one below.</div>`;
+                    return;
+                }
+                listEl.innerHTML = shelves
+                    .map(
+                        (s) => `
+            <div class="shelf-chooser-item" data-id="${esc(s.id)}">
+              <label>
+                <input type="checkbox" ${membership.has(s.id) ? "checked" : ""}>
+                ${esc(s.name || "Untitled Shelf")}
+              </label>
+              <span class="count">${Array.isArray(s.bookIds) ? s.bookIds.length : 0}</span>
+            </div>`
+                    )
+                    .join("");
+            }
+            render();
+
+            btnCreate.onclick = async () => {
+                const name = newNameInput.value.trim();
+                if (!name) return;
+                try {
+                    const ref = await db()
+                        .collection("users")
+                        .doc(uid)
+                        .collection("shelves")
+                        .add({
+                            name,
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            bookIds: [],
+                        });
+                    shelves.unshift({ id: ref.id, name, bookIds: [] });
+                    membership.add(ref.id); // pre-select new shelf
+                    newNameInput.value = "";
+                    render();
+                } catch (e) {
+                    console.warn(e);
+                    alert("Could not create shelf.");
+                }
+            };
+
+            btnSave.onclick = async () => {
+                btnSave.disabled = true;
+                btnSave.textContent = "Saving…";
+                try {
+                    const updates = [];
+                    $$(".shelf-chooser-item", listEl).forEach((row) => {
+                        const id = row.getAttribute("data-id");
+                        const checked = row.querySelector("input[type=checkbox]").checked;
+                        const was = membership.has(id);
+                        if (checked && !was) {
+                            updates.push(
+                                db()
+                                    .collection("users")
+                                    .doc(uid)
+                                    .collection("shelves")
+                                    .doc(id)
+                                    .update({ bookIds: firebase.firestore.FieldValue.arrayUnion(bookId) })
+                            );
+                        }
+                        if (!checked && was) {
+                            updates.push(
+                                db()
+                                    .collection("users")
+                                    .doc(uid)
+                                    .collection("shelves")
+                                    .doc(id)
+                                    .update({ bookIds: firebase.firestore.FieldValue.arrayRemove(bookId) })
+                            );
+                        }
+                    });
+                    await Promise.all(updates);
+                    close();
+                } catch (e) {
+                    console.warn(e);
+                    alert("Could not update shelves.");
+                } finally {
+                    btnSave.disabled = false;
+                    btnSave.textContent = "Save";
+                }
+            };
+        }
+
+        // ---------- notes & quotes ----------
+        let allQuotes = [];
+        function renderNotes(quotes) {
             const listEl = $("#notesAndQuotesList");
             if (!listEl) return;
-
-            if (quotesToRender.length === 0) {
+            if (!quotes.length) {
                 listEl.innerHTML = `<p class="muted">No matching notes found.</p>`;
                 return;
             }
-
-            listEl.innerHTML = quotesToRender.map(quote => {
-                const noteHtml = quote.note ? `<div class="note-body">${quote.note}</div>` : '';
-                // Pass the full quote object to the share button
-                const quoteData = encodeURIComponent(JSON.stringify(quote));
-                return `
-                    <div class="quote-item" data-search-text="${(quote.text + ' ' + quote.note).toLowerCase()}">
-                        <blockquote class="quote-text">“${quote.text}”</blockquote>
-                        ${noteHtml}
-                        <div class="quote-meta">
-                            <span>From <strong>${quote.bookTitle || 'a book'}</strong></span>
-                            <button class="btn btn-secondary small" data-action="share-quote" data-quote='${quoteData}'>
-                                <i class="fa-solid fa-share-nodes"></i> Share
-                            </button>
-                        </div>
-                    </div>
-                `;
-            }).join('');
+            listEl.innerHTML = quotes
+                .map((quote) => {
+                    const noteHtml = quote.note ? `<div class="note-body">${quote.note}</div>` : "";
+                    const quoteData = encodeURIComponent(JSON.stringify(quote));
+                    return `
+            <div class="quote-item" data-search-text="${(quote.text + " " + (quote.note || "")).toLowerCase()}">
+              <blockquote class="quote-text">“${quote.text}”</blockquote>
+              ${noteHtml}
+              <div class="quote-meta">
+                <span>From <strong>${quote.bookTitle || "a book"}</strong></span>
+                <button class="btn btn-secondary small" data-action="share-quote" data-quote='${quoteData}'>
+                  <i class="fa-solid fa-share-nodes"></i> Share
+                </button>
+              </div>
+            </div>`;
+                })
+                .join("");
         }
 
         async function generateQuoteCard(quote) {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            const width = 1080;
-            const height = 1080;
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d");
+            const width = 1080,
+                height = 1080;
             canvas.width = width;
             canvas.height = height;
 
-            // Background
-            ctx.fillStyle = '#111827'; // Dark theme background
+            ctx.fillStyle = "#111827";
             ctx.fillRect(0, 0, width, height);
 
-            // Book Cover Image
-            const bookCoverUrl = quote.bookCoverUrl; // Assuming you save this when creating a quote
+            const bookCoverUrl = quote.bookCoverUrl;
             if (bookCoverUrl) {
                 try {
                     const img = new Image();
-                    img.crossOrigin = "anonymous"; // Important for cross-origin images
+                    img.crossOrigin = "anonymous";
                     img.src = bookCoverUrl;
-                    await new Promise(resolve => { img.onload = resolve; });
-                    // Draw a blurred, full-canvas background
+                    await new Promise((res) => (img.onload = res));
                     ctx.globalAlpha = 0.2;
-                    ctx.filter = 'blur(20px)';
+                    ctx.filter = "blur(20px)";
                     ctx.drawImage(img, -50, -50, width + 100, height + 100);
-                    ctx.globalAlpha = 1.0;
-                    ctx.filter = 'none';
-                } catch (e) { console.warn("Could not load cover for quote card", e); }
+                    ctx.globalAlpha = 1;
+                    ctx.filter = "none";
+                } catch { }
             }
 
-            // Quote Text
-            ctx.fillStyle = '#e5e7eb';
-            ctx.textAlign = 'center';
+            ctx.fillStyle = "#e5e7eb";
+            ctx.textAlign = "center";
             ctx.font = 'italic bold 60px Georgia, serif';
-            const quoteLines = wrapText(ctx, `“${quote.text}”`, width - 120);
-            let y = height / 2 - (quoteLines.length / 2 * 70);
-            quoteLines.forEach(line => {
+            const lines = wrapText(ctx, `“${quote.text}”`, width - 120);
+            let y = height / 2 - (lines.length / 2) * 70;
+            lines.forEach((line) => {
                 ctx.fillText(line, width / 2, y);
-                y += 70; // Line height
+                y += 70;
             });
 
-            // Book Title
             ctx.font = '50px "system-ui", sans-serif';
             ctx.fillText(`— ${quote.bookTitle}`, width / 2, y + 50);
 
-            // App Watermark
             ctx.font = '30px "system-ui", sans-serif';
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-            ctx.fillText('Shared from PageBud', width / 2, height - 60);
+            ctx.fillStyle = "rgba(255,255,255,.5)";
+            ctx.fillText("Shared from PageBud", width / 2, height - 60);
 
             return canvas;
         }
-
-        // Helper to wrap text for canvas
         function wrapText(context, text, maxWidth) {
-            const words = text.split(' ');
+            const words = text.split(" ");
             const lines = [];
-            let currentLine = words[0];
+            let current = words[0];
             for (let i = 1; i < words.length; i++) {
-                const word = words[i];
-                const width = context.measureText(currentLine + " " + word).width;
-                if (width < maxWidth) {
-                    currentLine += " " + word;
-                } else {
-                    lines.push(currentLine);
-                    currentLine = word;
+                const w = words[i];
+                const width = context.measureText(current + " " + w).width;
+                if (width < maxWidth) current += " " + w;
+                else {
+                    lines.push(current);
+                    current = w;
                 }
             }
-            lines.push(currentLine);
+            lines.push(current);
             return lines;
         }
 
-        // New function to load and display all notes and quotes
         async function loadNotesAndQuotes(uid) {
             const section = $("#notesAndQuotesSection");
             if (!section) return;
+            try {
+                const snap = await db()
+                    .collection("users")
+                    .doc(uid)
+                    .collection("quotes")
+                    .orderBy("createdAt", "desc")
+                    .limit(20)
+                    .get();
+                if (snap.empty) return;
+
+                const bookIds = [...new Set(snap.docs.map((d) => d.data().bookId))];
+                const bookSnaps = await Promise.all(
+                    bookIds.map((id) => db().collection("users").doc(uid).collection("books").doc(id).get())
+                );
+                const coverMap = new Map(bookSnaps.map((s) => [s.id, (s.data() || {}).coverUrl]));
+                allQuotes = snap.docs.map((doc) => ({
+                    ...doc.data(),
+                    bookCoverUrl: coverMap.get(doc.data().bookId),
+                }));
+                renderNotes(allQuotes);
+                section.style.display = "block";
+            } catch (e) {
+                console.warn("Notes/quotes load skipped:", e);
+            }
+        }
+
+        $("#notesAndQuotesList")?.addEventListener("click", async (e) => {
+            const shareBtn = e.target.closest('[data-action="share-quote"]');
+            if (!shareBtn) return;
+            const quote = JSON.parse(decodeURIComponent(shareBtn.dataset.quote));
+            const modal = $("#quoteCardModal");
+            const wrap = $("#quoteCardCanvasWrap");
+            const dl = $("#downloadQuoteCardBtn");
+            wrap.innerHTML = `<p class="muted">Generating card...</p>`;
+            modal.style.display = "flex";
+            const canvas = await generateQuoteCard(quote);
+            wrap.innerHTML = "";
+            wrap.appendChild(canvas);
+            dl.href = canvas.toDataURL("image/png");
+        });
+        $("#closeQuoteCardBtn")?.addEventListener("click", () => ($("#quoteCardModal").style.display = "none"));
+        $("#notesSearchInput")?.addEventListener("input", (e) => {
+            const q = (e.target.value || "").toLowerCase().trim();
+            if (!q) return renderNotes(allQuotes);
+            renderNotes(
+                allQuotes.filter(
+                    (x) =>
+                        x.text.toLowerCase().includes(q) ||
+                        (x.note && x.note.toLowerCase().includes(q)) ||
+                        (x.bookTitle || "").toLowerCase().includes(q)
+                )
+            );
+        });
+
+        // ---------- quirks ----------
+        function renderQuirks(quirks) {
+            const host = $("#quirksContainer");
+            if (!host) return;
+            host.innerHTML = Array.isArray(quirks) && quirks.length
+                ? quirks.map((q) => `<span class="quirk-chip">${q}</span>`).join("")
+                : "";
+        }
+        function wireUpQuirksEditor(selectedQuirks) {
+            const quirksList =
+                (window.PB_CONST && window.PB_CONST.QUIRKS) || [
+                    "Annotator",
+                    "DNF is okay",
+                    "TBR mountain climber",
+                    "Buddy reader",
+                    "Audiobook lover",
+                    "Re-reader",
+                ];
+            const host = $("#editQuirks");
+            if (!host) return;
+            const setSel = new Set(selectedQuirks || []);
+            host.innerHTML = quirksList
+                .map(
+                    (q) =>
+                        `<span class="category ${setSel.has(q) ? "active" : ""}" data-value="${q}">${q}</span>`
+                )
+                .join("");
+            host.addEventListener("click", (e) => {
+                const chip = e.target.closest(".category");
+                if (chip) chip.classList.toggle("active");
+            });
+        }
+        function getSelectedQuirks() {
+            return Array.from($("#editQuirks")?.querySelectorAll(".category.active") || []).map(
+                (el) => el.dataset.value
+            );
+        }
+
+        // ---------- shelf cards ----------
+        function wireShelfGridActions(grid, isMyProfile, shelfId) {
+            grid.addEventListener("click", async (e) => {
+                const openBtn = e.target.closest("[data-action='open']");
+                if (openBtn) return (location.href = `edit-page.html?id=${openBtn.dataset.id}`);
+
+                const readBtn = e.target.closest("[data-action='read']");
+                if (readBtn) return (location.href = `reader.html?id=${readBtn.dataset.id}`);
+
+                const addBtn = e.target.closest("[data-action='addtoshelf']");
+                if (addBtn && isMyProfile) {
+                    const id = addBtn.dataset.id;
+                    const title =
+                        addBtn.closest(".book-card")?.querySelector(".title")?.textContent || "This book";
+                    await openAddToShelfForBook(auth().currentUser.uid, id, title);
+                    return;
+                }
+
+                const favBtn = e.target.closest("[data-action='fav']");
+                if (favBtn && isMyProfile) {
+                    const card = favBtn.closest(".book-card");
+                    const id = card && card.dataset.id;
+                    if (!id) return;
+                    const user = auth().currentUser;
+                    if (!user) return;
+                    try {
+                        const ref = db().collection("users").doc(user.uid).collection("books").doc(id);
+                        const snap = await ref.get();
+                        const d = snap.data() || {};
+                        const next = !d.favorite;
+                        await ref.set(
+                            { favorite: next, updatedAt: firebase.firestore.FieldValue.serverTimestamp() },
+                            { merge: true }
+                        );
+                        favBtn.classList.toggle("active", next);
+                        if (shelfId === "favoritesShelf" && !next) {
+                            card.remove();
+                            if (!grid.children.length)
+                                grid.closest(".profile-shelf").style.display = "none";
+                        }
+                    } catch (err) {
+                        console.warn("Favorite toggle failed:", err);
+                    }
+                }
+            });
+        }
+
+        async function loadCurrentlyReading(uid, isMyProfile) {
+            const shelf = $("#currentlyReadingShelf");
+            const grid = shelf?.querySelector(".shelf-grid");
+            if (!shelf || !grid) return;
+            try {
+                const snap = await db()
+                    .collection("users")
+                    .doc(uid)
+                    .collection("books")
+                    .where("status", "==", "reading")
+                    .limit(10)
+                    .get();
+                if (snap.empty) return;
+                const frag = document.createDocumentFragment();
+                snap.forEach((doc) => {
+                    const card = createCardElement(doc, isMyProfile);
+                    if (card) frag.appendChild(card);
+                });
+                grid.innerHTML = "";
+                grid.appendChild(frag);
+                shelf.style.display = "block";
+                shelf.querySelector(".see-all-btn")?.style && (shelf.querySelector(".see-all-btn").style.display = isMyProfile ? "" : "none");
+                wireShelfGridActions(grid, isMyProfile, "currentlyReadingShelf");
+            } catch (e) {
+                console.warn("Currently Reading load failed:", e);
+            }
+        }
+        async function loadFavoritesShelf(uid, isMyProfile) {
+            const shelf = $("#favoritesShelf");
+            const grid = shelf?.querySelector(".shelf-grid");
+            if (!shelf || !grid) return;
+            try {
+                const snap = await db()
+                    .collection("users")
+                    .doc(uid)
+                    .collection("books")
+                    .where("favorite", "==", true)
+                    .limit(10)
+                    .get();
+                if (snap.empty) return;
+                const frag = document.createDocumentFragment();
+                snap.forEach((doc) => {
+                    const card = createCardElement(doc, isMyProfile);
+                    if (card) frag.appendChild(card);
+                });
+                grid.innerHTML = "";
+                grid.appendChild(frag);
+                shelf.style.display = "block";
+                shelf.querySelector(".see-all-btn")?.style && (shelf.querySelector(".see-all-btn").style.display = isMyProfile ? "" : "none");
+                wireShelfGridActions(grid, isMyProfile, "favoritesShelf");
+            } catch (e) {
+                console.warn("Favorites load failed:", e);
+            }
+        }
+        async function loadFinishedShelf(uid, isMyProfile) {
+            const shelf = $("#finishedShelf");
+            const grid = shelf?.querySelector(".shelf-grid");
+            if (!shelf || !grid) return;
+            try {
+                const snap = await db()
+                    .collection("users")
+                    .doc(uid)
+                    .collection("books")
+                    .where("status", "==", "finished")
+                    .orderBy("finished", "desc")
+                    .limit(10)
+                    .get();
+                if (snap.empty) return;
+                const frag = document.createDocumentFragment();
+                snap.forEach((doc) => {
+                    const card = createCardElement(doc, isMyProfile);
+                    if (card) frag.appendChild(card);
+                });
+                grid.innerHTML = "";
+                grid.appendChild(frag);
+                shelf.style.display = "block";
+                shelf.querySelector(".see-all-btn")?.style && (shelf.querySelector(".see-all-btn").style.display = isMyProfile ? "" : "none");
+                wireShelfGridActions(grid, isMyProfile, "finishedShelf");
+            } catch (e) {
+                console.warn("Finished load failed:", e);
+            }
+        }
+        async function loadWishlistShelf(uid, isMyProfile) {
+            const shelf = $("#wishlistShelf");
+            const grid = shelf?.querySelector(".shelf-grid");
+            if (!shelf || !grid) return;
+            try {
+                const snap = await db()
+                    .collection("users")
+                    .doc(uid)
+                    .collection("books")
+                    .where("status", "==", "wishlist")
+                    .limit(10)
+                    .get();
+                if (snap.empty) return;
+                const frag = document.createDocumentFragment();
+                snap.forEach((doc) => {
+                    const card = createCardElement(doc, isMyProfile);
+                    if (card) frag.appendChild(card);
+                });
+                grid.innerHTML = "";
+                grid.appendChild(frag);
+                shelf.style.display = "block";
+                shelf.querySelector(".see-all-btn")?.style && (shelf.querySelector(".see-all-btn").style.display = isMyProfile ? "" : "none");
+                wireShelfGridActions(grid, isMyProfile, "wishlistShelf");
+            } catch (e) {
+                console.warn("Wishlist load failed:", e);
+            }
+        }
+
+        // ---------- achievements & badges ----------
+        async function calculateAndShowAchievements(uid, streak) {
+            const container = $("#achievementsSection");
+            const grid = $("#achievementsGrid");
+            if (!container || !grid) return;
+
+            const booksSnap = await db().collection("users").doc(uid).collection("books").get();
+            const books = booksSnap.docs.map((d) => d.data());
+
+            const achievements = [
+                {
+                    id: "bookworm",
+                    title: "Bookworm",
+                    desc: "Read 10 books",
+                    icon: "fa-book-open-reader",
+                    unlocked: books.filter((b) => b.status === "finished").length >= 10,
+                },
+                {
+                    id: "explorer",
+                    title: "Genre Explorer",
+                    desc: "Read from 5+ genres",
+                    icon: "fa-compass",
+                    unlocked: new Set(books.flatMap((b) => b.genres || [])).size >= 5,
+                },
+                {
+                    id: "streak",
+                    title: "Streak Keeper",
+                    desc: "Read for 7 days in a row",
+                    icon: "fa-fire",
+                    unlocked: streak >= 7,
+                },
+                {
+                    id: "marathoner",
+                    title: "The Marathoner",
+                    desc: "Finish a 500+ page book",
+                    icon: "fa-person-running",
+                    unlocked: books.some((b) => b.status === "finished" && b.pageCount >= 500),
+                },
+                {
+                    id: "critic",
+                    title: "The Critic",
+                    desc: "Rate 5 books",
+                    icon: "fa-star",
+                    unlocked: books.filter((b) => (b.rating || 0) > 0).length >= 5,
+                },
+            ];
+
+            grid.innerHTML = achievements
+                .map(
+                    (a) => `
+        <div class="achievement-item ${a.unlocked ? "" : "locked"}">
+          <i class="fa-solid ${a.icon} achievement-icon"></i>
+          <div>
+            <div class="achievement-title">${a.title}</div>
+            <div class="achievement-desc">${a.desc}</div>
+          </div>
+        </div>`
+                )
+                .join("");
+
+            container.style.display = "block";
+        }
+
+        async function loadAndDisplayBadges(uid) {
+            const container = $("#badgesSection");
+            const grid = $("#badgesGrid");
+            if (!container || !grid) return;
 
             try {
-                const snap = await db().collection("users").doc(uid).collection("quotes")
-                    .orderBy("createdAt", "desc").limit(20).get();
+                const snap = await db()
+                    .collection("users")
+                    .doc(uid)
+                    .collection("active_challenges")
+                    .where("completedAt", "!=", null)
+                    .orderBy("completedAt", "desc")
+                    .get();
 
                 if (snap.empty) return;
 
-                // Fetch book cover URLs for the quotes
-                const bookIds = [...new Set(snap.docs.map(d => d.data().bookId))];
-                const bookCoverPromises = bookIds.map(id => db().collection("users").doc(uid).collection("books").doc(id).get());
-                const bookSnaps = await Promise.all(bookCoverPromises);
-                const bookCoverMap = new Map(bookSnaps.map(s => [s.id, s.data()?.coverUrl]));
+                const iconMap = {
+                    tbr_5_2024: "fa-list-check",
+                    genre_explorer_2024: "fa-compass",
+                    big_book_2024: "fa-book-journal-whills",
+                    new_author_2024: "fa-feather-pointed",
+                    default: "fa-trophy",
+                };
 
-                allQuotes = snap.docs.map(doc => ({ ...doc.data(), bookCoverUrl: bookCoverMap.get(doc.data().bookId) }));
-                renderNotes(allQuotes);
-                section.style.display = 'block';
+                grid.innerHTML = snap.docs
+                    .map((doc) => {
+                        const ch = doc.data();
+                        const icon = iconMap[ch.challengeId] || iconMap.default;
+                        const date = ch.completedAt?.toDate ? ch.completedAt.toDate().toLocaleDateString() : "";
+                        return `
+            <div class="badge-item" title="Completed on ${date}">
+              <div class="badge-icon-wrap"><i class="fa-solid ${icon} badge-icon"></i></div>
+              <div class="badge-title">${ch.title || "Challenge Complete"}</div>
+            </div>`;
+                    })
+                    .join("");
 
-            } catch (error) {
-                console.warn("Could not load notes and quotes:", error);
-                section.style.display = 'none';
+                container.style.display = "block";
+            } catch (e) {
+                console.warn("Badges load skipped:", e);
             }
         }
 
-        // Wire up the new search and share functionality
-        const notesSearchInput = $("#notesSearchInput");
-        if (notesSearchInput) {
-            notesSearchInput.addEventListener('input', (e) => {
-                const query = e.target.value.toLowerCase().trim();
-                if (!query) {
-                    renderNotes(allQuotes);
-                    return;
-                }
-                const filtered = allQuotes.filter(q =>
-                    q.text.toLowerCase().includes(query) ||
-                    (q.note && q.note.toLowerCase().includes(query)) ||
-                    q.bookTitle.toLowerCase().includes(query)
-                );
-                renderNotes(filtered);
-            });
-        }
-
-        const notesList = $("#notesAndQuotesList");
-        if (notesList) {
-            notesList.addEventListener('click', async (e) => {
-                const shareBtn = e.target.closest('[data-action="share-quote"]');
-                if (!shareBtn) return;
-
-                const quote = JSON.parse(decodeURIComponent(shareBtn.dataset.quote));
-                const modal = $("#quoteCardModal");
-                const canvasWrap = $("#quoteCardCanvasWrap");
-                const downloadBtn = $("#downloadQuoteCardBtn");
-                canvasWrap.innerHTML = `<p class="muted">Generating card...</p>`;
-                modal.style.display = 'flex';
-                const canvas = await generateQuoteCard(quote);
-                canvasWrap.innerHTML = '';
-                canvasWrap.appendChild(canvas);
-                downloadBtn.href = canvas.toDataURL('image/png');
-            });
-        }
-        $("#closeQuoteCardBtn")?.addEventListener('click', () => $("#quoteCardModal").style.display = 'none');
-
-        function renderQuirks(quirks) {
-            if (!quirksContainer) return;
-            if (!quirks || quirks.length === 0) {
-                quirksContainer.innerHTML = '';
-                return;
-            }
-            quirksContainer.innerHTML = quirks.map(q => `<span class="quirk-chip">${q}</span>`).join('');
-        }
-
-        function wireUpQuirksEditor(selectedQuirks) {
-            const quirks = window.PB_CONST?.QUIRKS || [];
-            if (!editQuirksContainer || quirks.length === 0) return;
-
-            const selected = new Set(selectedQuirks);
-            editQuirksContainer.innerHTML = quirks.map(q => `
-                <span class="category ${selected.has(q) ? 'active' : ''}" data-value="${q}">${q}</span>
-            `).join('');
-
-            editQuirksContainer.addEventListener('click', (e) => {
-                const chip = e.target.closest('.category');
-                if (chip) {
-                    chip.classList.toggle('active');
-                }
-            });
-        }
-
-        function getSelectedQuirks() {
-            if (!editQuirksContainer) return [];
-            return Array.from(editQuirksContainer.querySelectorAll('.category.active')).map(c => c.dataset.value);
-        }
-
-        // --- This function was missing ---
+        // ---------- streak ----------
         async function calculateStreak(uid) {
             try {
-                const ninetyDaysAgo = new Date();
-                ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-
-                const sessionsSnap = await db().collection("users").doc(uid).collection("sessions")
-                    .where("at", ">=", ninetyDaysAgo).orderBy("at", "desc").get();
-
+                const ninety = new Date();
+                ninety.setDate(ninety.getDate() - 90);
+                const sessionsSnap = await db()
+                    .collection("users")
+                    .doc(uid)
+                    .collection("sessions")
+                    .where("at", ">=", ninety)
+                    .orderBy("at", "desc")
+                    .get();
                 if (sessionsSnap.empty) return 0;
 
-                const toDayStr = (d) => { const x = new Date(d); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`; };
-                const readingDays = [...new Set(sessionsSnap.docs.map(d => d.data().date))].sort().reverse();
-                if (readingDays.length === 0) return 0;
+                const toDayStr = (d) => {
+                    const x = new Date(d);
+                    return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(
+                        x.getDate()
+                    ).padStart(2, "0")}`;
+                };
+                const readingDays = [...new Set(sessionsSnap.docs.map((d) => d.data().date))]
+                    .sort()
+                    .reverse();
+                if (!readingDays.length) return 0;
 
                 let streak = 0;
                 const today = new Date();
@@ -651,278 +1174,94 @@
                 if (readingDays[0] === toDayStr(today) || readingDays[0] === toDayStr(yesterday)) {
                     streak = 1;
                     for (let i = 0; i < readingDays.length - 1; i++) {
-                        const diffTime = new Date(readingDays[i]).getTime() - new Date(readingDays[i + 1]).getTime();
-                        if (Math.round(diffTime / (1000 * 60 * 60 * 24)) === 1) streak++;
+                        const diff =
+                            new Date(readingDays[i]).getTime() - new Date(readingDays[i + 1]).getTime();
+                        if (Math.round(diff / (1000 * 60 * 60 * 24)) === 1) streak++;
                         else break;
                     }
                 }
                 return streak;
-            } catch (error) {
-                console.warn("Could not calculate streak:", error);
+            } catch (e) {
+                console.warn("Streak calc skipped:", e);
                 return 0;
             }
         }
 
-        async function loadCurrentlyReading(uid, isMyProfile) {
-            const shelf = $("#currentlyReadingShelf");
-            const grid = shelf?.querySelector(".shelf-grid");
-            if (!shelf || !grid) return;
-
+        // ---------- friends ----------
+        async function addFriend(fromUid, toUid) {
+            const reqId = [fromUid, toUid].sort().join("__");
+            const ref = db().collection("friend_requests").doc(reqId);
+            const snap = await ref.get();
+            if (snap.exists) {
+                const cur = snap.data() || {};
+                if (cur.status === "accepted") return alert("You’re already friends.");
+                if (cur.status === "pending") return alert("Request already pending.");
+            }
             try {
-                const snap = await db().collection("users").doc(uid).collection("books")
-                    .where("status", "==", "reading").limit(10).get();
-
-                if (snap.empty) return;
-
-                const fragment = document.createDocumentFragment();
-                snap.forEach(doc => {
-                    const card = createCardElement(doc, isMyProfile);
-                    if (card) fragment.appendChild(card);
-                });
-
-                grid.innerHTML = "";
-                grid.appendChild(fragment);
-                shelf.style.display = 'block';
-
-                if (isMyProfile) {
-                    const seeAllBtn = shelf.querySelector('.see-all-btn');
-                    if (seeAllBtn) seeAllBtn.style.display = '';
-                }
-
-                wireShelfGridActions(grid, isMyProfile, 'currentlyReadingShelf');
-
+                await ref.set(
+                    {
+                        from: fromUid,
+                        to: toUid,
+                        status: "pending",
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    },
+                    { merge: true }
+                );
+                btnAddFriend.textContent = "Request Sent ✓";
+                btnAddFriend.disabled = true;
             } catch (error) {
-                console.warn("Could not load 'Currently Reading' shelf:", error);
+                console.error("Friend request failed:", error);
+                alert("Could not send friend request.");
             }
         }
-
-        function wireShelfGridActions(grid, isMyProfile, shelfId) {
-            grid.addEventListener('click', async (e) => {
-                // Handle opening the edit page
-                const openBtn = e.target.closest("[data-action='open']");
-                if (openBtn) {
-                    location.href = `edit-page.html?id=${openBtn.dataset.id}`;
-                    return;
-                }
-
-                // Handle read button
-                const readBtn = e.target.closest("[data-action='read']");
-                if (readBtn) {
-                    location.href = `reader.html?id=${readBtn.dataset.id}`;
-                    return;
-                }
-
-                // Handle favorite button clicks
-                const favBtn = e.target.closest("[data-action='fav']");
-                if (favBtn && isMyProfile) {
-                    const card = favBtn.closest('.book-card');
-                    const id = card?.dataset.id;
-                    if (!id) return;
-
-                    const user = auth().currentUser;
-                    if (!user) return;
-
-                    try {
-                        const ref = db().collection("users").doc(user.uid).collection("books").doc(id);
-                        const snap = await ref.get();
-                        const d = snap.data() || {};
-                        const nextState = !d.favorite;
-
-                        await ref.set({ favorite: nextState, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
-
-                        favBtn.classList.toggle("active", nextState);
-
-                        if (shelfId === 'favoritesShelf' && !nextState) {
-                            card.remove();
-                            if (grid.children.length === 0) {
-                                grid.closest('.profile-shelf').style.display = 'none';
-                            }
-                        }
-                    } catch (err) {
-                        console.warn("Favorite toggle failed", err);
-                    }
-                }
-            });
+        function showMoreOptions(theirUid, theirName) {
+            const action = prompt(`More options for ${theirName}:\n\nType "block" to block this user.`, "");
+            if ((action || "").toLowerCase() === "block")
+                blockUser(auth().currentUser.uid, theirUid, theirName);
         }
-
-        async function loadFavoritesShelf(uid, isMyProfile) {
-            const shelf = $("#favoritesShelf");
-            const grid = shelf?.querySelector(".shelf-grid");
-            if (!shelf || !grid) return;
-
+        async function blockUser(myUid, theirUid, theirName) {
+            if (!confirm(`Block ${theirName}?`)) return;
             try {
-                const snap = await db().collection("users").doc(uid).collection("books")
-                    .where("favorite", "==", true).limit(10).get();
-
-                if (snap.empty) return;
-
-                const fragment = document.createDocumentFragment();
-                snap.forEach(doc => {
-                    const card = createCardElement(doc, isMyProfile);
-                    if (card) fragment.appendChild(card);
-                });
-
-                grid.innerHTML = "";
-                grid.appendChild(fragment);
-                shelf.style.display = 'block';
-
-                if (isMyProfile) {
-                    const seeAllBtn = shelf.querySelector('.see-all-btn');
-                    if (seeAllBtn) seeAllBtn.style.display = '';
-                }
-
-                wireShelfGridActions(grid, isMyProfile, 'favoritesShelf');
-
-            } catch (error) {
-                console.warn("Could not load 'Favorites' shelf:", error);
+                await db().collection("users").doc(myUid).collection("blocked").doc(theirUid).set({ at: new Date() });
+                alert(`${theirName} has been blocked.`);
+                location.href = "index.html";
+            } catch {
+                alert("Could not block user. Please try again.");
             }
         }
+        async function checkFriendshipAndShowActions(myUid, theirUid) {
+            const friendDoc = await db().collection("users").doc(myUid).collection("friends").doc(theirUid).get();
+            const isFriend = friendDoc.exists && friendDoc.data().status === "accepted";
 
-        async function loadFinishedShelf(uid, isMyProfile) {
-            const shelf = $("#finishedShelf");
-            const grid = shelf?.querySelector(".shelf-grid");
-            if (!shelf || !grid) return;
-
-            try {
-                const snap = await db().collection("users").doc(uid).collection("books")
-                    .where("status", "==", "finished").orderBy("finished", "desc").limit(10).get();
-
-                if (snap.empty) return;
-
-                const fragment = document.createDocumentFragment();
-                snap.forEach(doc => {
-                    const card = createCardElement(doc, isMyProfile);
-                    if (card) fragment.appendChild(card);
-                });
-
-                grid.innerHTML = "";
-                grid.appendChild(fragment);
-                shelf.style.display = 'block';
-
-                if (isMyProfile) {
-                    const seeAllBtn = shelf.querySelector('.see-all-btn');
-                    if (seeAllBtn) seeAllBtn.style.display = '';
+            if (isFriend) {
+                btnAddFriend.textContent = "Friends ✓";
+                btnAddFriend.disabled = true;
+            } else {
+                const reqId = [myUid, theirUid].sort().join("__");
+                const reqDoc = await db().collection("friend_requests").doc(reqId).get();
+                if (reqDoc.exists && reqDoc.data().status === "pending") {
+                    btnAddFriend.textContent = "Request Pending...";
+                    btnAddFriend.disabled = true;
+                } else {
+                    btnAddFriend.textContent = "Add Friend";
+                    btnAddFriend.onclick = () => addFriend(myUid, theirUid);
                 }
-
-                wireShelfGridActions(grid, isMyProfile, 'finishedShelf');
-
-            } catch (error) {
-                console.warn("Could not load 'Finished Books' shelf:", error);
             }
         }
+    } // end init
 
-        async function loadWishlistShelf(uid, isMyProfile) {
-            const shelf = $("#wishlistShelf");
-            const grid = shelf?.querySelector(".shelf-grid");
-            if (!shelf || !grid) return;
-
-            try {
-                const snap = await db().collection("users").doc(uid).collection("books")
-                    .where("status", "==", "wishlist").limit(10).get();
-
-                if (snap.empty) return;
-
-                const fragment = document.createDocumentFragment();
-                snap.forEach(doc => {
-                    const card = createCardElement(doc, isMyProfile);
-                    if (card) fragment.appendChild(card);
-                });
-
-                grid.innerHTML = "";
-                grid.appendChild(fragment);
-                shelf.style.display = 'block';
-
-                if (isMyProfile) {
-                    const seeAllBtn = shelf.querySelector('.see-all-btn');
-                    if (seeAllBtn) seeAllBtn.style.display = '';
-                }
-
-                wireShelfGridActions(grid, isMyProfile, 'wishlistShelf');
-
-            } catch (error) {
-                console.warn("Could not load 'Wishlist' shelf:", error);
-            }
-        }
-
-        async function calculateAndShowAchievements(uid, streak) {
-            const container = $("#achievementsSection");
-            const grid = $("#achievementsGrid");
-            if (!container || !grid) return;
-
-            const booksSnap = await db().collection("users").doc(uid).collection("books").get();
-            const books = booksSnap.docs.map(d => d.data());
-
-            const achievements = [
-                { id: 'bookworm', title: 'Bookworm', desc: 'Read 10 books', icon: 'fa-book-open-reader', unlocked: books.filter(b => b.status === 'finished').length >= 10 },
-                { id: 'explorer', title: 'Genre Explorer', desc: 'Read from 5+ genres', icon: 'fa-compass', unlocked: new Set(books.flatMap(b => b.genres || [])).size >= 5 },
-                { id: 'streak', title: 'Streak Keeper', desc: 'Read for 7 days in a row', icon: 'fa-fire', unlocked: streak >= 7 },
-                { id: 'marathoner', title: 'The Marathoner', desc: 'Finish a 500+ page book', icon: 'fa-person-running', unlocked: books.some(b => b.status === 'finished' && b.pageCount >= 500) },
-                { id: 'critic', title: 'The Critic', desc: 'Rate 5 books', icon: 'fa-star', unlocked: books.filter(b => (b.rating || 0) > 0).length >= 5 },
-            ];
-
-            grid.innerHTML = achievements.map(a => `
-                <div class="achievement-item ${a.unlocked ? '' : 'locked'}">
-                    <i class="fa-solid ${a.icon} achievement-icon"></i>
-                    <div>
-                        <div class="achievement-title">${a.title}</div>
-                        <div class="achievement-desc">${a.desc}</div>
-                    </div>
-                </div>
-            `).join('');
-
-            container.style.display = 'block';
-        }
+    // boot
+    if (window.onAuthReady && typeof window.onAuthReady.then === "function") {
+        window.onAuthReady.then((user) => {
+            if (user) init(user);
+            else location.href = "auth.html";
+        });
+    } else {
+        const unsub = firebase.auth().onAuthStateChanged((user) => {
+            unsub();
+            if (user) init(user);
+            else location.href = "auth.html";
+        });
     }
-
-    async function loadAndDisplayBadges(uid) {
-        const container = $("#badgesSection");
-        const grid = $("#badgesGrid");
-        if (!container || !grid) return;
-
-        try {
-            const snap = await db().collection("users").doc(uid).collection("active_challenges")
-                .where("completedAt", "!=", null)
-                .orderBy("completedAt", "desc")
-                .get();
-
-            if (snap.empty) return;
-
-            const badgeIconMap = {
-                'tbr_5_2024': 'fa-list-check',
-                'genre_explorer_2024': 'fa-compass',
-                'big_book_2024': 'fa-book-journal-whills',
-                'new_author_2024': 'fa-feather-pointed',
-                'default': 'fa-trophy'
-            };
-
-            grid.innerHTML = snap.docs.map(doc => {
-                const challenge = doc.data();
-                const icon = badgeIconMap[challenge.challengeId] || badgeIconMap['default'];
-                const completedDate = challenge.completedAt?.toDate ? challenge.completedAt.toDate().toLocaleDateString() : '';
-
-                return `
-                    <div class="badge-item" title="Completed on ${completedDate}">
-                        <div class="badge-icon-wrap">
-                            <i class="fa-solid ${icon} badge-icon"></i>
-                        </div>
-                        <div class="badge-title">${challenge.title || 'Challenge Complete'}</div>
-                    </div>
-                `;
-            }).join('');
-
-            container.style.display = 'block';
-        } catch (error) {
-            console.warn("Could not load badges:", error);
-        }
-    }
-
-    // Use requireAuth to safely run the page logic and prevent race conditions
-    window.onAuthReady.then(user => {
-        if (user) {
-            init(user);
-        } else {
-            // If no user, redirect to login. This is the safe way.
-            location.href = 'auth.html';
-        }
-    });
 })();

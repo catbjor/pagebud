@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Profile – PageBud</title>
     <link rel="stylesheet" href="style.css" />
-    <link rel="stylesheet" href="profile.css" /> <!-- New CSS file for profile-specific styles -->
+    <link rel="stylesheet" href="profile.css" />
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js"></script>
     <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -32,21 +32,22 @@
         <main class="profile-content">
             <div class="profile-card">
                 <div class="profile-header-actions">
-                    <!-- Edit button will be shown here for own profile -->
-                    <button id="btnCreateShelf" class="btn btn-secondary" style="display: none;"><i
-                            class="fa-solid fa-plus"></i> New Shelf</button>
-                    <button id="btnEditProfile" class="btn btn-secondary" style="display: none;">Edit Profile</button>
+                    <button id="btnCreateShelf" class="btn btn-secondary" style="display:none;">
+                        <i class="fa-solid fa-plus"></i> New Shelf
+                    </button>
+                    <button id="btnEditProfile" class="btn btn-secondary" style="display:none;">Edit Profile</button>
                 </div>
+
                 <div class="profile-photo-wrap">
                     <img id="profilePhoto"
                         src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
                         alt="Profile photo">
-                    <!-- Edit button shown only for own profile -->
-                    <button id="btnChangePhoto" class="btn-change-photo" style="display: none;" title="Change photo">
+                    <button id="btnChangePhoto" class="btn-change-photo" style="display:none;" title="Change photo">
                         <i class="fa fa-camera"></i>
                     </button>
-                    <input type="file" id="photoInput" accept="image/*" style="display: none;">
+                    <input type="file" id="photoInput" accept="image/*" style="display:none;">
                 </div>
+
                 <h2 id="profileName">Loading...</h2>
                 <p id="profileUsername" class="muted"></p>
 
@@ -55,8 +56,7 @@
                     <div id="quirksContainer" class="quirks-container"></div>
                 </div>
 
-                <!-- Actions for viewing OTHER people's profiles -->
-                <div id="otherUserActions" class="profile-actions" style="display: none;">
+                <div id="otherUserActions" class="profile-actions" style="display:none;">
                     <button id="btnMessage" class="btn btn-primary">Message</button>
                     <button id="btnAddFriend" class="btn btn-secondary">Add Friend</button>
                     <button id="btnMoreOptions" class="btn-icon" title="More options">
@@ -64,8 +64,7 @@
                     </button>
                 </div>
 
-                <!-- Compatibility Score with another user (Corrected structure) -->
-                <div id="compatibilityScore" class="compatibility-score" style="display: none;">
+                <div id="compatibilityScore" class="compatibility-score" style="display:none;">
                     <div class="score-label">You & <span id="compFriendName"></span></div>
                     <div class="score-value-wrap">
                         <div class="score-value">--%</div>
@@ -74,52 +73,48 @@
                     <div class="score-breakdown"></div>
                 </div>
 
-                <!-- Custom Shelves Section -->
-                <div id="customShelvesContainer">
-                </div>
+                <!-- Custom Shelves go here -->
+                <div id="customShelvesContainer"></div>
 
-                <!-- "Currently Reading" Shelf -->
-                <section id="currentlyReadingShelf" class="profile-shelf card" style="display: none;">
+                <!-- Built-in shelves -->
+                <section id="currentlyReadingShelf" class="profile-shelf card" style="display:none;">
                     <div class="card-head">
                         <h3>Currently Reading</h3>
                         <a href="index.html?filter=reading" class="btn btn-secondary see-all-btn"
-                            style="display: none; padding: 4px 10px; font-size: .85rem;">See All</a>
+                            style="display:none; padding:4px 10px; font-size:.85rem;">See All</a>
                     </div>
                     <div class="shelf-grid"></div>
                 </section>
 
-                <!-- "Favorites" Shelf -->
-                <section id="favoritesShelf" class="profile-shelf card" style="display: none;">
+                <section id="favoritesShelf" class="profile-shelf card" style="display:none;">
                     <div class="card-head">
                         <h3>Favorites</h3>
                         <a href="index.html?filter=favorites" class="btn btn-secondary see-all-btn"
-                            style="display: none; padding: 4px 10px; font-size: .85rem;">See All</a>
+                            style="display:none; padding:4px 10px; font-size:.85rem;">See All</a>
                     </div>
                     <div class="shelf-grid"></div>
                 </section>
 
-                <!-- "Finished Books" Shelf -->
-                <section id="finishedShelf" class="profile-shelf card" style="display: none;">
+                <section id="finishedShelf" class="profile-shelf card" style="display:none;">
                     <div class="card-head">
                         <h3>Finished Books</h3>
                         <a href="index.html?filter=finished" class="btn btn-secondary see-all-btn"
-                            style="display: none; padding: 4px 10px; font-size: .85rem;">See All</a>
+                            style="display:none; padding:4px 10px; font-size:.85rem;">See All</a>
                     </div>
                     <div class="shelf-grid"></div>
                 </section>
 
-                <!-- "Wishlist" Shelf -->
-                <section id="wishlistShelf" class="profile-shelf card" style="display: none;">
+                <section id="wishlistShelf" class="profile-shelf card" style="display:none;">
                     <div class="card-head">
                         <h3>Wishlist</h3>
                         <a href="index.html?filter=wishlist" class="btn btn-secondary see-all-btn"
-                            style="display: none; padding: 4px 10px; font-size: .85rem;">See All</a>
+                            style="display:none; padding:4px 10px; font-size:.85rem;">See All</a>
                     </div>
                     <div class="shelf-grid"></div>
                 </section>
 
-                <!-- Edit form for OWN profile -->
-                <div id="editProfileSection" class="card" style="display: none;">
+                <!-- Edit form -->
+                <div id="editProfileSection" class="card" style="display:none;">
                     <h3>Edit Your Profile</h3>
                     <div class="form-row">
                         <label for="editName">Display Name</label>
@@ -127,8 +122,7 @@
                     </div>
                     <div class="form-row">
                         <label for="editQuirks">Reading Quirks</label>
-                        <div class="categories picker-grid" id="editQuirks">
-                        </div>
+                        <div class="categories picker-grid" id="editQuirks"></div>
                     </div>
                     <div class="form-row">
                         <label for="editBio">Your Bio</label>
@@ -138,43 +132,41 @@
                 </div>
 
                 <!-- Achievements -->
-                <section id="achievementsSection" class="profile-shelf card" style="display: none;">
+                <section id="achievementsSection" class="profile-shelf card" style="display:none;">
                     <div class="card-head">
                         <h3>Achievements</h3>
                     </div>
                     <div id="achievementsGrid" class="achievements-grid"></div>
                 </section>
 
-                <!-- Badges for Completed Challenges -->
-                <section id="badgesSection" class="profile-shelf card" style="display: none;">
+                <!-- Badges -->
+                <section id="badgesSection" class="profile-shelf card" style="display:none;">
                     <div class="card-head">
                         <h3>Badges</h3>
                     </div>
                     <div id="badgesGrid" class="badges-grid"></div>
                 </section>
+            </div>
         </main>
 
-        <!-- New Section for Notes & Quotes -->
-        <section id="notesAndQuotesSection" class="card" style="display: none; margin: 16px;">
+        <!-- Notes & Quotes -->
+        <section id="notesAndQuotesSection" class="card" style="display:none; margin:16px;">
             <div class="card-head">
                 <h3 style="margin:0">My Notes & Quotes</h3>
-                <input type="search" id="notesSearchInput" placeholder="Search notes..." style="max-width: 250px;">
+                <input type="search" id="notesSearchInput" placeholder="Search notes..." style="max-width:250px;">
             </div>
-            <div id="notesAndQuotesList">
-                <!-- Notes will be injected here -->
-            </div>
+            <div id="notesAndQuotesList"></div>
         </section>
 
-        <!-- Modal for Shareable Quote Card -->
+        <!-- Quote card modal -->
         <div id="quoteCardModal" class="modal-backdrop" style="align-items:center; justify-content:center;">
-            <div class="modal-sheet" style="max-width: min(90vw, 450px); bottom: auto;">
+            <div class="modal-sheet" style="max-width:min(90vw,450px); bottom:auto;">
                 <h3>Your Quote Card</h3>
                 <div id="quoteCardCanvasWrap"
-                    style="margin: 16px 0; background: var(--surface); padding: 10px; border-radius: 8px;">
-                    <!-- Canvas will be injected here -->
+                    style="margin:16px 0; background:var(--surface); padding:10px; border-radius:8px;">
                     <p class="muted">Generating card...</p>
                 </div>
-                <div class="modal-actions" style="flex-direction: column; gap: 10px;">
+                <div class="modal-actions" style="flex-direction:column; gap:10px;">
                     <a id="downloadQuoteCardBtn" class="btn btn-primary" download="pagebud-quote.png">
                         <i class="fa-solid fa-download"></i> Download Image
                     </a>
@@ -182,14 +174,52 @@
                 </div>
             </div>
         </div>
-
     </div>
 
+    <!-- Shelf Picker (manage a shelf's contents) -->
+    <div id="shelfPickerModal" class="modal-backdrop" style="align-items:center; justify-content:center; display:none;">
+        <div class="modal-sheet" style="max-width:min(92vw,900px); bottom:auto;">
+            <div class="row" style="align-items:center; justify-content:space-between; gap:10px;">
+                <h3 style="margin:0">Add books to: <span id="spShelfName"></span></h3>
+                <input id="spSearch" type="search" placeholder="Search your library..." style="max-width:280px">
+            </div>
+            <p class="muted-small" style="margin-top:6px">
+                Click books to select/deselect. Use search. Press “Save to Shelf”.
+            </p>
+            <div id="spList" class="shelf-picker-grid" aria-live="polite"></div>
+            <div class="row" style="justify-content:space-between; margin-top:12px;">
+                <div class="muted-small"><span id="spCount">0</span> selected</div>
+                <div class="modal-actions" style="display:flex; gap:8px;">
+                    <button id="spCancel" class="btn btn-secondary">Cancel</button>
+                    <button id="spSave" class="btn btn-primary">Save to Shelf</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shelf Chooser (add one book to multiple shelves) -->
+    <div id="shelfChooserModal" class="modal-backdrop"
+        style="align-items:center; justify-content:center; display:none;">
+        <div class="modal-sheet" style="max-width:min(92vw,520px); bottom:auto;">
+            <h3 style="margin:0 0 6px;">Add to shelves: <span id="scBookTitle"></span></h3>
+            <div id="scList" class="shelf-chooser-list" aria-live="polite"></div>
+            <div class="row" style="gap:8px; margin-top:10px;">
+                <input id="scNewName" type="text" class="input" placeholder="Create new shelf…" style="flex:1;">
+                <button id="scCreate" class="btn btn-secondary">Create</button>
+            </div>
+            <div class="modal-actions" style="display:flex; gap:8px; margin-top:12px;">
+                <button id="scCancel" class="btn btn-secondary">Cancel</button>
+                <button id="scSave" class="btn btn-primary">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Book card template (now includes Add to Shelf) -->
     <template id="book-card-template">
         <article class="book-card">
             <div class="thumb-wrap">
                 <img class="thumb" src="" alt="" />
-                <span class="rated-badge" style="display: none;">
+                <span class="rated-badge" style="display:none;">
                     <img class="star" src="icons/yellow-star.svg" alt="" aria-hidden="true" />
                     <span class="val"></span>
                 </span>
@@ -204,10 +234,13 @@
                 <div class="card-row spice-chilis" aria-label="spice"></div>
             </div>
             <div class="actions">
+                <button class="btn btn-secondary" data-action="addtoshelf">
+                    <i class="fa fa-plus"></i> Add to Shelf
+                </button>
                 <button class="btn btn-secondary" data-action="open">
                     <i class="fa fa-pen"></i> Edit
                 </button>
-                <button class="btn" data-action="read" style="display: none;">
+                <button class="btn" data-action="read" style="display:none;">
                     <i class="fa fa-book-open"></i> Read
                 </button>
             </div>
@@ -215,7 +248,7 @@
     </template>
 
     <script src="nav.js" defer></script>
-    <script src="profile-page.js" defer></script> <!-- New JS file -->
+    <script src="profile-page.js" defer></script>
 </body>
 
 </html>

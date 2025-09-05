@@ -8,7 +8,6 @@
 
 .profile-card {
     position: relative;
-    /* For positioning child elements */
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: 16px;
@@ -94,7 +93,7 @@
     resize: vertical;
 }
 
-/* --- Reading Quirks --- */
+/* Quirks */
 .quirks-container {
     margin-top: 20px;
     display: flex;
@@ -113,95 +112,38 @@
     font-size: .85rem;
 }
 
-/* --- Reading Stats --- */
-.stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 16px;
-}
-
-.stat-item {
-    text-align: center;
-}
-
-.stat-value {
-    font-size: 1.8rem;
-    font-weight: 900;
-    color: var(--primary);
-}
-
-.stat-label {
-    font-size: .9rem;
-    color: var(--muted);
-    font-weight: 600;
-}
-
-/* --- Profile Shelf --- */
+/* Shelves */
 .profile-shelf {
     margin-top: 24px;
 }
 
+.profile-shelf .card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.shelf-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 .shelf-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     gap: 12px;
     margin-top: 12px;
 }
 
-/* On wider screens, allow slightly larger cards */
-@media (min-width: 768px) {
+@media (max-width: 480px) {
     .shelf-grid {
-        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
     }
 }
 
-/* --- Achievements --- */
-.achievements-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 16px;
-    margin-top: 12px;
-}
-
-.achievement-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    gap: 8px;
-    padding: 16px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.achievement-item.locked {
-    opacity: 0.5;
-    background: transparent;
-    border-style: dashed;
-}
-
-.achievement-icon {
-    font-size: 2.5rem;
-    color: var(--primary);
-}
-
-.achievement-item.locked .achievement-icon {
-    color: var(--muted);
-}
-
-.achievement-title {
-    font-weight: 900;
-    font-size: 1rem;
-}
-
-.achievement-desc {
-    font-size: .85rem;
-    color: var(--muted);
-}
-
-/* --- Achievements --- */
+/* Achievements */
 .achievements-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -220,7 +162,7 @@
 }
 
 .achievement-item.locked {
-    opacity: 0.6;
+    opacity: .6;
 }
 
 .achievement-icon {
@@ -237,7 +179,33 @@
     color: var(--muted);
 }
 
-/* --- Compatibility Score --- */
+/* Badges */
+.badges-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.badge-item {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    border-radius: 12px;
+    padding: 12px;
+    text-align: center;
+}
+
+.badge-icon {
+    font-size: 26px;
+    color: var(--primary);
+}
+
+.badge-title {
+    font-weight: 700;
+    margin-top: 6px;
+}
+
+/* Compatibility */
 .compatibility-score {
     margin-top: 24px;
     padding-top: 24px;
@@ -280,4 +248,112 @@
 .breakdown-item {
     font-weight: 600;
 }
+
+/* ensure the action buttons are always clickable above anything */
+.profile-card {
+    position: relative;
+    overflow: visible;
+}
+
+.profile-header-actions {
+    z-index: 5;
+    pointer-events: auto;
+}
+
+/* default-hide the share modal just in case global css didn't */
+#quoteCardModal {
+    display: none;
+}
+
+/* tiny bar that appears after you pick a new photo */
+.photo-confirm {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+/* --- Shelf Picker --- */
+.shelf-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+    margin-top: 12px;
+    max-height: 60vh;
+    overflow: auto;
+}
+
+.shelf-picker-item {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+    padding: 8px;
+    display: flex;
+    gap: 8px;
+    cursor: pointer;
+    align-items: flex-start;
+}
+
+.shelf-picker-item .cover {
+    width: 48px;
+    height: 68px;
+    object-fit: cover;
+    border-radius: 6px;
+    background: #eee;
+    flex: 0 0 auto;
+    border: 1px solid var(--border);
+}
+
+.shelf-picker-item .col {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.shelf-picker-item .t {
+    font-weight: 800;
+    line-height: 1.2;
+    max-height: 2.4em;
+    overflow: hidden;
+}
+
+.shelf-picker-item .a {
+    font-size: .85rem;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.shelf-picker-item .check {
+    margin-left: 8px;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--border);
+    border-radius: 4px;
+    position: relative;
+    flex: 0 0 auto;
+}
+
+.shelf-picker-item.selected {
+    outline: 3px solid var(--primary);
+    background: var(--card);
+}
+
+.shelf-picker-item.selected .check {
+    background: var(--primary);
+    border-color: var(--primary);
+}
+
+.shelf-picker-item.selected .check::after {
+    content: "";
+    position: absolute;
+    left: 4px;
+    top: 0px;
+    width: 6px;
+    height: 12px;
+    border: solid var(--btn-text);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
 }
