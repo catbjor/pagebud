@@ -24,7 +24,8 @@
         const themes = [
             { id: "default", name: "Default" }, { id: "light", name: "Light" }, { id: "dark", name: "Dark" },
             { id: "porcelain", name: "Porcelain" }, { id: "moss", name: "Moss" }, { id: "navy", name: "Navy & Teal" },
-            { id: "blush", name: "Soft Blush" }, { id: "sunset", name: "Sunset Pastel" }, { id: "espresso-peony", name: "Espresso & Peony" },
+            { id: "blush", name: "Soft Blush" }, { id: "sunset", name: "Sunset Pastel" }, { id: "pastel-dream", name: "Pastel Dream" },
+            { id: "espresso-peony", name: "Espresso & Peony" },
             { id: "glow", name: "Navy & Gold" }, { id: "bakery", name: "Bakery Pastels" }
         ];
 
@@ -33,7 +34,9 @@
             dark: ['#38bdf8', '#0b1220', '#111827', '#263244'], porcelain: ['#475569', '#f7f7fb', '#fff', '#cbd5e1'],
             moss: ['#34d399', '#0f172a', '#111827', '#223046'], navy: ['#0f766e', '#0b1220', '#111827', '#243041'],
             blush: ['#f472b6', '#fff7f9', '#fff', '#f3cfe0'], sunset: ['#fb7185', '#0f0f12', '#111113', '#26262d'],
-            "espresso-peony": ['#854d0e', '#f5e1e9', '#fff', '#e5c9d5'], glow: ['#f59e0b', '#0b1220', ' #0f172a', '#223046'],
+            "pastel-dream": ['#ff8a80', '#e0f7fa', '#ffffff', '#b2ebf2'],
+            "espresso-peony": ['#854d0e', '#f5e1e9', '#fff', '#e5c9d5'],
+            glow: ['#f59e0b', '#0b1220', '#0f172a', '#223046'],
             bakery: ['#bde0fe', '#fffdfa', '#fff', '#f0dce3']
         };
 

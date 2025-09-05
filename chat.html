@@ -6,171 +6,46 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Chat – PageBud</title>
-
     <link rel="stylesheet" href="style.css" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-
+    <link rel="stylesheet" href="chat.css" /> <!-- New CSS file -->
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js"></script>
     <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
     <script src="firebase-config.js"></script>
     <script src="firebase-init.js"></script>
-
-    <style>
-        /* light layout for the chat page only (keeps your theme/colors) */
-        .chat-wrap {
-            display: grid;
-            grid-template-rows: auto 1fr auto;
-            min-height: calc(100vh - var(--bottom-nav-h));
-        }
-
-        .chat-inner {
-            position: relative;
-            display: grid;
-            grid-template-rows: 1fr auto;
-        }
-
-        #chatMessages {
-            overflow: auto;
-            padding: 12px;
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            background: var(--surface);
-            min-height: 48vh;
-        }
-
-        .msg-row {
-            display: flex;
-            margin: 6px 0;
-        }
-
-        .msg-row.me {
-            justify-content: flex-end;
-        }
-
-        .msg-bubble {
-            max-width: 80%;
-            padding: 8px 10px;
-            border-radius: 14px;
-            border: 1px solid var(--border);
-            background: var(--card);
-            word-wrap: break-word;
-            white-space: pre-wrap;
-        }
-
-        .msg-row.me .msg-bubble {
-            background: color-mix(in oklab, var(--card) 90%, var(--primary) 10%);
-        }
-
-        #typingIndicator {
-            display: none;
-            font-size: .85rem;
-            opacity: .7;
-            padding: 6px 2px;
-        }
-
-        .compose {
-            display: grid;
-            grid-template-columns: 1fr auto auto;
-            gap: 8px;
-            padding: 10px 0;
-            align-items: center;
-        }
-
-        .compose input {
-            width: 100%;
-            padding: 10px 12px;
-            border-radius: 12px;
-            border: 1px solid var(--border);
-            background: var(--background);
-            color: var(--text);
-        }
-
-        .icon-btn {
-            border: 1px solid var(--border);
-            background: var(--card);
-            border-radius: 12px;
-            width: 42px;
-            height: 42px;
-            display: grid;
-            place-items: center;
-            cursor: pointer;
-        }
-
-        /* Inline emoji picker panel */
-        #emojiPicker {
-            position: absolute;
-            bottom: 56px;
-            right: 12px;
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            background: var(--card);
-            background-image: none !important;
-            /* avoid pattern bleed */
-            box-shadow: 0 8px 24px rgba(0, 0, 0, .15);
-            padding: 8px;
-            display: none;
-            z-index: 3000;
-            max-width: 280px;
-            max-height: 220px;
-            overflow: auto;
-
-            /* grid layout for emojis */
-            display: grid;
-            grid-template-columns: repeat(8, 28px);
-            gap: 6px;
-        }
-
-        #emojiPicker button {
-            border: none;
-            background: transparent;
-            cursor: pointer;
-            font-size: 20px;
-            line-height: 1;
-        }
-    </style>
 </head>
 
 <body>
     <div class="app-container">
-        <header class="header">
-            <h1>Chat</h1>
-            <div class="header-actions">
-                <button class="back-fab" onclick="location.href='friends.html'" title="Back">
-                    <i class="fa fa-chevron-left"></i>
-                </button>
+        <header class="header chat-header">
+            <button class="back-fab" onclick="history.back()" title="Back">
+                <i class="fa fa-chevron-left"></i>
+            </button>
+            <div class="chat-header-info">
+                <img id="chatFriendPhoto"
+                    src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="">
+                <h1 id="chatFriendName">Loading...</h1>
             </div>
+            <!-- You could add a link to the friend's profile here -->
         </header>
 
-        <div class="content-wrapper chat-wrap">
-            <div class="chat-inner">
-                <div id="chatMessages" aria-live="polite"></div>
-                <div id="typingIndicator" class="muted">Typing…</div>
+        <main id="chatMessages" class="chat-messages-container">
+            <!-- Messages will be injected here -->
+            <div class="chat-loading">Loading messages...</div>
+        </main>
 
-                <!-- emoji picker injected here -->
-                <div id="emojiPicker" aria-hidden="true"></div>
-
-                <div class="compose">
-                    <input id="chatInput" type="text" placeholder="Write a message…" />
-                    <button id="emojiBtn" class="icon-btn" title="Emoji"><i class="fa-solid fa-face-smile"></i></button>
-                    <button id="chatSend" class="btn" style="min-width:82px">
-                        <i class="fa-solid fa-paper-plane"></i> Send
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Bottom nav -->
-        <nav class="bottom-nav">
-            <div class="nav-item" onclick="location.href='index.html'"><i class="fas fa-book"></i> Library</div>
-            <div class="nav-item" onclick="location.href='stats.html'"><i class="fas fa-chart-line"></i> Stats</div>
-            <div class="nav-item" onclick="location.href='discover.html'"><i class="fas fa-compass"></i> Discover</div>
-            <div class="nav-item" onclick="location.href='settings.html'"><i class="fas fa-cog"></i> Settings</div>
-        </nav>
+        <footer class="chat-footer">
+            <form id="chatForm" class="chat-input-form">
+                <input id="chatInput" type="text" placeholder="Type a message..." autocomplete="off">
+                <button id="sendBtn" type="submit" class="btn btn-primary">
+                    <i class="fa-solid fa-paper-plane"></i>
+                </button>
+            </form>
+        </footer>
     </div>
 
-    <script src="nav.js" defer></script>
     <script src="chat.js" defer></script>
 </body>
 

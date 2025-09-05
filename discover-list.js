@@ -5,6 +5,8 @@
     const esc = (s) => String(s || "").replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' }[m]));
     const short = (s, max = 20) => (s || "").length > max ? (s.slice(0, max - 1) + "…") : (s || "");
     const nk = (t, a) => `${(t || "").toLowerCase().trim()}::${(a || "").toLowerCase().trim()}`;
+    const randomId = () => Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10);
+    const take = (arr, n) => (Array.isArray(arr) ? arr.slice(0, n) : []);
 
     function qs() {
         const p = new URLSearchParams(location.search);
@@ -51,53 +53,61 @@
         } catch { }
         return fetchSearch(`subject:${slug}`, 1, limit);
     }
-    async function fetchRail(rail) {
-        if (rail === "booktok") return fetchSearch('subject:"booktok" OR "tiktok made me buy it"', 1, 120);
-        if (rail === "new_week") {
-            const d = await fetchSearch("", 1, 220);
-            const now = new Date().getFullYear();
-            return d.filter(x => Number(x.year) >= now - 1).slice(0, 120);
+    async function fetchRail(railId) {
+        const railDef = window.PB_RAILS?.[railId];
+        if (!railDef) {
+            console.warn(`Rail definition for "${railId}" not found.`);
+            return fetchSearch("", 1, 120); // Fallback
         }
-        if (rail === "romance") return fetchSubject("romance", 120);
-        if (rail === "new_adult") return fetchSearch('subject:"new adult" OR subject:"college romance"', 1, 120);
-        if (rail === "ya_fav") return fetchSubject("young_adult_fiction", 120);
-        if (rail === "dark_romance") return fetchSearch('subject:"dark romance" OR subject:"erotic romance"', 1, 120);
-        if (rail === "retellings") return fetchSearch('subject:retellings OR subject:mythology', 1, 120);
-        if (rail === "dark_acad") return fetchSearch('subject:"dark academia" OR subject:"campus fiction"', 1, 120);
-        if (rail === "thrillers") return fetchSearch('subject:thriller OR subject:"mystery fiction"', 1, 120);
-        if (rail === "classics_modern") {
-            const all = await fetchSearch("subject:classics", 1, 200);
-            return all.filter(b => Number(b.year) >= 1980);
+
+        if (railDef.type === 'search') {
+            return fetchSearch(railDef.query, 1, 120);
         }
-        if (rail === "banned") return fetchSubject("banned_books", 120);
-        if (rail === "short_sweet") {
-            const all = await fetchSearch("", 1, 260);
-            return all.filter(b => Number(b.number_of_pages_median || b.pages || 0) > 0 && Number(b.number_of_pages_median || b.pages || 0) < 300);
+        if (railDef.type === 'subject') {
+            return fetchSubject(railDef.query, 120);
         }
-        if (rail === "chonkers") {
-            const all = await fetchSearch("", 1, 260);
-            return all.filter(b => Number(b.number_of_pages_median || b.pages || 0) >= 500);
-        }
-        if (rail === "nonfic") return fetchSubject("nonfiction", 120);
-        if (rail === "nor") return fetchSearch('language:nor OR subject:norway', 1, 120);
-        return fetchSearch("", 1, 120);
+        // Fallback for any other type or if type is missing
+        return fetchSearch(railDef.query || "", 1, 120);
     }
 
     /* --- Library membership (for badges) --- */
-    let lib = new Map();
-    function loadLib() {
-        lib = new Map();
+    let libCache = { work: new Set(), title: new Set() };
+    async function loadLib(user) {
+        if (!user || !window.fb?.db) return;
         try {
-            const arr = JSON.parse(localStorage.getItem("pb:books") || "[]");
-            arr.forEach(b => lib.set(nk(b.title, b.author), { id: b.id, rating: b.rating || 0, spice: b.spice || 0 }));
-        } catch { }
+            const col = window.fb.db.collection("users").doc(user.uid).collection("books");
+            const snap = await col.limit(500).get();
+            snap.forEach(d => {
+                const x = d.data() || {};
+                if (x.workKey) libCache.work.add(String(x.workKey).toLowerCase());
+                if (x.title) libCache.title.add(String(x.title).toLowerCase());
+            });
+        } catch (e) {
+            console.warn("Could not build library map for list page:", e);
+        }
+    }
+    const inLib = (b) => {
+        if (!b) return false;
+        if (b.workKey && libCache.work.has(String(b.workKey).toLowerCase())) return true;
+        if (b.title && libCache.title.has(String(b.title).toLowerCase())) return true;
+        return false;
+    };
+
+    async function fbAddToLibrary(book) {
+        const user = window.fb?.auth?.currentUser;
+        if (!user) throw new Error("Not signed in");
+        const payload = {
+            id: book.id || randomId(), title: book.title || "Untitled", author: book.author || "",
+            coverUrl: book.cover || "", status: "want", rating: 0, createdAt: new Date(), updatedAt: new Date(),
+            workKey: book.workKey || null, subjects: take(book.subjects || [], 6)
+        };
+        await window.fb.db.collection("users").doc(user.uid).collection("books").doc(payload.id).set(payload, { merge: true });
     }
 
     function card(b) {
-        const hit = lib.get(nk(b.title, b.author));
         const meta = b.year ? `<div class="muted">${esc(String(b.year))}</div>` : ``;
         const chips = (b.subjects || []).slice(0, 2).map(s => `<span class="chip">${esc(short(s, 18))}</span>`).join("");
-        const act = hit ? `<span class="chip">✓ In library</span>` :
+        const act = inLib(b) ? `<span class="chip">✓ In library</span>` :
             `<button class="btn btn-secondary small" data-add='${encodeURIComponent(JSON.stringify({
                 title: b.title, author: b.author, cover: b.cover, year: b.year, subjects: b.subjects || [], workKey: b.workKey || ""
             }))}'>+ Add</button>`;
@@ -122,14 +132,19 @@
     }
 
     async function boot() {
-        loadLib();
+        const user = await window.onAuthReady;
+        if (user) {
+            await loadLib(user);
+        }
+
         const { rail, subject, q } = qs();
         let items = [];
         $("#grid").innerHTML = `<div class="muted">Loading…</div>`;
         try {
             if (subject) items = await fetchSubject(subject, 120);
             else if (q) items = await fetchSearch(q, 1, 120);
-            else items = await fetchRail(rail || "");
+            else if (rail) items = await fetchRail(rail);
+            else { $("#grid").innerHTML = `<div class="muted">No collection specified.</div>`; return; }
         } catch { $("#grid").innerHTML = `<div class="muted">Failed to load.</div>`; return; }
 
         let view = items;
@@ -137,7 +152,7 @@
 
         // Filter i denne lista
         $("#q")?.addEventListener("input", (e) => {
-            const f = (e.target.value || "").toLowerCase();
+            const f = (e.target.value || "").toLowerCase().trim();
             view = items.filter(x =>
                 (x.title || "").toLowerCase().includes(f) ||
                 (x.author || "").toLowerCase().includes(f) ||
@@ -158,14 +173,17 @@
         // + Add
         document.body.addEventListener("click", async (e) => {
             const b = e.target.closest("[data-add]"); if (!b) return;
+            b.disabled = true;
             try {
+                if (!window.fb?.auth?.currentUser) { alert("Please sign in to add books."); b.disabled = false; return; }
                 const data = JSON.parse(decodeURIComponent(b.getAttribute("data-add")));
-                const id = "disc_" + Math.random().toString(36).slice(2);
-                const all = JSON.parse(localStorage.getItem("pb:books") || "[]");
-                all.push({ id, ...data, status: "want", rating: 0, spice: 0, createdAt: new Date().toISOString() });
-                localStorage.setItem("pb:books", JSON.stringify(all));
+                await fbAddToLibrary(data);
                 b.replaceWith(`<span class="chip">✓ In library</span>`);
-            } catch { }
+            } catch (err) {
+                console.warn("Failed to add book from list page:", err);
+                alert("Could not add book. Please try again.");
+                b.disabled = false;
+            }
         });
     }
 

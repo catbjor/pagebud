@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <script src="theme-init.js"></script>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Character Ranking – PageBud</title>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="firebase-config.js"></script>
+    <script src="firebase-init.js"></script>
+    <!-- SortableJS for drag-and-drop -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+
+    <style>
+        .ranking-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            counter-reset: ranking-counter;
+        }
+        .ranking-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            margin-bottom: 8px;
+            font-weight: 700;
+            cursor: grab;
+        }
+        .ranking-item:active {
+            cursor: grabbing;
+        }
+        .ranking-item::before {
+            counter-increment: ranking-counter;
+            content: counter(ranking-counter);
+            font-weight: 900;
+            font-size: 1.2rem;
+            color: var(--muted);
+            min-width: 24px;
+            text-align: center;
+        }
+        .sortable-ghost {
+            opacity: 0.4;
+            background: var(--hover);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container">
+        <header class="header">
+            <h1 id="rankingHeader">Character Ranking</h1>
+            <div class="header-actions">
+                <button class="back-fab" onclick="history.back()" title="Back">
+                    <i class="fa fa-chevron-left"></i>
+                </button>
+            </div>
+        </header>
+
+        <main class="container">
+            <div class="card">
+                <p class="muted">Drag and drop the characters into your preferred order. Your ranking is saved automatically.</p>
+                <ul id="rankingList" class="ranking-list">
+                    <!-- Characters will be injected here -->
+                </ul>
+            </div>
+        </main>
+    </div>
+
+    <script src="constants.js"></script>
+    <script src="buddy-ranking.js" defer></script>
+</body>
+
+</html>

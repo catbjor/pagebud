@@ -11,6 +11,10 @@
     const inputEl = $('#chat-input');
     const sendBtn = $('#send-btn');
     const emojiBtn = $('#emoji-btn');
+    const micBtn = $('#mic-btn');
+    const recordingIndicator = $('#recording-indicator');
+    const recordingTimer = $('#recording-timer');
+    const stopRecordingBtn = $('#stop-recording-btn');
     const picker = $('#emoji-picker');
 
     const EMOJIS = ["👍", "❤️", "🔥", "😂", "👏", "😮", "😢", "🤯", "🫶", "🎉", "✅", "⭐️"];
@@ -19,6 +23,7 @@
     // Firebase helpers
     function auth() { return (window.fb?.auth) || (window.firebase?.auth?.()) || firebase.auth(); }
     function db() { return (window.fb?.db) || (window.firebase?.firestore?.()) || firebase.firestore(); }
+    function storage() { return (window.fb?.storage) || (window.firebase?.storage?.()) || firebase.storage(); }
 
     // State
     let unsubMsgs = null;
@@ -27,6 +32,9 @@
     let currentGid = "";
     let me = null;
     let amMember = false;
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let recordingInterval = null;
 
     // Refs
     const groupRef = (gid) => db().collection("buddy_groups").doc(gid);
@@ -56,13 +64,21 @@
     function renderMessages(arr, myUid) {
         msgsEl.innerHTML = arr.map(m => {
             const meSide = m.uid === myUid;
+            const messageContent = m.type === 'voice'
+                ? `<audio controls src="${htmlEscape(m.audioUrl)}"></audio>`
+                : htmlEscape(m.text || "");
+
             const reacts = m.reacts
                 ? Object.entries(m.reacts).map(([emo, c]) => `<span class="react-chip">${emo} ${c}</span>`).join("")
                 : "";
+
             return `
         <div class="bubble ${meSide ? 'me' : 'them'}" data-id="${m.id}">
-          <div class="bubble-text">${htmlEscape(m.text || "")}</div>
-          ${reacts ? `<div class="reacts">${reacts}</div>` : ""}
+          <div class="bubble-text">${messageContent}</div>
+          ${reacts
+                    ? `<div class="reacts">${reacts}</div>`
+                    : `<button class="btn-react-bubble" data-msg-id="${m.id}" title="React">👍</button>`
+                }
           <div class="meta">${timeLabel(m.t)}</div>
         </div>`;
         }).join("");
@@ -120,6 +136,7 @@
         if (!gid || !me) return;
         if (!amMember) { toast("Join the group to chat."); return; }
 
+        // This function now only sends text messages
         const text = (inputEl?.value || "").trim();
         if (!text) return;
 
@@ -127,6 +144,7 @@
             await messagesRef(gid).add({
                 text,
                 uid: me.uid,
+                type: 'text', // Explicitly set message type
                 t: firebase.firestore.FieldValue.serverTimestamp(),
                 reacts: {}
             });
@@ -137,13 +155,100 @@
         }
     }
 
-    // React on last message
-    async function react(emoji) {
+    // --- Voice Note Logic ---
+    async function startRecording() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            alert("Your browser doesn't support voice recording.");
+            return;
+        }
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            audioChunks = [];
+
+            mediaRecorder.addEventListener("dataavailable", event => {
+                audioChunks.push(event.data);
+            });
+
+            mediaRecorder.addEventListener("stop", async () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                await uploadAndSendVoiceNote(audioBlob);
+                stream.getTracks().forEach(track => track.stop()); // Stop microphone access
+            });
+
+            mediaRecorder.start();
+            toggleRecordingUI(true);
+        } catch (err) {
+            console.error("Error accessing microphone:", err);
+            alert("Could not access microphone. Please check your browser permissions.");
+        }
+    }
+
+    function stopRecording() {
+        if (mediaRecorder && mediaRecorder.state === "recording") {
+            mediaRecorder.stop();
+        }
+        toggleRecordingUI(false);
+    }
+
+    function toggleRecordingUI(isRecording) {
+        if (isRecording) {
+            inputEl.style.display = 'none';
+            sendBtn.style.display = 'none';
+            micBtn.style.display = 'none';
+            recordingIndicator.style.display = 'flex';
+            let seconds = 0;
+            recordingTimer.textContent = '00:00';
+            recordingInterval = setInterval(() => {
+                seconds++;
+                const min = Math.floor(seconds / 60).toString().padStart(2, '0');
+                const sec = (seconds % 60).toString().padStart(2, '0');
+                recordingTimer.textContent = `${min}:${sec}`;
+            }, 1000);
+        } else {
+            inputEl.style.display = '';
+            sendBtn.style.display = '';
+            micBtn.style.display = '';
+            recordingIndicator.style.display = 'none';
+            clearInterval(recordingInterval);
+        }
+    }
+
+    async function uploadAndSendVoiceNote(audioBlob) {
         const gid = currentGid;
-        if (!gid || !me || !lastMsgId || !amMember) return;
+        if (!gid || !me || !amMember) return;
+
+        toast("Sending voice note...");
+        const messageId = db().collection("buddy_groups").doc().id; // Generate a unique ID
+        const filePath = `buddy_chats/${gid}/${messageId}.webm`;
+        const fileRef = storage().ref(filePath);
+
+        try {
+            const snapshot = await fileRef.put(audioBlob);
+            const downloadURL = await snapshot.ref.getDownloadURL();
+
+            await messagesRef(gid).add({
+                uid: me.uid,
+                type: 'voice',
+                audioUrl: downloadURL,
+                storagePath: filePath,
+                t: firebase.firestore.FieldValue.serverTimestamp(),
+            });
+        } catch (error) {
+            console.error("Failed to upload voice note:", error);
+            alert("Could not send voice note.");
+        }
+    }
+
+    // React on last message
+    async function react(emoji, messageId) {
+        const gid = currentGid;
+        const msgIdToReact = messageId || lastMsgId;
+        if (!gid || !me || !msgIdToReact || !amMember) return;
+
         const field = `reacts.${emoji}`;
         try {
-            await messagesRef(gid).doc(lastMsgId).set({
+            await messagesRef(gid).doc(msgIdToReact).set({
                 reacts: { [emoji]: firebase.firestore.FieldValue.increment(1) }
             }, { merge: true });
         } catch (e) {
@@ -157,6 +262,9 @@
         inputEl?.addEventListener("keydown", (e) => {
             if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
         });
+
+        micBtn?.addEventListener("click", startRecording);
+        stopRecordingBtn?.addEventListener("click", stopRecording);
 
         emojiBtn?.addEventListener("click", (e) => {
             e.preventDefault();

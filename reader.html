@@ -13,6 +13,94 @@
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 
+  <style>
+    /* Styles for the new selection pop-up and note modal */
+    #selectionPopup {
+      position: absolute;
+      display: none;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      padding: 4px;
+      z-index: 100;
+      display: flex;
+      gap: 4px;
+    }
+
+    #selectionPopup button {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    #selectionPopup button:hover {
+      background: var(--hover);
+    }
+
+    #noteModal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+
+    #noteModal.show {
+      display: flex;
+    }
+
+    .note-panel {
+      background: var(--card);
+      padding: 20px;
+      border-radius: 12px;
+      max-width: min(90vw, 400px);
+      width: 100%;
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+    }
+
+    #noteQuoteText {
+      font-style: italic;
+      color: var(--muted);
+      border-left: 3px solid var(--primary);
+      padding-left: 10px;
+      margin-bottom: 16px;
+    }
+
+    #noteTextarea {
+      width: 100%;
+      min-height: 100px;
+      margin-bottom: 12px;
+    }
+
+    /* Chapter Check-in Modal */
+    #checkInModal .note-panel {
+      text-align: center;
+    }
+
+    #checkInMoods {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      font-size: 2rem;
+      margin: 16px 0;
+    }
+
+    #checkInMoods span {
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    #checkInMoods span:hover {
+      transform: scale(1.2);
+    }
+  </style>
   <!-- Firebase (compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -60,6 +148,44 @@
 
     <!-- The script will render either an EPUB viewer div or an iframe for PDFs -->
     <div id="viewerRoot"></div>
+
+    <!-- UI for Highlights & Notes -->
+    <div id="selectionPopup">
+      <button id="highlightBtn" title="Highlight selection">
+        <i class="fa-solid fa-highlighter"></i> Highlight
+      </button>
+      <button id="addNoteBtn" title="Add a note to selection">
+        <i class="fa-solid fa-note-sticky"></i> Note
+      </button>
+    </div>
+
+    <div id="noteModal">
+      <div class="note-panel">
+        <h3>Add a Note</h3>
+        <p id="noteQuoteText"></p>
+        <textarea id="noteTextarea" placeholder="Your thoughts on this passage..."></textarea>
+        <div class="row between">
+          <button id="cancelNoteBtn" class="btn btn-secondary">Cancel</button>
+          <button id="saveNoteBtn" class="btn btn-primary">Save Note</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chapter Check-in Modal -->
+    <div id="checkInModal" class="modal-backdrop" style="align-items:center; justify-content:center;">
+      <div class="note-panel">
+        <h3 id="checkInTitle">Finished Chapter X?</h3>
+        <p class="muted">How are you feeling?</p>
+        <div id="checkInMoods">
+          <span>🤯</span><span>😂</span><span>😢</span><span>😍</span><span>🤔</span><span>😡</span>
+        </div>
+        <textarea id="checkInThoughts" placeholder="Any quick thoughts? (Optional)"></textarea>
+        <div class="row between">
+          <button id="skipCheckInBtn" class="btn btn-secondary">Skip</button>
+          <button id="saveCheckInBtn" class="btn btn-primary">Save Check-in</button>
+        </div>
+      </div>
+    </div>
 
     <nav class="bottom-nav">
       <div class="nav-item active"><i class="fas fa-book"></i> Library</div>

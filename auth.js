@@ -24,10 +24,28 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const db = fb.db || firebase.firestore();
 
+    // This function handles redirecting the user after a successful login or signup.
+    // It checks if we were sent here from another page (like the chat).
+    function handleRedirect() {
+        const params = new URLSearchParams(window.location.search);
+        const redirectUrl = params.get('redirect');
+        if (redirectUrl) {
+            window.location.href = redirectUrl; // Go back to the page that sent us here
+        } else {
+            window.location.href = 'index.html'; // Go to the main library page
+        }
+    }
+
     function browserLang() {
         const l = (navigator.language || "en").toLowerCase();
         if (l.startsWith("no") || l.startsWith("nb") || l.startsWith("nn")) return "no";
         return "en";
+    }
+
+    async function sha256(s) {
+        const b = new TextEncoder().encode(s.trim().toLowerCase());
+        const h = await crypto.subtle.digest("SHA-256", b);
+        return Array.from(new Uint8Array(h)).map(x => x.toString(16).padStart(2, "0")).join("");
     }
 
     function randomGreeting(name) {
@@ -73,7 +91,7 @@ document.addEventListener("DOMContentLoaded", () => {
             );
             const cred = await fb.auth.signInWithEmailAndPassword(emailEl.value.trim(), passEl.value);
             await ensureUserDoc(cred.user); // ensure /users/{uid}
-            location.href = "index.html";
+            handleRedirect();
         } catch (e) {
             alert(e.message || "Sign in failed");
         }
@@ -130,11 +148,14 @@ document.addEventListener("DOMContentLoaded", () => {
             // 3) Reserve /usernames/{usernameLower}
             await createUsernameDoc(username, user);
 
+            // 4) Create email hash for friend lookup
+            await createDirectoryEntry(email, user.uid);
+
             // 4) Create /users/{uid}
             await ensureUserDoc(user, username);
 
             // Done
-            location.href = "index.html";
+            handleRedirect();
         } catch (err) {
             console.error("[Signup] failed:", err);
             if (err?.code === "permission-denied" || String(err?.message || "").includes("PERMISSION_DENIED")) {
@@ -168,6 +189,12 @@ document.addEventListener("DOMContentLoaded", () => {
         };
 
         await ref.set(payload, { merge: false });
+    }
+
+    async function createDirectoryEntry(email, uid) {
+        const key = await sha256(email);
+        const ref = db.collection("directory").doc(key);
+        await ref.set({ uid });
     }
 
     async function ensureUserDoc(user, usernameRaw) {

@@ -32,25 +32,13 @@
         } catch { alert(msg); }
     }
 
-    async function requireUser() {
-        const a = auth();
-        if (a.currentUser) return a.currentUser;
-        return new Promise((res, rej) => {
-            const off = a.onAuthStateChanged(u => { off(); u ? res(u) : rej(new Error("Not signed in")); });
-        });
-    }
-
-    // ---------- Books ----------
-    async function populateBooksIfNeeded(force = false) {
+    async function populateBooksIfNeeded(user, force = false) {
         if (booksLoaded && !force) return;
-        const u = await requireUser();
+        const u = user;
+        if (!u) return;
+
         const database = db();
         if (!database || !els.book) return;
-
-        // keep the first placeholder option
-        const keepFirst = els.book.querySelector("option[value='']");
-        els.book.innerHTML = "";
-        if (keepFirst) els.book.appendChild(keepFirst);
 
         try {
             const qs = await database
@@ -59,6 +47,11 @@
                 .orderBy("createdAt", "desc")
                 .limit(500)
                 .get();
+
+            // keep the first placeholder option
+            const keepFirst = els.book.querySelector("option[value='']");
+            els.book.innerHTML = "";
+            if (keepFirst) els.book.appendChild(keepFirst);
 
             const frag = document.createDocumentFragment();
             qs.forEach(doc => {
@@ -94,6 +87,17 @@
         els.detailCard.dataset.id = id || "";
         els.detailText.textContent = id ? `Selected: ${label || id}` : "Select a group above to view details.";
         els.openChat.disabled = !id;
+
+        // New logic for ranking button
+        const rankingBtn = $("#brOpenRankingBtn");
+        if (rankingBtn) {
+            if (id) {
+                rankingBtn.href = `buddy-ranking.html?group=${encodeURIComponent(id)}`;
+                rankingBtn.style.display = '';
+            } else {
+                rankingBtn.style.display = 'none';
+            }
+        }
     }
 
     function renderGroups(list, { autoPickId } = {}) {
@@ -130,11 +134,10 @@
         });
     }
 
-    async function subscribeGroups() {
-        const u = await requireUser();
-        const database = db();
+    async function subscribeGroups(user) {
+        const u = user;
         unsubGroups && unsubGroups(); unsubGroups = null;
-
+        const database = db();
         // Live list of groups you own (matching your earlier schema)
         unsubGroups = database.collection("buddy_groups")
             .where("owner", "==", u.uid)
@@ -151,12 +154,12 @@
             );
     }
 
-    async function createGroup() {
-        const u = await requireUser();
+    async function createGroup(user) {
+        const u = user;
         const database = db();
 
         // ensure books are loaded (user may press Create before opening dropdown)
-        await populateBooksIfNeeded();
+        await populateBooksIfNeeded(user);
 
         const bookId = els.book?.value || "";
         const opt = bookId ? els.book.querySelector(`option[value="${CSS.escape(bookId)}"]`) : null;
@@ -166,6 +169,10 @@
 
         let name = (els.name?.value || "").trim();
         if (!name) name = bookTitle || "Buddy Read";
+
+        // Get spoiler and format settings from the new UI elements
+        const spoilerAgreement = document.querySelector('input[name="spoiler-agreement"]:checked')?.value || 'none';
+        const discussionFormats = Array.from(document.querySelectorAll('input[name="discussion-format"]:checked')).map(el => el.value);
 
         try {
             const ref = database.collection("buddy_groups").doc();
@@ -178,7 +185,9 @@
                 ...(bookAuthor ? { bookAuthor } : {}),
                 ...(bookCover ? { bookCover } : {}),
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                spoilerAgreement: spoilerAgreement,
+                discussionFormats: discussionFormats
             }, { merge: true });
 
             // Put a chip instantly in UI for snappy feel
@@ -212,17 +221,20 @@
             const t = e.target.closest("#brCreateBtn, #brInviteBtn, #brRefreshBtn, #brOpenChatBtn, #brBookSelect");
             if (!t) return;
 
-            if (t.id === "brCreateBtn") { e.preventDefault(); await createGroup(); return; }
+            const user = auth()?.currentUser;
+            if (!user) { toast("Please sign in first."); return; }
+
+            if (t.id === "brCreateBtn") { e.preventDefault(); await createGroup(user); return; }
             if (t.id === "brInviteBtn") { e.preventDefault(); location.href = "friends.html"; return; }
-            if (t.id === "brRefreshBtn") { e.preventDefault(); await populateBooksIfNeeded(true); return; }
+            if (t.id === "brRefreshBtn") { e.preventDefault(); await populateBooksIfNeeded(user, true); return; }
             if (t.id === "brOpenChatBtn") { e.preventDefault(); openChatForSelected(); return; }
             if (t.id === "brBookSelect") {
-                if (!booksLoaded) { e.preventDefault(); await populateBooksIfNeeded(true); }
+                if (!booksLoaded) { e.preventDefault(); await populateBooksIfNeeded(user, true); }
             }
         });
 
         // First focus on the select lazily loads books
-        els.book?.addEventListener("focus", () => { populateBooksIfNeeded(); }, { once: true });
+        els.book?.addEventListener("focus", () => window.requireAuth(populateBooksIfNeeded), { once: true });
     }
 
     async function boot() {
@@ -230,9 +242,16 @@
         document.body.style.pointerEvents = "auto";
 
         wireDelegated();
-        // Load books/groups early so UI is ready
-        try { await populateBooksIfNeeded(); } catch (e) { console.warn(e); }
-        try { await subscribeGroups(); } catch (e) { console.warn(e); }
+
+        // Use requireAuth to safely load data after user is confirmed.
+        window.requireAuth(async (user) => {
+            try {
+                await populateBooksIfNeeded(user);
+                await subscribeGroups(user);
+            } catch (e) {
+                console.warn("Buddy read initialization failed:", e);
+            }
+        });
     }
 
     if (document.readyState === "loading") {

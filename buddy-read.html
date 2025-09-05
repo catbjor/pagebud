@@ -55,6 +55,24 @@
           </select>
         </div>
 
+        <div class="form-row">
+          <label class="row-label">Spoiler Agreement</label>
+          <div class="chips">
+            <label class="chip"><input type="radio" name="spoiler-agreement" value="none" checked> No Spoilers</label>
+            <label class="chip"><input type="radio" name="spoiler-agreement" value="chapter"> Up to Current
+              Chapter</label>
+            <label class="chip"><input type="radio" name="spoiler-agreement" value="full"> Full Spoilers</label>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <label class="row-label">Discussion Formats</label>
+          <div class="chips">
+            <label class="chip"><input type="checkbox" name="discussion-format" value="text" checked> Text</label>
+            <label class="chip"><input type="checkbox" name="discussion-format" value="emoji"> Emoji Reactions</label>
+          </div>
+        </div>
+
         <div class="row between">
           <button id="brCreateBtn" class="btn" type="button">
             <i class="fa-solid fa-user-plus"></i> Create group
@@ -76,10 +94,13 @@
         <div id="brGroupsList" class="chips" aria-live="polite">
           <span class="muted">No groups yet.</span>
         </div>
-        <div class="row" style="margin-top:12px;">
+        <div class="row" style="margin-top:12px; justify-content: flex-start;">
           <button id="brOpenChatBtn" class="btn" type="button" disabled>
             <i class="fa-solid fa-comments"></i> Open group chat
           </button>
+          <a id="brOpenRankingBtn" class="btn btn-secondary" href="#" style="display: none;">
+            <i class="fa-solid fa-ranking-star"></i> Rank Characters
+          </a>
         </div>
       </div>
 
@@ -93,14 +114,12 @@
   <!-- Firebase + auth -->
   <script src="firebase-config.js"></script>
   <script src="firebase-init.js"></script>
-  <script src="auth.js"></script>
 
   <!-- Page logic -->
   <script src="buddy-read.js"></script>
 
   <!-- Global UI bits -->
   <script defer src="nav.js"></script>
-  <script defer src="timer.js"></script>
 </body>
 
 </html>

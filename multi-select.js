@@ -21,6 +21,7 @@
     const countEl = $("#selectCount");
     const cancelBtn = $("#cancelSelectBtn");
     const delBtn = $("#deleteSelectedBtn");
+    const addToShelfBtn = $("#addToShelfBtn");
     const selectAllBtn = $("#selectAllBtn");
 
     if (!grid || !bar || !countEl || !cancelBtn || !delBtn) {
@@ -47,6 +48,8 @@
         const n = selected.size;
         countEl.textContent = `${n} selected`;
         delBtn.disabled = n === 0;
+        if (addToShelfBtn) addToShelfBtn.disabled = n === 0;
+        if ($("#removeFromShelfBtn")) $("#removeFromShelfBtn").disabled = n === 0;
     }
 
     function enterMode(firstCard) {
@@ -228,7 +231,9 @@
 
     // Expose state for other scripts to check
     window.PB_MultiSelect = {
-        isActive: () => active
+        isActive: () => active,
+        getSelectedIds: () => Array.from(selected),
+        clearSelection: exitMode
     };
 
 })();

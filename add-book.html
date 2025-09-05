@@ -119,27 +119,102 @@
                     <div id="spiceBar" class="spice"></div>
                 </div>
 
+                <div class="form-row">
+                    <label class="chk"><input id="rereadValue" type="checkbox" /><span>Would you read this book
+                            again?</span></label>
+                </div>
+
+                <!-- Multi-dimensional Ratings -->
+                <details class="card">
+                    <summary>
+                        <h3>Multi-dimensional Ratings</h3>
+                    </summary>
+                    <div class="card-content">
+                        <div class="form-row">
+                            <label>Plot</label>
+                            <div id="plotRatingBar" class="rating"></div>
+                            <textarea id="plotNotes" class="rating-notes" placeholder="Notes on the plot..."></textarea>
+                        </div>
+                        <div class="form-row">
+                            <label>Characters</label>
+                            <div id="charRatingBar" class="rating"></div>
+                            <textarea id="charNotes" class="rating-notes"
+                                placeholder="Notes on the characters..."></textarea>
+                        </div>
+                        <div class="form-row">
+                            <label>Writing Style</label>
+                            <div id="writingRatingBar" class="rating"></div>
+                            <textarea id="writingNotes" class="rating-notes"
+                                placeholder="Notes on the writing..."></textarea>
+                        </div>
+                        <div class="form-row">
+                            <label>Emotional Impact</label>
+                            <div id="impactRatingBar" class="rating"></div>
+                            <textarea id="impactNotes" class="rating-notes"
+                                placeholder="How did it make you feel?"></textarea>
+                        </div>
+                    </div>
+                </details>
+
                 <!-- Genres / Moods / Tropes -->
-                <details class="card" id="genresBox" open>
-                    <summary style="font-weight:900">Genres</summary>
-                    <div class="categories" id="genres" style="margin-top:8px"></div>
+                <details class="card" id="genresBox">
+                    <summary>
+                        <h3>Genres</h3>
+                    </summary>
+                    <div class="card-content">
+                        <div class="categories" id="genres"></div>
+                    </div>
                 </details>
 
                 <details class="card" id="moodsBox">
-                    <summary style="font-weight:900">Moods</summary>
-                    <div class="categories" id="moods" style="margin-top:8px"></div>
+                    <summary>
+                        <h3>Moods</h3>
+                    </summary>
+                    <div class="card-content">
+                        <div class="categories" id="moods"></div>
+                    </div>
                 </details>
 
                 <details class="card" id="tropesBox">
-                    <summary style="font-weight:900">Tropes</summary>
-                    <div class="categories" id="tropes" style="margin-top:8px"></div>
+                    <summary>
+                        <h3>Tropes</h3>
+                    </summary>
+                    <div class="card-content">
+                        <div class="categories" id="tropes"></div>
+                    </div>
                 </details>
 
-                <!-- Review -->
-                <div class="form-row">
-                    <label>Review</label>
-                    <textarea id="review" rows="4" placeholder="Write your review…"></textarea>
+                <div class="card">
+                    <div class="card-content">
+                        <h3 style="margin:0">My Review</h3>
+                        <div class="form-row">
+                            <label class="chk">
+                                <input id="reviewHasSpoilers" type="checkbox" />
+                                <span>My review contains spoilers</span>
+                            </label>
+                        </div>
+                        <textarea id="review" placeholder="Write your review here..."></textarea>
+                    </div>
                 </div>
+
+                <!-- Quotes -->
+                <details class="card">
+                    <summary>
+                        <h3>My Favorite Quotes</h3>
+                    </summary>
+                    <div class="card-content">
+                        <textarea id="quotesTextArea"
+                            placeholder="Add your favorite quotes here, one per line..."></textarea>
+                        <div id="quotesContainer"></div>
+                        <div class="row" style="margin-top:12px; gap: 8px;">
+                            <button type="button" id="addQuoteTextBtn" class="btn btn-secondary"><i
+                                    class="fa-solid fa-plus"></i> Add Quote</button>
+                            <button type="button" id="addQuotePhotoBtn" class="btn btn-secondary"><i
+                                    class="fa-solid fa-camera"></i> Use Photo</button>
+                        </div>
+                        <input type="file" id="quotePhotoInput" accept="image/*" style="display:none;">
+                    </div>
+                </details>
 
             </div>
 
@@ -152,6 +227,10 @@
             <input type="hidden" name="format" />
             <input type="hidden" name="rating" />
             <input type="hidden" name="spice" />
+            <input type="hidden" name="plotRating">
+            <input type="hidden" name="charRating">
+            <input type="hidden" name="writingRating">
+            <input type="hidden" name="impactRating">
             <input type="hidden" id="coverDataUrl" name="coverDataUrl" />
 
         </form>

@@ -62,14 +62,16 @@
         return;
       }
       const here = (location.pathname || "").split("/").pop();
-      if (here !== "auth.html") location.href = "auth.html";
+      // If not authenticated, redirect to auth page, passing the current
+      // URL so we can be redirected back after successful login.
+      if (here !== "auth.html") location.href = `auth.html?redirect=${encodeURIComponent(location.href)}`;
     });
   };
 
   // Promise if you prefer awaiting
   window.onAuthReady = new Promise(res => {
-    const u = auth.currentUser;
-    if (u) return res(u);
-    const off = auth.onAuthStateChanged(user => { off(); res(user || null); });
+    // onAuthStateChanged is the only guaranteed way to get the initial auth state.
+    // Checking currentUser immediately can lead to a race condition on page load.
+    const unsubscribe = auth.onAuthStateChanged(user => { unsubscribe(); res(user || null); });
   });
 })();

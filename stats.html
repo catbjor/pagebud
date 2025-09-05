@@ -113,24 +113,6 @@
         <div class="stat-value" id="pagesRead">0</div>
       </div>
 
-      <!-- Today progress ring -->
-      <div class="stat-card">
-        <div class="stat-title">Today</div>
-        <div class="today-ring">
-          <div class="ring-wrap" title="Today's reading">
-            <svg width="56" height="56" viewBox="0 0 56 56">
-              <circle cx="28" cy="28" r="24" stroke="var(--border)" stroke-width="6" fill="none"></circle>
-              <circle cx="28" cy="28" r="24" id="todayRing" stroke="var(--primary)" stroke-width="6"
-                stroke-linecap="round" stroke-dasharray="0 999" fill="none"></circle>
-            </svg>
-            <div class="ring-center" id="todayPct">0%</div>
-          </div>
-          <div>
-            <div class="stat-value" id="todayMinutes">0m</div>
-            <div class="muted-small"><span id="todayGoal">Goal: 20m</span></div>
-          </div>
-        </div>
-      </div>
     </section>
 
     <!-- Charts (placeholder-beholdere; styres senere av egne scripts hvis ønsket) -->
@@ -188,10 +170,20 @@
     </div>
   </div>
 
+  <!-- Modal for Daily Reading Details -->
+  <div id="dayDetailModal" class="modal-backdrop" style="align-items:center; justify-content:center;">
+    <div class="modal-sheet" style="max-width: min(90vw, 450px); bottom: auto;">
+      <h3 id="dayDetailTitle">Reading Details</h3>
+      <div id="dayDetailContent">
+        <!-- Daily log will be injected here -->
+      </div>
+      <button id="closeDayDetailBtn" class="btn btn-secondary" style="margin-top: 16px; width: 100%;">Close</button>
+    </div>
+  </div>
+
   <!-- Scripts -->
   <script src="reset-utils.js"></script>
   <script src="stats.js"></script>
-  <script defer src="timer.js"></script>
   <script>
     // Quick reset button (samme som du hadde)
     document.getElementById("btnQuickReset")?.addEventListener("click", async () => {
@@ -201,6 +193,14 @@
 
     // Ikke redirect ved sign-out; stats.js håndterer auth-ready
     try { requireAuth?.(() => { }); } catch { }
+  </script>
+  <script>
+    // Wire up the full reset button
+    document.getElementById("resetStatsBtn")?.addEventListener("click", () => {
+      if (confirm("Are you sure you want to reset ALL your data? This will sign you out and cannot be undone.")) {
+        window.pbResetCaches?.({ full: true });
+      }
+    });
   </script>
 </body>
 

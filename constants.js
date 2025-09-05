@@ -42,5 +42,16 @@
         "Cries over fictional characters", "Buys more books than they can read"
     ];
 
-    window.PB_CONST = { GENRES, MOODS, TROPES, QUIRKS };
+    // and an array of character names as values.
+    const CHARACTERS = {
+        // Example:
+        "example_book_id_123": [
+            "Kvothe", "Denna", "Auri", "Elodin", "Bast", "Simmon", "Wilem", "Ambrose Jakis"
+        ],
+        "another_book_id_456": [
+            "Harry Potter", "Hermione Granger", "Ron Weasley", "Albus Dumbledore", "Severus Snape", "Draco Malfoy"
+        ]
+    };
+
+    window.PB_CONST = { GENRES, MOODS, TROPES, QUIRKS, CHARACTERS };
 })();

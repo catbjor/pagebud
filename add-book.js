@@ -116,6 +116,60 @@
         });
     }
 
+    // --- Quotes Section Logic (copied from edit-page.js) ---
+    function renderQuotes(quotes = []) {
+        const container = byId("quotesContainer");
+        if (!container) return;
+        container.innerHTML = quotes.map(quote => createQuoteEntry(quote)).join('');
+    }
+
+    function createQuoteEntry(quote = { text: '', imageUrl: '' }) {
+        const textContent = quote.text ? `<textarea>${quote.text}</textarea>` : '<textarea placeholder="Type or paste quote..."></textarea>';
+        const imageContent = quote.imageUrl ? `<img src="${quote.imageUrl}" alt="Quote image">` : '';
+
+        return `
+      <div class="quote-entry">
+        <div class="quote-content">
+          ${imageContent || textContent}
+        </div>
+        <button type="button" class="btn-remove-quote" title="Remove quote">&times;</button>
+      </div>
+    `;
+    }
+
+    function wireQuotesSection() {
+        const container = byId("quotesContainer");
+        if (!container) return;
+
+        byId("addQuoteTextBtn")?.addEventListener('click', () => {
+            container.insertAdjacentHTML('beforeend', createQuoteEntry());
+        });
+
+        const quotePhotoInput = byId("quotePhotoInput");
+        byId("addQuotePhotoBtn")?.addEventListener('click', () => {
+            quotePhotoInput.click();
+        });
+
+        quotePhotoInput?.addEventListener('change', async (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            try {
+                // Re-using the readAsDataURL function from the cover upload logic
+                const dataUrl = await readAsDataURL(file);
+                container.insertAdjacentHTML('beforeend', createQuoteEntry({ imageUrl: dataUrl }));
+            } catch (err) {
+                alert("Could not load image.");
+            }
+            e.target.value = ''; // Reset input
+        });
+
+        container.addEventListener('click', (e) => {
+            if (e.target.classList.contains('btn-remove-quote')) {
+                e.target.closest('.quote-entry').remove();
+            }
+        });
+    }
+
     // ------- state -------
     let createdBookId = null;
     let coverBlob = null;          // extracted from book (optional)
@@ -154,6 +208,12 @@
         const inpStatus = ensureHidden(form, "status");     // legacy single
         const inpStatuses = ensureHidden(form, "statuses");   // NEW: array
         const inpFormat = ensureHidden(form, "format");
+
+        // Ensure hidden inputs for new ratings exist
+        ensureHidden(form, "plotRating");
+        ensureHidden(form, "charRating");
+        ensureHidden(form, "writingRating");
+        ensureHidden(form, "impactRating");
 
         const { genres, moods, tropes, statuses, formats } = getLists();
 
@@ -220,6 +280,13 @@
             });
         }
 
+        // Wire up new rating controls
+        window.PB_RatingControls?.init?.(byId("plotRatingBar"), ensureHidden(form, "plotRating"));
+        window.PB_RatingControls?.init?.(byId("charRatingBar"), ensureHidden(form, "charRating"));
+        window.PB_RatingControls?.init?.(byId("writingRatingBar"), ensureHidden(form, "writingRating"));
+        window.PB_RatingControls?.init?.(byId("impactRatingBar"), ensureHidden(form, "impactRating"));
+        wireQuotesSection();
+
         async function handleSave() {
             const title = (byId("title")?.value || "").trim();
             const author = (byId("author")?.value || "").trim();
@@ -244,6 +311,10 @@
             // rating/spice from hidden inputs if present
             const rating = $('input[name="rating"]')?.value;
             const spice = $('input[name="spice"]')?.value;
+            const plotRating = $('input[name="plotRating"]')?.value;
+            const charRating = $('input[name="charRating"]')?.value;
+            const writingRating = $('input[name="writingRating"]')?.value;
+            const impactRating = $('input[name="impactRating"]')?.value;
 
             // parse statuses
             let statusesArr = [];
@@ -251,19 +322,35 @@
             const primaryStatus = statusesArr[0] || (inpStatus.value || "") || null;
 
             const payload = {
-                title, author,
+                title,
+                author,
                 started: byId("started")?.value || null,
                 pageCount: Number(byId("pageCount")?.value) || null,
                 finished: byId("finished")?.value || null,
                 review: byId("review")?.value || "",
+                reviewHasSpoilers: byId("reviewHasSpoilers")?.checked || false,
                 status: primaryStatus,                 // legacy
+                quotesText: byId("quotesTextArea")?.value || "", // Save the new quotes text
                 statuses: statusesArr,                 // array
                 format: inpFormat.value || null,
                 genres: JSON.parse(inpGenres.value || "[]"),
                 moods: JSON.parse(inpMoods.value || "[]"),
                 tropes: JSON.parse(inpTropes.value || "[]"),
+                quotes: $$('#quotesContainer .quote-entry').map(entry => ({
+                    text: entry.querySelector('textarea')?.value || '',
+                    imageUrl: entry.querySelector('img')?.src || ''
+                })).filter(q => q.text || q.imageUrl),
                 ...(rating ? { rating: Number(rating) || 0 } : {}),
                 ...(spice ? { spice: Number(spice) || 0 } : {}),
+                rereadValue: byId("rereadValue")?.checked || false,
+                ...(plotRating ? { plotRating: Number(plotRating) || 0 } : {}),
+                plotNotes: byId("plotNotes")?.value || "",
+                charNotes: byId("charNotes")?.value || "",
+                writingNotes: byId("writingNotes")?.value || "",
+                impactNotes: byId("impactNotes")?.value || "",
+                ...(charRating ? { charRating: Number(charRating) || 0 } : {}),
+                ...(writingRating ? { writingRating: Number(writingRating) || 0 } : {}),
+                ...(impactRating ? { impactRating: Number(impactRating) || 0 } : {}),
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             };
@@ -283,6 +370,11 @@
 
             // Save base doc
             await ref.set(payload, { merge: true });
+
+            // If the book was marked as finished, check for challenge progress.
+            if (payload.status === 'finished') {
+                window.PBChallenges?.updateChallengeProgress?.(user.uid, { id: createdBookId, ...payload });
+            }
 
             // If user also picked a book file, save it via local store (unchanged)
             const f = fileInput?.files?.[0] || null;

@@ -149,8 +149,82 @@
         return null;
     }
 
+    // --- Buddy Read Chapter Check-in ---
+    let currentBuddyReadId = null;
+    let currentChapter = null;
+    let lastCheckInChapter = null;
+
+    function showChapterCheckInModal(chapter, uid) {
+        if (!chapter || !currentBuddyReadId || chapter.id === lastCheckInChapter) return;
+
+        const modal = $("#checkInModal");
+        $("#checkInTitle").textContent = `Finished: ${chapter.label.trim() || 'Chapter'}`;
+        $("#checkInThoughts").value = "";
+        modal.style.display = 'flex';
+
+        let selectedMood = '';
+
+        const moodSpans = modal.querySelectorAll("#checkInMoods span");
+        moodSpans.forEach(span => {
+            span.onclick = () => {
+                selectedMood = span.textContent;
+                moodSpans.forEach(s => s.style.border = 'none');
+                span.style.borderBottom = '3px solid var(--primary)';
+            };
+        });
+
+        $("#skipCheckInBtn").onclick = () => {
+            modal.style.display = 'none';
+            lastCheckInChapter = chapter.id;
+        };
+
+        $("#saveCheckInBtn").onclick = async () => {
+            const thoughts = $("#checkInThoughts").value.trim();
+            const groupRef = db().collection("buddy_reads").doc(currentBuddyReadId);
+            const fieldPath = `chapterCheckIns.${chapter.id}.${uid}`;
+            await groupRef.update({ [fieldPath]: { mood: selectedMood, thoughts, at: new Date() } });
+            modal.style.display = 'none';
+            lastCheckInChapter = chapter.id;
+        };
+    }
+
+    // New function to save a highlight or note to Firestore
+    async function saveQuote({ uid, bookId, bookTitle, cfi, text, type = 'highlight', note = '' }) {
+        if (!uid || !bookId || !cfi || !text) {
+            throw new Error("Missing required data to save quote.");
+        }
+        const payload = {
+            uid,
+            bookId,
+            bookTitle,
+            cfi,
+            text: text.trim(),
+            type, // 'highlight' or 'note'
+            note: note.trim(),
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        await db().collection("users").doc(uid).collection("quotes").add(payload);
+
+        // Log this as an activity
+        try {
+            window.PBActivity?.note?.({ bookId, title: bookTitle, text: payload.text });
+        } catch (e) {
+            console.warn("Failed to log note activity", e);
+        }
+    }
+
+    // New function to load and render existing annotations
+    async function loadAndRenderAnnotations(uid, bookId, rendition) {
+        const quotesSnap = await db().collection("users").doc(uid).collection("quotes").where("bookId", "==", bookId).get();
+        quotesSnap.forEach(doc => {
+            const quote = doc.data();
+            const style = quote.type === 'note' ? { fill: '#38bdf8', 'fill-opacity': '0.3' } : { fill: 'yellow', 'fill-opacity': '0.3' };
+            rendition.annotations.add('highlight', quote.cfi, {}, (e) => { console.log('annotation clicked', e); }, 'hl', style);
+        });
+    }
+
     // ---------- EPUB render ----------
-    async function renderEPUB(url, uid, bookId, saved) {
+    async function renderEPUB(url, uid, bookId, bookTitle, saved) {
         const root = $("#viewerRoot");
         root.innerHTML = "";
 
@@ -160,6 +234,14 @@
         host.style.height = "100vh";
         host.style.position = "relative";
         root.appendChild(host);
+
+        // Get references to the new UI elements
+        const popup = $("#selectionPopup");
+        const highlightBtn = $("#highlightBtn");
+        const addNoteBtn = $("#addNoteBtn");
+        const noteModal = $("#noteModal");
+        const noteQuoteText = $("#noteQuoteText");
+        const noteTextarea = $("#noteTextarea");
 
         const ctrls = document.createElement("div");
         ctrls.style.position = "absolute";
@@ -212,6 +294,7 @@
         const book = ePub(url);
         const rendition = book.renderTo(host, { width: "100%", height: "100%" });
 
+        let currentSelection = null; // To store the active text selection details
         const writeProgress = makeProgressWriter(uid, bookId);
         const writeActivity = makeActivityWriter(bookId);
 
@@ -229,6 +312,9 @@
         }
 
         await rendition.display(startDisplayed || undefined);
+
+        // Load existing highlights and notes for this book
+        loadAndRenderAnnotations(uid, bookId, rendition);
 
         const updateDisplayedInfo = async () => {
             try {
@@ -271,6 +357,20 @@
         rendition.on("relocated", () => { updateDisplayedInfo(); setProgressFromLoc(); });
         setProgressFromLoc();
 
+        // --- Buddy Read Chapter Detection ---
+        if (currentBuddyReadId) {
+            rendition.on("relocated", (location) => {
+                const chapterInfo = book.navigation.get(location.start.href);
+                if (chapterInfo && chapterInfo.id !== currentChapter) {
+                    const previousChapter = book.navigation.get(book.spine.get(location.start.index - 1)?.href);
+                    currentChapter = chapterInfo.id;
+                    if (previousChapter) {
+                        showChapterCheckInModal(previousChapter, uid);
+                    }
+                }
+            });
+        }
+
         const goPrev = () => rendition.prev();
         const goNext = () => rendition.next();
         btnPrev.addEventListener("click", goPrev);
@@ -280,6 +380,63 @@
         window.addEventListener("keydown", (e) => {
             if (e.key === "ArrowRight") goNext();
             if (e.key === "ArrowLeft") goPrev();
+        });
+
+        // --- Highlighting & Notes Logic ---
+        rendition.on("selected", (cfiRange, contents) => {
+            const range = contents.window.getSelection().getRangeAt(0);
+            const rect = range.getBoundingClientRect();
+            const text = range.toString();
+
+            if (text.trim().length === 0) return;
+
+            currentSelection = { cfi: cfiRange, text: text };
+
+            popup.style.display = "flex";
+            popup.style.left = `${rect.left + rect.width / 2 - popup.offsetWidth / 2}px`;
+            popup.style.top = `${rect.top - popup.offsetHeight - 5}px`;
+
+            // Hide popup when clicking away
+            const hidePopup = () => {
+                popup.style.display = "none";
+                document.removeEventListener("click", hidePopup);
+            };
+            setTimeout(() => document.addEventListener("click", hidePopup), 100);
+        });
+
+        highlightBtn.addEventListener("click", async () => {
+            if (!currentSelection) return;
+            try {
+                await saveQuote({ uid, bookId, bookTitle, ...currentSelection });
+                rendition.annotations.add('highlight', currentSelection.cfi, {}, null, 'hl', { fill: 'yellow', 'fill-opacity': '0.3' });
+                popup.style.display = "none";
+            } catch (e) {
+                console.error("Failed to save highlight:", e);
+                alert("Could not save highlight.");
+            }
+        });
+
+        addNoteBtn.addEventListener("click", () => {
+            if (!currentSelection) return;
+            noteQuoteText.textContent = `“${currentSelection.text.trim()}”`;
+            noteTextarea.value = "";
+            noteModal.classList.add("show");
+            popup.style.display = "none";
+        });
+
+        noteModal.querySelector("#cancelNoteBtn").addEventListener("click", () => noteModal.classList.remove("show"));
+        noteModal.querySelector("#saveNoteBtn").addEventListener("click", async () => {
+            if (!currentSelection) return;
+            const noteText = noteTextarea.value;
+            try {
+                await saveQuote({ uid, bookId, bookTitle, ...currentSelection, type: 'note', note: noteText });
+                // Use a different color for notes
+                rendition.annotations.add('highlight', currentSelection.cfi, {}, null, 'hl', { fill: '#38bdf8', 'fill-opacity': '0.3' });
+                noteModal.classList.remove("show");
+            } catch (e) {
+                console.error("Failed to save note:", e);
+                alert("Could not save note.");
+            }
         });
 
         const gotoPercent = (pct) => {
@@ -441,7 +598,9 @@
     async function boot() {
         const user = await requireUser();
         const uid = user?.uid || null;
-        const id = new URLSearchParams(location.search).get("id");
+        const params = new URLSearchParams(location.search);
+        const id = params.get("id");
+        currentBuddyReadId = params.get("buddyRead"); // Get the buddy read ID from URL
         if (!uid || !id) { warn("Missing uid or book id."); return; }
 
         const ref = db().collection("users").doc(uid).collection("books").doc(id);
@@ -466,8 +625,8 @@
         }
 
         const t = (src.type || "").toLowerCase();
-        if (t === "epub") await renderEPUB(src.url, uid, id, saved);
-        else await renderPDFPaged(src.url, uid, id, saved);
+        if (t === "epub") await renderEPUB(src.url, uid, id, doc.title, saved);
+        else await renderPDFPaged(src.url, uid, id, doc.title, saved);
     }
 
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);

@@ -3,7 +3,7 @@ importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js
 importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js');
 
 firebase.initializeApp({
-    apiKey: "AIzaSyCEV-dncbQSnP7q9AvF2_Re93l-VHN-2cg",
+    apiKey: "AIzaSyDPBEPwMqL-O-2mDI-iJLqzjRL_mUbzavE",
     authDomain: "pagebud-cb6d9.firebaseapp.com",
     projectId: "pagebud-cb6d9",
     storageBucket: "pagebud-cb6d9.appspot.com",

@@ -2,11 +2,14 @@
 <html lang="en">
 
 <head>
-  <script src="theme-init.js"></script>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Edit Book – PageBud</title>
 
+  <!-- Theme early -->
+  <script src="theme-init.js"></script>
+
+  <!-- Styles -->
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="rating.css" />
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js"></script>
@@ -18,11 +21,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
   <script src="firebase-config.js"></script>
   <script src="firebase-init.js"></script>
-
-  <!-- PDF/EPUB helpers -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <script>pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";</script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.93/epub.min.js"></script>
 </head>
 
 <body>
@@ -30,17 +28,14 @@
     <header class="header">
       <h1>Edit Book</h1>
       <div class="header-actions">
-        <!-- Action buttons moved from bottom -->
-        <button type="button" id="deleteBtn" class="btn" style="background:#e23a3a;color:#fff">Delete</button>
-        <button type="button" class="btn btn-secondary">Cancel</button>
-        <button type="button" class="btn btn-primary" id="saveBtn">Save</button>
+        <button type="button" id="deleteBtn" class="btn btn-danger">Delete</button>
+        <button type="button" id="cancelBtn" class="btn btn-secondary">Cancel</button>
+        <button type="button" class="btn btn-primary" id="saveBtn">Save Changes</button>
       </div>
     </header>
 
     <form id="bookForm">
       <div class="form-content-wrapper">
-
-
         <!-- Cover block -->
         <div class="cover-block">
           <div class="cover-preview-wrap">
@@ -63,17 +58,10 @@
           <div><label>Author *</label><input id="author" type="text" required></div>
         </div>
 
-        <!-- Status (multi) -->
+        <!-- Status -->
         <div class="form-row">
           <label>Status</label>
-          <div class="categories" id="statusChips">
-            <span class="category" data-val="reading">Reading</span>
-            <span class="category" data-val="finished">Finished</span>
-            <span class="category" data-val="tbr">TBR</span>
-            <span class="category" data-val="dnf">DNF</span>
-            <span class="category" data-val="owned">Books I Own</span>
-            <span class="category" data-val="wishlist">Wish List</span>
-          </div>
+          <div class="categories" id="statusChips"></div>
         </div>
 
         <!-- Dates -->
@@ -82,20 +70,16 @@
           <div><label>Finished</label><input id="finished" type="date"></div>
         </div>
 
+        <!-- Page Count -->
         <div class="form-row">
           <label>Page Count</label>
           <input id="pageCount" type="number" placeholder="e.g., 350" />
         </div>
 
-        <!-- Format (single) -->
+        <!-- Format -->
         <div class="form-row">
           <label>Format</label>
-          <div class="categories" id="formatChips">
-            <span class="category" data-val="ebook">Ebook</span>
-            <span class="category" data-val="paperback">Paperback</span>
-            <span class="category" data-val="hardcover">Hardcover</span>
-            <span class="category" data-val="audiobook">Audiobook</span>
-          </div>
+          <div class="categories" id="formatChips"></div>
         </div>
 
         <!-- File picker -->
@@ -108,7 +92,7 @@
           <span id="fileName" class="file-name"></span>
         </div>
 
-        <!-- Rating & Spice -->
+        <!-- Ratings -->
         <div class="form-row">
           <label>Rating</label>
           <div id="ratingBar" class="rating"></div>
@@ -116,20 +100,98 @@
           <div id="spiceBar" class="spice"></div>
         </div>
 
-        <!-- Genres / Moods / Tropes -->
-        <details class="card" id="genresBox" open>
-          <summary style="font-weight:900">Genres</summary>
-          <div class="categories" id="genres"></div>
+        <div class="form-row">
+          <label class="chk"><input id="rereadValue" type="checkbox" /><span>Would you read this book
+              again?</span></label>
+        </div>
+
+        <!-- Multi-dimensional Ratings -->
+        <details class="card">
+          <summary>
+            <h3>Multi-dimensional Ratings</h3>
+          </summary>
+          <div class="card-content">
+            <div class="form-row">
+              <label>Plot</label>
+              <div id="plotRatingBar" class="rating"></div>
+              <textarea id="plotNotes" class="rating-notes" placeholder="Notes on the plot..."></textarea>
+            </div>
+            <div class="form-row">
+              <label>Characters</label>
+              <div id="charRatingBar" class="rating"></div>
+              <textarea id="charNotes" class="rating-notes" placeholder="Notes on the characters..."></textarea>
+            </div>
+            <div class="form-row">
+              <label>Writing Style</label>
+              <div id="writingRatingBar" class="rating"></div>
+              <textarea id="writingNotes" class="rating-notes" placeholder="Notes on the writing..."></textarea>
+            </div>
+            <div class="form-row">
+              <label>Emotional Impact</label>
+              <div id="impactRatingBar" class="rating"></div>
+              <textarea id="impactNotes" class="rating-notes" placeholder="How did it make you feel?"></textarea>
+            </div>
+          </div>
+        </details>
+
+        <!-- Genres / Moods / Tropes (Genres collapsed by default) -->
+        <details class="card" id="genresBox">
+          <summary>
+            <h3>Genres</h3>
+          </summary>
+          <div class="card-content">
+            <div class="categories" id="genres"></div>
+          </div>
         </details>
 
         <details class="card" id="moodsBox">
-          <summary style="font-weight:900">Moods</summary>
-          <div class="categories" id="moods"></div>
+          <summary>
+            <h3>Moods</h3>
+          </summary>
+          <div class="card-content">
+            <div class="categories" id="moods"></div>
+          </div>
         </details>
 
         <details class="card" id="tropesBox">
-          <summary style="font-weight:900">Tropes</summary>
-          <div class="categories" id="tropes"></div>
+          <summary>
+            <h3>Tropes</h3>
+          </summary>
+          <div class="card-content">
+            <div class="categories" id="tropes"></div>
+          </div>
+        </details>
+
+        <div class="card">
+          <div class="card-content">
+            <h3 style="margin:0">My Review</h3>
+            <div class="form-row">
+              <label class="chk">
+                <input id="reviewHasSpoilers" type="checkbox" />
+                <span>My review contains spoilers</span>
+              </label>
+            </div>
+            <textarea id="review" placeholder="Write your review here..."></textarea>
+          </div>
+        </div>
+
+        <!-- Quotes -->
+        <details class="card">
+          <summary>
+            <h3>My Favorite Quotes</h3>
+          </summary>
+          <div class="card-content">
+            <textarea id="quotesTextArea" placeholder="Add your favorite quotes here, one per line..."></textarea>
+            <div id="quotesContainer"></div>
+            <div class="row" style="margin-top:12px; gap: 8px;">
+              <button type="button" id="addQuoteTextBtn" class="btn btn-secondary"><i class="fa-solid fa-plus"></i> Add
+                Quote</button>
+              <button type="button" id="addQuotePhotoBtn" class="btn btn-secondary"><i class="fa-solid fa-camera"></i>
+                Use
+                Photo</button>
+            </div>
+            <input type="file" id="quotePhotoInput" accept="image/*" style="display:none;">
+          </div>
         </details>
       </div>
 
@@ -142,18 +204,14 @@
       <input type="hidden" name="format">
       <input type="hidden" name="rating">
       <input type="hidden" name="spice">
+      <input type="hidden" name="plotRating">
+      <input type="hidden" name="charRating">
+      <input type="hidden" name="writingRating">
+      <input type="hidden" name="impactRating">
 
     </form>
 
   </div>
-
-  <!-- Bottom nav -->
-  <nav class="bottom-nav">
-    <div class="nav-item active"><i class="fas fa-book"></i> Library</div>
-    <div class="nav-item" onclick="location.href='stats.html'"><i class="fas fa-chart-line"></i> Stats</div>
-    <div class="nav-item" onclick="location.href='discover.html'"><i class="fas fa-compass"></i> Discover</div>
-    <div class="nav-item" onclick="location.href='settings.html'"><i class="fas fa-cog"></i> Settings</div>
-  </nav>
 
   <!-- Core logic scripts -->
   <script src="constants.js"></script>

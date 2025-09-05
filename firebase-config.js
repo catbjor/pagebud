@@ -4,7 +4,7 @@
 // Check if config is already defined to avoid duplicates
 if (!window.__PB_FIREBASE) {
     window.__PB_FIREBASE = {
-        apiKey: "AIzaSyCEV-dncbQSnP7q9AvF2_Re93l-VHN-2cg",
+        apiKey: "AIzaSyDPBEPwMqL-O-2mDI-iJLqzjRL_mUbzavE",
         authDomain: "pagebud-cb6d9.firebaseapp.com",
         projectId: "pagebud-cb6d9",
         storageBucket: "pagebud-cb6d9.appspot.com",

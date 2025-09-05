@@ -31,17 +31,17 @@
         return out;
     }
 
-    async function writePrivate(uid, doc) {
-        const ref = db().collection("users").doc(uid).collection("activity").doc();
+    async function writePrivate(uid, id, doc) {
+        const ref = db().collection("users").doc(uid).collection("activity").doc(id);
         await ref.set(nowFields(doc));
-        return ref.id;
+        return id;
     }
 
-    async function writePublic(uid, doc) {
+    async function writePublic(uid, id, doc) {
         // owner felt brukes for queries (collectionGroup + owner in [...])
-        const ref = db().collection("users").doc(uid).collection("public_activity").doc();
+        const ref = db().collection("users").doc(uid).collection("public_activity").doc(id);
         await ref.set(nowFields({ owner: uid, ...doc }));
-        return ref.id;
+        return id;
     }
 
     // ---------- Public API ----------
@@ -52,12 +52,15 @@
             const me = uid || auth().currentUser?.uid;
             if (!me) return;
 
+            // Generate one ID to be used for both private and public documents
+            const activityId = db().collection("users").doc(me).collection("activity").doc().id;
+
             // Private (full meta)
-            await writePrivate(me, { action, targetId, meta, likeCount: 0, commentCount: 0 });
+            await writePrivate(me, activityId, { action, targetId, meta, likeCount: 0, commentCount: 0 });
 
             // Public (sanitized)
             const safeMeta = sanitizeMeta(meta);
-            await writePublic(me, { action, targetId, meta: safeMeta });
+            await writePublic(me, activityId, { action, targetId, meta: safeMeta });
         } catch (e) {
             console.warn("[activity] logActivity failed:", e);
         }
@@ -97,13 +100,16 @@
             const u = auth().currentUser; if (!u) return;
             // Notater er private i fulltekst, public får kun en kort “note added”
             // (ingen tekst leak)
-            await writePrivate(u.uid, {
+            const activityId = db().collection("users").doc(u.uid).collection("activity").doc().id;
+
+            await writePrivate(u.uid, activityId, {
                 action: "note_added",
                 targetId: p.bookId || null,
                 meta: { title: p.title, text: String(p.text || "").slice(0, 2000) },
                 likeCount: 0, commentCount: 0
             });
-            await writePublic(u.uid, {
+
+            await writePublic(u.uid, activityId, {
                 action: "note_added",
                 targetId: p.bookId || null,
                 meta: sanitizeMeta({ title: p.title })

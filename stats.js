@@ -24,6 +24,7 @@
 
   // State
   let minutesByDay = {}; // { "YYYY-MM-DD": number }
+  let sessionsByDay = {}; // { "YYYY-MM-DD": [{...}, {...}] }
   let ym = { y: new Date().getFullYear(), m: new Date().getMonth() };
 
   /* ---------------- Firestore fetch ---------------- */
@@ -54,42 +55,20 @@
     }
 
     const map = {};
+    const sessionMap = {};
     if (snap) {
       snap.forEach(d => {
         const x = d.data() || {};
         const day = x.day || toDayStr(x.startAt?.toDate?.() || x.startAt || Date.now());
         const min = Number(x.minutes || 0);
         map[day] = (map[day] || 0) + min;
+        if (!sessionMap[day]) {
+          sessionMap[day] = [];
+        }
+        sessionMap[day].push({ bookId: x.bookId, minutes: min, at: x.at?.toDate() });
       });
     }
     minutesByDay = map;
-  }
-
-  /* ---------------- Today ring ---------------- */
-  function renderToday() {
-    const rEl = $("#todayRing");      // <circle id="todayRing" r="24">
-    const pctEl = $("#todayPct");
-    const mEl = $("#todayMinutes");
-    const gEl = $("#todayGoal");
-
-    const R = Number(rEl?.getAttribute("r") || 24);
-    const C = 2 * Math.PI * R;
-
-    const goal = Math.max(1, Number(localStorage.getItem("pb:timer:goalMin") || "20"));
-    const today = toDayStr(new Date());
-
-    // Prefer server value; if local cache for today is bigger (because of eventual consistency),
-    // use the maximum so the UI feels instant.
-    const serverMin = Number(minutesByDay[today] || 0);
-    const localDay = localStorage.getItem("pb:timer:_localDay");
-    const localMin = (localDay === today) ? Number(localStorage.getItem("pb:timer:_localMin") || "0") : 0;
-    const mins = Math.max(serverMin, localMin);
-
-    const pct = Math.min(100, Math.round((mins / goal) * 100));
-    if (rEl) rEl.setAttribute("stroke-dasharray", `${(pct / 100) * C} ${C}`);
-    if (pctEl) pctEl.textContent = `${pct}%`;
-    if (mEl) mEl.textContent = `${mins}m`;
-    if (gEl) gEl.textContent = `Goal: ${goal}m`;
   }
 
   /* ---------------- Calendar ---------------- */
@@ -129,6 +108,7 @@
       const cell = document.createElement("div");
       cell.className = "calendar-day" + (inMonth ? "" : " other-month");
       cell.title = `${ds} — ${mins} min`;
+      cell.dataset.date = ds; // Add date for click handling
       cell.textContent = String(d.getDate());
 
       // Heat: tint background intensity by minutes
@@ -140,6 +120,10 @@
         cell.style.borderColor = `color-mix(in oklab, var(--border) 60%, var(--primary))`;
         cell.style.color = "var(--text)";
       }
+      if (mins > 0) {
+        cell.style.cursor = "pointer";
+      }
+
       grid.appendChild(cell);
     }
   }
@@ -154,11 +138,63 @@
     $("#pagesRead") && ($("#pagesRead").textContent ||= "0");
   }
 
+  // --- Day Detail Modal Logic ---
+  async function showDayDetail(dateStr) {
+    const modal = $("#dayDetailModal");
+    const titleEl = $("#dayDetailTitle");
+    const contentEl = $("#dayDetailContent");
+    if (!modal || !titleEl || !contentEl) return;
+
+    const date = new Date(dateStr + 'T12:00:00'); // Avoid timezone issues
+    titleEl.textContent = `Reading for ${date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}`;
+    contentEl.innerHTML = `<p class="muted">Loading details...</p>`;
+    modal.style.display = 'flex';
+
+    const sessions = sessionsByDay[dateStr] || [];
+    if (sessions.length === 0) {
+      contentEl.innerHTML = `<p class="muted">No reading sessions found for this day.</p>`;
+      return;
+    }
+
+    // Fetch book details for all sessions in parallel
+    const bookIds = [...new Set(sessions.map(s => s.bookId).filter(Boolean))];
+    const bookPromises = bookIds.map(id => db().collection("users").doc(USER().uid).collection("books").doc(id).get());
+    const bookSnaps = await Promise.all(bookPromises);
+    const bookDataMap = new Map(bookSnaps.map(snap => [snap.id, snap.data()]));
+
+    contentEl.innerHTML = sessions.map(session => {
+      const book = bookDataMap.get(session.bookId);
+      const coverUrl = book?.coverUrl || book?.coverDataUrl || 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+      const title = book?.title || "An unknown book";
+
+      return `
+        <div class="day-detail-item">
+          <img src="${coverUrl}" alt="Cover for ${title}">
+          <div>
+            <div style="font-weight: 700;">${title}</div>
+            <div class="muted small">${session.minutes} minutes</div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function wireModal() {
+    const modal = $("#dayDetailModal");
+    const closeBtn = $("#closeDayDetailBtn");
+
+    modal?.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.style.display = 'none';
+      }
+    });
+    closeBtn?.addEventListener('click', () => modal.style.display = 'none');
+  }
+
   /* ---------------- Boot ---------------- */
   async function boot() {
     const u = USER(); if (!u) return;
     await fetchTimerMinutes(u);
-    renderToday();
     renderCalendar();
     renderQuickTotals();
   }
@@ -170,13 +206,16 @@
     $("#prevYear")?.addEventListener("click", () => { ym.y--; renderCalendar(); });
     $("#nextYear")?.addEventListener("click", () => { ym.y++; renderCalendar(); });
 
+    // Wire up calendar day clicks
+    $("#calendarGrid")?.addEventListener('click', (e) => {
+      const dayEl = e.target.closest('.calendar-day');
+      if (dayEl && dayEl.dataset.date && (minutesByDay[dayEl.dataset.date] || 0) > 0) {
+        showDayDetail(dayEl.dataset.date);
+      }
+    });
+
     // React to timer saves + goal changes + storage updates
     window.addEventListener("pb:sessions:updated", async () => { await boot(); });
-    window.addEventListener("pb:settings:update", (e) => { if (e.detail?.timer?.goalMin != null) renderToday(); });
-    window.addEventListener("storage", (e) => {
-      if (["pb:timer:_localMin", "pb:timer:_localDay", "pb:timer:goalMin"].includes(e.key)) renderToday();
-    });
-    document.addEventListener("visibilitychange", () => { if (!document.hidden) renderToday(); });
 
     // Auth-ready
     if (typeof requireAuth === "function") {
@@ -184,6 +223,8 @@
     } else {
       const t = setInterval(() => { if (USER() && DB()) { clearInterval(t); boot(); } }, 300);
     }
+
+    wireModal();
   });
 })();
 

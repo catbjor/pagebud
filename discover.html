@@ -20,118 +20,16 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
     <script src="firebase-config.js"></script>
     <script src="firebase-init.js?v=dev-1"></script>
-    <script src="profiles.js"></script>
-    <style>
-        .disc-shell {
-            display: grid;
-            grid-template-columns: 220px 1fr;
-            gap: 16px;
-            padding: 16px
-        }
-
-        @media (max-width:860px) {
-            .disc-shell {
-                grid-template-columns: 1fr
-            }
-        }
-
-        .disc-side,
-        .disc-main {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 14px;
-            padding: 12px
-        }
-
-        .side-title {
-            font-weight: 900;
-            margin: 4px 0 10px
-        }
-
-        .side-link {
-            display: block;
-            padding: 8px 10px;
-            border-radius: 10px;
-            cursor: pointer
-        }
-
-        .side-link:hover {
-            background: var(--hover)
-        }
-
-        .active.side-link {
-            background: color-mix(in oklab, var(--primary) 20%, transparent);
-            border: 1px solid var(--primary)
-        }
-
-        .search-row {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 10px
-        }
-
-        .search-row input {
-            flex: 1
-        }
-
-        .list {
-            display: flex;
-            flex-direction: column;
-            gap: 12px
-        }
-
-        .tile {
-            display: grid;
-            grid-template-columns: 92px 1fr auto;
-            gap: 12px;
-            align-items: center;
-            border: 1px solid var(--border);
-            background: var(--surface);
-            border-radius: 12px;
-            padding: 8px
-        }
-
-        .cover {
-            width: 92px;
-            height: 125px;
-            object-fit: cover;
-            border-radius: 8px;
-            background: #222
-        }
-
-        .t {
-            font-weight: 900;
-            margin-bottom: 4px
-        }
-
-        .a {
-            color: var(--text-light);
-            font-size: .9rem
-        }
-
-        .meta {
-            text-align: right;
-            color: var(--text-light);
-            font-size: .85rem
-        }
-
-        .pill {
-            display: inline-block;
-            border: 1px solid var(--border);
-            border-radius: 999px;
-            padding: 4px 8px;
-            font-size: .75rem
-        }
-    </style>
 </head>
 
 <body>
-    <header class="header">
-        <h1>Discover</h1>
-        <div class="header-actions"><!-- (tom) --></div>
-    </header>
+    <div class="app-container">
+        <header class="header">
+            <h1>Discover</h1>
+            <div class="header-actions"><!-- (tom) --></div>
+        </header>
 
-        <main class="disc-main">
+        <main>
             <div class="search-row">
                 <input class="form-control" id="q" placeholder="Search by keyword…" />
                 <button class="btn" id="qBtn" style="width:auto">Search</button>
@@ -141,26 +39,16 @@
                     <i class="fa-solid fa-bars"></i> Genres
                 </button>
             </div>
-
-
-            <div style="display:flex;gap:8px;margin:6px 2px 12px;">
-                <span class="pill" id="sortPopular">Popular</span>
-                <span class="pill" id="sortNew">New this year</span>
-            </div>
+            <!-- Container for search results -->
             <div aria-live="polite" class="list" id="results"></div>
+            <!-- Container for collections -->
+            <div id="railsHost"></div>
         </main>
+        <script src="rail-definitions.js" defer></script>
+        <script src="discover.js" defer></script>
+        <script defer="" src="nav.js"></script>
+        <script src="library-enricher.js" defer></script>
     </div>
-    </div>
-    <script src="discover.js"></script>
-    <script defer="" src="nav.js"></script>
-    <script defer="" src="timer.js"></script>
-    <script src="library-enricher.js" defer></script>
-    <script>
-        requireAuth(async (user) => {
-            // her er du garantert innlogget og fb.auth/fb.db finnes
-            // last data / start lyttere
-        });
-    </script>
 </body>
 
 </html>

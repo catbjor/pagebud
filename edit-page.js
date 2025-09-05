@@ -1,4 +1,4 @@
-// edit-page.js — prefill chips + show/replace cover + existing file name.
+// edit-page.js — Unified logic for editing a book with advanced features.
 // Adds Upload Cover button support (#btnPickCover + #coverFile → coverDataUrl)
 (function () {
   "use strict";
@@ -10,7 +10,7 @@
     const C = (window.PB_CONST) || (window.CONSTANTS) || (window.PB && {
       GENRES: window.PB.GENRES, MOODS: window.PB.MOODS, TROPES: window.PB.TROPES,
       STATUSES: window.PB.STATUSES, FORMATS: window.PB.FORMATS
-    }) || {};
+    }) || { MOODS: [] }; // Add fallback for MOODS
     return {
       genres: C.GENRES || window.GENRES || [],
       moods: C.MOODS || window.MOODS || [],
@@ -103,12 +103,34 @@
     $("#pageCount") && ($("#pageCount").value = d.pageCount || "");
     $("#finished") && ($("#finished").value = typeof d.finished === "string" ? d.finished : "");
     $("#review") && ($("#review").value = d.review || "");
+    $("#quotesTextArea") && ($("#quotesTextArea").value = d.quotesText || ""); // Load quotes text
+
+    // Load notes for multi-dimensional ratings
+    $("#plotNotes") && ($("#plotNotes").value = d.plotNotes || "");
+    $("#charNotes") && ($("#charNotes").value = d.charNotes || "");
+    $("#writingNotes") && ($("#writingNotes").value = d.writingNotes || "");
+    $("#impactNotes") && ($("#impactNotes").value = d.impactNotes || "");
 
     // Pre-fill rating/spice hidden inputs so controls can pick them up
+    const inpPlot = ensureHidden(form, "plotRating");
+    const inpChar = ensureHidden(form, "charRating");
+    const inpWriting = ensureHidden(form, "writingRating");
+    const inpImpact = ensureHidden(form, "impactRating");
+
+    // Set values for the new multi-dimensional ratings
+    inpPlot.value = d.plotRating || "0";
+    inpChar.value = d.charRating || "0";
+    inpWriting.value = d.writingRating || "0";
+    inpImpact.value = d.impactRating || "0";
+
+    // Existing ratings
     const inpRating = ensureHidden(form, "rating");
     const inpSpice = ensureHidden(form, "spice");
     inpRating.value = d.rating || "0";
     inpSpice.value = d.spice || "0";
+
+    // Reread value checkbox
+    $("#rereadValue") && ($("#rereadValue").checked = !!d.rereadValue);
 
     // Cover preview (existing)
     if ($("#coverPreview")) {
@@ -146,6 +168,9 @@
     populateChips($("#genresBox .categories"), genres);
     populateChips($("#moodsBox .categories"), moods);
     populateChips($("#tropesBox .categories"), tropes);
+    // Also populate status and format if they are empty
+    populateChips($("#statusChips"), getLists().statuses);
+    populateChips($("#formatChips"), formats);
 
     // Activate chips visually
     activateChips($("#genresBox .categories"), JSON.parse(inpGenres.value || "[]"));
@@ -163,6 +188,9 @@
       onChange: vals => { inpStatuses.value = JSON.stringify(vals); inpStatus.value = vals[0] || ""; }
     });
     wireChipGroup($("#formatChips"), { multi: false, onChange: val => inpFormat.value = val || "" });
+
+    // Render existing quotes
+    renderQuotes(d.quotes || []);
 
     return { ref, data: d, uid: u.uid };
   }
@@ -184,6 +212,11 @@
     const statuses = JSON.parse((form.querySelector('input[name="statuses"]')?.value || "[]"));
     const status = (form.querySelector('input[name="status"]')?.value || (statuses[0] || ""));
 
+    // Get quotes from the UI
+    const quotes = $$('#quotesContainer .quote-entry').map(entry => ({
+      text: entry.querySelector('textarea')?.value || '',
+      imageUrl: entry.querySelector('img')?.src || ''
+    })).filter(q => q.text || q.imageUrl);
     const format = (form.querySelector('input[name="format"]')?.value || null);
 
     const ratingVal = $('input[name="rating"]')?.value ?? "";
@@ -195,10 +228,22 @@
       pageCount: Number($("#pageCount")?.value) || null,
       finished: $("#finished")?.value || null,
       review: $("#review")?.value || "",
+      quotesText: $("#quotesTextArea")?.value || "", // Save quotes text
+      reviewHasSpoilers: $("#reviewHasSpoilers")?.checked || false,
       genres, moods, tropes,
+      plotNotes: $("#plotNotes")?.value || "",
+      charNotes: $("#charNotes")?.value || "",
+      writingNotes: $("#writingNotes")?.value || "",
+      impactNotes: $("#impactNotes")?.value || "",
       statuses, status, format,
+      quotes, // Save the quotes array
       ...(ratingVal !== "" ? { rating: Number(ratingVal) || 0 } : {}),
       ...(spiceVal !== "" ? { spice: Number(spiceVal) || 0 } : {}),
+      rereadValue: $("#rereadValue")?.checked || false,
+      plotRating: Number($('input[name="plotRating"]')?.value) || 0,
+      charRating: Number($('input[name="charRating"]')?.value) || 0,
+      writingRating: Number($('input[name="writingRating"]')?.value) || 0,
+      impactRating: Number($('input[name="impactRating"]')?.value) || 0,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     };
 
@@ -214,6 +259,11 @@
 
     await ref.set(payload, { merge: true });
 
+    // If the book was marked as finished, check for challenge progress.
+    if (payload.status === 'finished') {
+        window.PBChallenges?.updateChallengeProgress?.(u.uid, { id, ...payload });
+    }
+
     // Toast
     try {
       const t = document.createElement("div");
@@ -224,6 +274,59 @@
     } catch { }
 
     setTimeout(() => location.replace(`index.html?refresh=${Date.now()}`), 120);
+  }
+
+  // --- Quotes Section Logic ---
+  function renderQuotes(quotes = []) {
+    const container = $("#quotesContainer");
+    if (!container) return;
+    container.innerHTML = quotes.map(quote => createQuoteEntry(quote)).join('');
+  }
+
+  function createQuoteEntry(quote = { text: '', imageUrl: '' }) {
+    const textContent = quote.text ? `<textarea>${quote.text}</textarea>` : '<textarea placeholder="Type or paste quote..."></textarea>';
+    const imageContent = quote.imageUrl ? `<img src="${quote.imageUrl}" alt="Quote image">` : '';
+
+    return `
+      <div class="quote-entry">
+        <div class="quote-content">
+          ${imageContent || textContent}
+        </div>
+        <button type="button" class="btn-remove-quote" title="Remove quote">&times;</button>
+      </div>
+    `;
+  }
+
+  function wireQuotesSection() {
+    const container = $("#quotesContainer");
+    if (!container) return;
+
+    $("#addQuoteTextBtn")?.addEventListener('click', () => {
+      container.insertAdjacentHTML('beforeend', createQuoteEntry());
+    });
+
+    const quotePhotoInput = $("#quotePhotoInput");
+    $("#addQuotePhotoBtn")?.addEventListener('click', () => {
+      quotePhotoInput.click();
+    });
+
+    quotePhotoInput?.addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      try {
+        const dataUrl = await readAsDataURL(file);
+        container.insertAdjacentHTML('beforeend', createQuoteEntry({ imageUrl: dataUrl }));
+      } catch (err) {
+        alert("Could not load image.");
+      }
+      e.target.value = ''; // Reset input
+    });
+
+    container.addEventListener('click', (e) => {
+      if (e.target.classList.contains('btn-remove-quote')) {
+        e.target.closest('.quote-entry').remove();
+      }
+    });
   }
 
   // --- Init -------------------------------------------------------
@@ -237,7 +340,7 @@
 
     // Wire header buttons
     const delBtn = $("#deleteBtn");
-    const cancelBtn = form.closest(".app-container").querySelector('.header-actions .btn-secondary');
+    const cancelBtn = $("#cancelBtn");
 
     delBtn?.addEventListener("click", () => window.PB_Delete?.deleteBook?.(ctx.data.id, ctx.data.title));
     cancelBtn?.addEventListener("click", () => history.back());
@@ -309,6 +412,15 @@
       e.stopPropagation();
       save(form, ctx, newCoverDataUrl, extractedCoverBlob);
     });
+
+    // Wire up the new quotes section
+    wireQuotesSection();
+
+    // Wire up multi-dimensional rating controls
+    window.PB_RatingControls?.init?.($("#plotRatingBar"), ensureHidden(form, "plotRating"));
+    window.PB_RatingControls?.init?.($("#charRatingBar"), ensureHidden(form, "charRating"));
+    window.PB_RatingControls?.init?.($("#writingRatingBar"), ensureHidden(form, "writingRating"));
+    window.PB_RatingControls?.init?.($("#impactRatingBar"), ensureHidden(form, "impactRating"));
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init, { once: true });

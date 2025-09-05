@@ -129,9 +129,28 @@
         } catch (e) { warn("ensureLocalFriend failed:", e); }
     }
 
-    async function removeLocalFriend(uid, otherUid) {
-        try { await db().collection("users").doc(uid).collection("friends").doc(otherUid).delete(); }
-        catch (e) { warn("removeLocalFriend failed:", e); }
+    async function unfriend(myUid, otherUid, otherUsername) {
+        if (!confirm(`Are you sure you want to remove ${otherUsername || 'this friend'}?`)) {
+            return;
+        }
+
+        try {
+            const batch = db().batch();
+
+            // Remove from my friends list
+            const myFriendRef = db().collection("users").doc(myUid).collection("friends").doc(otherUid);
+            batch.delete(myFriendRef);
+
+            // Remove me from their friends list
+            const theirFriendRef = db().collection("users").doc(otherUid).collection("friends").doc(myUid);
+            batch.delete(theirFriendRef);
+
+            await batch.commit();
+            try { window.PB?.logActivity?.({ action: "friend_removed", meta: { other: otherUid } }); } catch { }
+        } catch (e) {
+            warn("Unfriend failed:", e);
+            alert("Could not remove friend. Please try again.");
+        }
     }
 
     // ---------- row renderer ----------
@@ -357,13 +376,8 @@
                     chatBtn.addEventListener("click", () => { location.href = `chat.html?buddy=${encodeURIComponent(f.uid)}`; });
 
                     const rmBtn = button("Remove", "btn btn-secondary");
-                    rmBtn.addEventListener("click", async () => {
-                        rmBtn.disabled = true;
-                        try {
-                            await removeLocalFriend(me.uid, f.uid);
-                            try { window.PB?.logActivity?.({ action: "friend_removed", meta: { other: f.uid } }); } catch { }
-                        } catch (e) { warn(e); }
-                    });
+                    // Add confirmation dialog before unfriending
+                    rmBtn.addEventListener("click", () => unfriend(me.uid, f.uid, f.displayName || f.username));
 
                     renderUserRow(els.friendsList, f, [chatBtn, rmBtn], () => modal.show(f));
                 }

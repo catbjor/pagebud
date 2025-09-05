@@ -95,10 +95,10 @@
         const usernameEl = $("#profileUsername");
         const bioEl = $("#profileBio");
         const quirksContainer = $("#quirksContainer");
-        const myUserActions = $("#myUserActions");
         const btnEditProfile = $("#btnEditProfile");
         const otherUserActions = $("#otherUserActions");
         const editProfileSection = $("#editProfileSection");
+        const btnCreateShelf = $("#btnCreateShelf");
         const btnChangePhoto = $("#btnChangePhoto");
         const photoInput = $("#photoInput");
         const editName = $("#editName");
@@ -108,6 +108,7 @@
         const headerTitle = $("#profileHeaderTitle");
         const btnAddFriend = $("#btnAddFriend");
         const btnMessage = $("#btnMessage");
+        const btnMoreOptions = $("#btnMoreOptions");
 
         // --- Load Profile Data ---
         let profileData = null;
@@ -120,9 +121,14 @@
             profileData = userDoc.data();
 
             // Also get username from the dedicated collection
-            const usernameSnap = await db().collection("usernames").where("uid", "==", profileUid).limit(1).get();
-            if (!usernameSnap.empty) {
-                profileData.username = usernameSnap.docs[0].id;
+            try {
+                const usernameSnap = await db().collection("usernames").where("uid", "==", profileUid).limit(1).get();
+                if (!usernameSnap.empty) {
+                    profileData.username = usernameSnap.docs[0].id;
+                }
+            } catch (e) {
+                console.warn("Could not fetch username, possibly missing index:", e);
+                // Continue without the username, don't crash the page.
             }
 
             // --- Populate UI ---
@@ -136,13 +142,15 @@
             }
 
             const streak = await calculateStreak(profileUid); // This function was missing
-            loadAndDisplayStats(profileUid, streak);
             calculateAndShowAchievements(profileUid, streak);
+            loadAndDisplayBadges(profileUid); // New function call
 
             loadCurrentlyReading(profileUid, isMyProfile);
             loadFavoritesShelf(profileUid, isMyProfile);
             loadFinishedShelf(profileUid, isMyProfile);
             loadWishlistShelf(profileUid, isMyProfile);
+            loadAndRenderCustomShelves(profileUid, isMyProfile);
+            if (isMyProfile) loadNotesAndQuotes(me.uid); // Load notes for own profile
 
             if (!isMyProfile) {
                 checkFriendshipAndShowActions(me.uid, profileUid);
@@ -152,12 +160,13 @@
         } catch (error) {
             console.error("Failed to load profile:", error);
             nameEl.textContent = "Error loading profile";
-            return;
+            return; // Stop execution if the main profile doc fails to load
         }
 
         // --- Conditional UI ---
         if (isMyProfile) {
-            myUserActions.style.display = 'flex';
+            btnEditProfile.style.display = 'inline-flex';
+            btnCreateShelf.style.display = 'inline-flex';
             btnChangePhoto.style.display = 'grid';
             editName.value = profileData.displayName || '';
             wireUpQuirksEditor(profileData.quirks || []);
@@ -171,9 +180,11 @@
             btnChangePhoto.addEventListener('click', () => photoInput.click());
             photoInput.addEventListener('change', handlePhotoUpload);
             btnSaveChanges.addEventListener('click', saveChanges);
+            btnCreateShelf.addEventListener('click', createNewShelf);
 
         } else {
             otherUserActions.style.display = 'flex';
+            btnMoreOptions.addEventListener('click', () => showMoreOptions(profileUid, profileData.displayName));
         }
 
         // --- Functions for editing ---
@@ -241,10 +252,40 @@
             }
         }
 
+        async function createNewShelf() {
+            const shelfName = prompt("Enter a name for your new shelf:", "");
+            if (!shelfName || shelfName.trim().length === 0) {
+                return;
+            }
+
+            try {
+                await db().collection("users").doc(me.uid).collection("shelves").add({
+                    name: shelfName.trim(),
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    bookIds: []
+                });
+                // Simple refresh to show the new shelf
+                location.reload();
+            } catch (error) {
+                console.error("Failed to create shelf:", error);
+                alert("Could not create the shelf. Please try again.");
+            }
+        }
+
+
         async function addFriend(fromUid, toUid) {
-            // This logic can be imported or copied from friends.js
+            // This logic is now aligned with friends.js and your security rules,
+            // using the top-level /friend_requests collection.
             const reqId = [fromUid, toUid].sort().join("__");
             const ref = db().collection("friend_requests").doc(reqId);
+            const snap = await ref.get();
+
+            if (snap.exists) {
+                const cur = snap.data() || {};
+                if (cur.status === "accepted") { alert("You’re already friends."); return; }
+                if (cur.status === "pending") { alert("Request already pending."); return; }
+            }
+
             try {
                 await ref.set({
                     from: fromUid,
@@ -261,6 +302,27 @@
             }
         }
 
+        function showMoreOptions(theirUid, theirName) {
+            // In a real app, this would open a proper menu. For now, we'll use a simple prompt.
+            const action = prompt(`More options for ${theirName}:\n\nType "block" to block this user.`, "");
+            if (action?.toLowerCase() === 'block') {
+                blockUser(me.uid, theirUid, theirName);
+            }
+        }
+
+        async function blockUser(myUid, theirUid, theirName) {
+            if (!confirm(`Are you sure you want to block ${theirName}? You will no longer see each other's profiles or activity.`)) {
+                return;
+            }
+            try {
+                await db().collection("users").doc(myUid).collection("blocked").doc(theirUid).set({ at: new Date() });
+                alert(`${theirName} has been blocked.`);
+                location.href = 'index.html'; // Redirect away from their profile
+            } catch (error) {
+                alert("Could not block user. Please try again.");
+            }
+        }
+
         async function checkFriendshipAndShowActions(myUid, theirUid) {
             const friendDoc = await db().collection("users").doc(myUid).collection("friends").doc(theirUid).get();
             const isFriend = friendDoc.exists && friendDoc.data().status === 'accepted';
@@ -268,14 +330,16 @@
             btnMessage.addEventListener('click', () => location.href = `chat.html?buddy=${theirUid}`);
 
             if (isFriend) {
-                btnAddFriend.textContent = 'Unfriend';
-                btnAddFriend.onclick = () => unfriend(myUid, theirUid);
+                btnAddFriend.textContent = 'Friends ✓';
+                btnAddFriend.disabled = true; // Disable if already friends
+                // Optionally, add an unfriend button if desired
+                // btnAddFriend.onclick = () => unfriend(myUid, theirUid);
             } else {
-                // Check if a request is pending
+                // Check the top-level collection for a pending request
                 const reqId = [myUid, theirUid].sort().join("__");
                 const reqDoc = await db().collection("friend_requests").doc(reqId).get();
                 if (reqDoc.exists && reqDoc.data().status === 'pending') {
-                    btnAddFriend.textContent = 'Request Sent';
+                    btnAddFriend.textContent = 'Request Pending...';
                     btnAddFriend.disabled = true;
                 } else {
                     btnAddFriend.textContent = 'Add Friend';
@@ -366,6 +430,173 @@
             container.style.display = 'block';
         }
 
+        // --- Notes & Quotes Section ---
+        let allQuotes = []; // Cache for search functionality
+
+        function renderNotes(quotesToRender) {
+            const listEl = $("#notesAndQuotesList");
+            if (!listEl) return;
+
+            if (quotesToRender.length === 0) {
+                listEl.innerHTML = `<p class="muted">No matching notes found.</p>`;
+                return;
+            }
+
+            listEl.innerHTML = quotesToRender.map(quote => {
+                const noteHtml = quote.note ? `<div class="note-body">${quote.note}</div>` : '';
+                // Pass the full quote object to the share button
+                const quoteData = encodeURIComponent(JSON.stringify(quote));
+                return `
+                    <div class="quote-item" data-search-text="${(quote.text + ' ' + quote.note).toLowerCase()}">
+                        <blockquote class="quote-text">“${quote.text}”</blockquote>
+                        ${noteHtml}
+                        <div class="quote-meta">
+                            <span>From <strong>${quote.bookTitle || 'a book'}</strong></span>
+                            <button class="btn btn-secondary small" data-action="share-quote" data-quote='${quoteData}'>
+                                <i class="fa-solid fa-share-nodes"></i> Share
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function generateQuoteCard(quote) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const width = 1080;
+            const height = 1080;
+            canvas.width = width;
+            canvas.height = height;
+
+            // Background
+            ctx.fillStyle = '#111827'; // Dark theme background
+            ctx.fillRect(0, 0, width, height);
+
+            // Book Cover Image
+            const bookCoverUrl = quote.bookCoverUrl; // Assuming you save this when creating a quote
+            if (bookCoverUrl) {
+                try {
+                    const img = new Image();
+                    img.crossOrigin = "anonymous"; // Important for cross-origin images
+                    img.src = bookCoverUrl;
+                    await new Promise(resolve => { img.onload = resolve; });
+                    // Draw a blurred, full-canvas background
+                    ctx.globalAlpha = 0.2;
+                    ctx.filter = 'blur(20px)';
+                    ctx.drawImage(img, -50, -50, width + 100, height + 100);
+                    ctx.globalAlpha = 1.0;
+                    ctx.filter = 'none';
+                } catch (e) { console.warn("Could not load cover for quote card", e); }
+            }
+
+            // Quote Text
+            ctx.fillStyle = '#e5e7eb';
+            ctx.textAlign = 'center';
+            ctx.font = 'italic bold 60px Georgia, serif';
+            const quoteLines = wrapText(ctx, `“${quote.text}”`, width - 120);
+            let y = height / 2 - (quoteLines.length / 2 * 70);
+            quoteLines.forEach(line => {
+                ctx.fillText(line, width / 2, y);
+                y += 70; // Line height
+            });
+
+            // Book Title
+            ctx.font = '50px "system-ui", sans-serif';
+            ctx.fillText(`— ${quote.bookTitle}`, width / 2, y + 50);
+
+            // App Watermark
+            ctx.font = '30px "system-ui", sans-serif';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.fillText('Shared from PageBud', width / 2, height - 60);
+
+            return canvas;
+        }
+
+        // Helper to wrap text for canvas
+        function wrapText(context, text, maxWidth) {
+            const words = text.split(' ');
+            const lines = [];
+            let currentLine = words[0];
+            for (let i = 1; i < words.length; i++) {
+                const word = words[i];
+                const width = context.measureText(currentLine + " " + word).width;
+                if (width < maxWidth) {
+                    currentLine += " " + word;
+                } else {
+                    lines.push(currentLine);
+                    currentLine = word;
+                }
+            }
+            lines.push(currentLine);
+            return lines;
+        }
+
+        // New function to load and display all notes and quotes
+        async function loadNotesAndQuotes(uid) {
+            const section = $("#notesAndQuotesSection");
+            if (!section) return;
+
+            try {
+                const snap = await db().collection("users").doc(uid).collection("quotes")
+                    .orderBy("createdAt", "desc").limit(20).get();
+
+                if (snap.empty) return;
+
+                // Fetch book cover URLs for the quotes
+                const bookIds = [...new Set(snap.docs.map(d => d.data().bookId))];
+                const bookCoverPromises = bookIds.map(id => db().collection("users").doc(uid).collection("books").doc(id).get());
+                const bookSnaps = await Promise.all(bookCoverPromises);
+                const bookCoverMap = new Map(bookSnaps.map(s => [s.id, s.data()?.coverUrl]));
+
+                allQuotes = snap.docs.map(doc => ({ ...doc.data(), bookCoverUrl: bookCoverMap.get(doc.data().bookId) }));
+                renderNotes(allQuotes);
+                section.style.display = 'block';
+
+            } catch (error) {
+                console.warn("Could not load notes and quotes:", error);
+                section.style.display = 'none';
+            }
+        }
+
+        // Wire up the new search and share functionality
+        const notesSearchInput = $("#notesSearchInput");
+        if (notesSearchInput) {
+            notesSearchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase().trim();
+                if (!query) {
+                    renderNotes(allQuotes);
+                    return;
+                }
+                const filtered = allQuotes.filter(q =>
+                    q.text.toLowerCase().includes(query) ||
+                    (q.note && q.note.toLowerCase().includes(query)) ||
+                    q.bookTitle.toLowerCase().includes(query)
+                );
+                renderNotes(filtered);
+            });
+        }
+
+        const notesList = $("#notesAndQuotesList");
+        if (notesList) {
+            notesList.addEventListener('click', async (e) => {
+                const shareBtn = e.target.closest('[data-action="share-quote"]');
+                if (!shareBtn) return;
+
+                const quote = JSON.parse(decodeURIComponent(shareBtn.dataset.quote));
+                const modal = $("#quoteCardModal");
+                const canvasWrap = $("#quoteCardCanvasWrap");
+                const downloadBtn = $("#downloadQuoteCardBtn");
+                canvasWrap.innerHTML = `<p class="muted">Generating card...</p>`;
+                modal.style.display = 'flex';
+                const canvas = await generateQuoteCard(quote);
+                canvasWrap.innerHTML = '';
+                canvasWrap.appendChild(canvas);
+                downloadBtn.href = canvas.toDataURL('image/png');
+            });
+        }
+        $("#closeQuoteCardBtn")?.addEventListener('click', () => $("#quoteCardModal").style.display = 'none');
+
         function renderQuirks(quirks) {
             if (!quirksContainer) return;
             if (!quirks || quirks.length === 0) {
@@ -429,67 +660,6 @@
             } catch (error) {
                 console.warn("Could not calculate streak:", error);
                 return 0;
-            }
-        }
-
-        async function loadAndDisplayStats(uid, streak) { // Added streak parameter
-            const statsContainer = $("#readingStats");
-            if (!statsContainer) return;
-
-            try {
-                const booksSnap = await db().collection("users").doc(uid).collection("books").get();
-                if (booksSnap.empty) return;
-
-                const books = booksSnap.docs.map(d => d.data());
-                const currentYear = new Date().getFullYear();
-
-                // --- Calculations ---
-                const booksFinishedThisYear = books.filter(b =>
-                    b.status === 'finished' && b.finished && new Date(b.finished).getFullYear() === currentYear
-                ).length;
-
-                const ratedBooks = books.filter(b => typeof b.rating === 'number' && b.rating > 0);
-                const averageRating = ratedBooks.length > 0
-                    ? (ratedBooks.reduce((sum, b) => sum + b.rating, 0) / ratedBooks.length).toFixed(1)
-                    : 'N/A';
-
-                const genreCounts = books.reduce((counts, book) => {
-                    (book.genres || []).forEach(genre => {
-                        counts[genre] = (counts[genre] || 0) + 1;
-                    });
-                    return counts;
-                }, {});
-
-                const favoriteGenre = Object.entries(genreCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A';
-
-                // --- Rendering ---
-                statsContainer.innerHTML = `
-                    <div class="card-head">
-                        <h3>Reading Stats</h3>
-                    </div>
-                    <div class="stats-grid">
-                        <div class="stat-item">
-                            <div class="stat-value">${booksFinishedThisYear}</div>
-                            <div class="stat-label">Finished This Year</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-value">${averageRating}</div>
-                            <div class="stat-label">Average Rating</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-value">${favoriteGenre}</div>
-                            <div class="stat-label">Favorite Genre</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-value">🔥 ${streak}</div>
-                            <div class="stat-label">Current Streak</div>
-                        </div>
-                    </div>
-                `;
-                statsContainer.style.display = 'block';
-
-            } catch (error) {
-                console.warn("Could not load reading stats:", error);
             }
         }
 
@@ -704,6 +874,55 @@
         }
     }
 
+    async function loadAndDisplayBadges(uid) {
+        const container = $("#badgesSection");
+        const grid = $("#badgesGrid");
+        if (!container || !grid) return;
+
+        try {
+            const snap = await db().collection("users").doc(uid).collection("active_challenges")
+                .where("completedAt", "!=", null)
+                .orderBy("completedAt", "desc")
+                .get();
+
+            if (snap.empty) return;
+
+            const badgeIconMap = {
+                'tbr_5_2024': 'fa-list-check',
+                'genre_explorer_2024': 'fa-compass',
+                'big_book_2024': 'fa-book-journal-whills',
+                'new_author_2024': 'fa-feather-pointed',
+                'default': 'fa-trophy'
+            };
+
+            grid.innerHTML = snap.docs.map(doc => {
+                const challenge = doc.data();
+                const icon = badgeIconMap[challenge.challengeId] || badgeIconMap['default'];
+                const completedDate = challenge.completedAt?.toDate ? challenge.completedAt.toDate().toLocaleDateString() : '';
+
+                return `
+                    <div class="badge-item" title="Completed on ${completedDate}">
+                        <div class="badge-icon-wrap">
+                            <i class="fa-solid ${icon} badge-icon"></i>
+                        </div>
+                        <div class="badge-title">${challenge.title || 'Challenge Complete'}</div>
+                    </div>
+                `;
+            }).join('');
+
+            container.style.display = 'block';
+        } catch (error) {
+            console.warn("Could not load badges:", error);
+        }
+    }
+
     // Use requireAuth to safely run the page logic and prevent race conditions
-    window.requireAuth(init);
+    window.onAuthReady.then(user => {
+        if (user) {
+            init(user);
+        } else {
+            // If no user, redirect to login. This is the safe way.
+            location.href = 'auth.html';
+        }
+    });
 })();

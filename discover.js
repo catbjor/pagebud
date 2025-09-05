@@ -1,13 +1,9 @@
-/* discover.js — Discover rails + genres drawer + search + BOOK SHEET
-   - Drawer for sjangre (Genres)
-   - Rails: Because you read, New this week, Popular on BookTok + curated (inkl. nye rails)
-   - Klikk på bok → detalj-sheet (blurb, rating, subjects, +Add)
-   - Desktopvennlig horisontal scroll per seksjon (drag/wheel), uten å stjele klikk
-*/
 (() => {
     "use strict";
 
-    /* ----------------- Utils ----------------- */
+    // =================================================================================
+    // UTILS & HELPERS
+    // =================================================================================
     const $ = (s, r = document) => r.querySelector(s);
     const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
     const esc = (s) => String(s || "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
@@ -24,7 +20,9 @@
         return String(n);
     };
 
-    /* ----------------- Subjects (alfabetisk) ----------------- */
+    // =================================================================================
+    // CONFIG & STATE
+    // =================================================================================
     const ALL_SUBJECTS = [
         "action", "adventure", "african literature", "american literature", "animals", "anthologies", "art",
         "autobiography", "banned books", "biology", "book club", "booktok", "business", "classics",
@@ -33,33 +31,51 @@
         "graphic novels", "health", "historical fiction", "history", "horror", "humor", "inspirational",
         "lgbt", "literary fiction", "manga", "memoir", "mystery", "mythology", "new adult", "nonfiction",
         "norwegian", "philosophy", "poetry", "psychology", "religion", "retellings", "romance", "romantasy",
-        "science", "science fiction", "self help", "short stories", "spirituality", "sports", "thriller",
+        "science", "science fiction", "self help", "short stories", "spirituality", "sports", "thriller", "smut",
         "time travel", "true crime", "urban fantasy", "war", "western", "women", "ya", "young adult", "zombies"
     ].sort((a, b) => a.localeCompare(b));
 
-    /* ----------------- Firebase helpers (robust) ----------------- */
-    const hasFB = () => !!(window.fb && window.fb.db && window.fb.auth);
-    const me = () => hasFB() ? window.fb.auth.currentUser : null;
-    let LIB_CACHE = null; // fylles ved boot
+    let LIB_CACHE = null;
 
-    async function myLibraryMap() {
-        const out = { work: new Set(), title: new Set(), subjects: [] };
-        if (!hasFB() || !me()) return out;
+    // =================================================================================
+    // FIREBASE HELPERS
+    // =================================================================================
+    const hasFB = () => !!(window.fb && window.fb.db && window.fb.auth);
+
+    async function myLibraryMap(user) {
+        const out = { work: new Set(), title: new Set(), subjects: [], authors: new Set() };
+        if (!hasFB() || !user) return out;
         try {
-            const col = window.fb.db.collection("users").doc(me().uid).collection("books");
+            const col = window.fb.db.collection("users").doc(user.uid).collection("books");
             const snap = await col.limit(500).get();
             snap.forEach(d => {
                 const x = d.data() || {};
+                if (x.author) out.authors.add(String(x.author));
                 if (x.workKey) out.work.add(String(x.workKey).toLowerCase());
                 if (x.title) out.title.add(String(x.title).toLowerCase());
                 if (Array.isArray(x.subjects)) out.subjects.push(...x.subjects.map(s => String(s).toLowerCase()));
             });
-        } catch { }
+        } catch (e) {
+            console.warn("Could not build library map:", e);
+        }
         return out;
     }
 
+    async function getFriendsUids(user) {
+        if (!user) return [];
+        const out = new Set();
+        try {
+            const snap = await window.fb.db.collection("users").doc(user.uid).collection("friends").where("status", "==", "accepted").get();
+            snap.forEach(d => out.add(d.id));
+        } catch (e) {
+            console.warn("Could not get friends UIDs:", e);
+        }
+        return Array.from(out);
+    }
+
     async function addToLibrary(normal) {
-        if (!hasFB() || !me()) throw new Error("Not signed in");
+        const user = window.fb?.auth?.currentUser;
+        if (!hasFB() || !user) throw new Error("Not signed in");
         const payload = {
             id: normal.id || randomId(),
             title: normal.title || "Untitled",
@@ -72,19 +88,17 @@
             workKey: normal.workKey || null,
             subjects: take(normal.subjects || [], 6)
         };
-        if (window.PBSync?.saveBook) {
-            await PBSync.saveBook(payload);
-        } else {
-            await window.fb.db.collection("users").doc(me().uid).collection("books")
-                .doc(payload.id).set(payload, { merge: true });
-        }
-        // hold LIB_CACHE ajour lokalt
+        await window.fb.db.collection("users").doc(user.uid).collection("books")
+            .doc(payload.id).set(payload, { merge: true });
+
         LIB_CACHE?.title?.add(String(payload.title).toLowerCase());
         if (payload.workKey) LIB_CACHE?.work?.add(String(payload.workKey).toLowerCase());
         return payload.id;
     }
 
-    /* ----------------- Open Library ----------------- */
+    // =================================================================================
+    // EXTERNAL API WRAPPERS (OPENLIBRARY, GOOGLE BOOKS)
+    // =================================================================================
     const OL = {
         coverURL(doc) {
             const id = doc.cover_i || doc.cover_edition_key || null;
@@ -94,17 +108,15 @@
                 : `https://covers.openlibrary.org/b/olid/${doc.cover_edition_key}-M.jpg`;
         },
         normalize(doc) {
-            const subs =
-                (Array.isArray(doc.subject) ? doc.subject :
-                    Array.isArray(doc.subject_key) ? doc.subject_key : [])
-                    .map(x => String(x).toLowerCase().replace(/_/g, " "));
+            const subs = (Array.isArray(doc.subject) ? doc.subject : (Array.isArray(doc.subject_key) ? doc.subject_key : []))
+                .map(x => String(x).toLowerCase().replace(/_/g, " "));
             return {
                 id: undefined,
                 title: doc.title || "Untitled",
                 author: Array.isArray(doc.author_name) ? doc.author_name[0] : (doc.author_name || "Unknown"),
                 year: yearOf(doc) || "",
                 cover: OL.coverURL(doc),
-                workKey: doc.key || doc.work_key?.[0] || null, // "/works/OLxxxxxW"
+                workKey: doc.key || doc.work_key?.[0] || null,
                 subjects: take(uniq(subs), 6),
                 pages: doc.number_of_pages_median || null,
                 editionCount: doc.edition_count || 0
@@ -115,13 +127,7 @@
             url.searchParams.set("q", q);
             url.searchParams.set("page", String(page));
             url.searchParams.set("limit", String(limit));
-            const r = await fetch(url); if (!r.ok) throw new Error("search failed");
-            return await r.json();
-        },
-        async trendingWeekly(limit = 24) {
-            const url = new URL("https://openlibrary.org/trending/weekly.json");
-            url.searchParams.set("limit", String(limit));
-            const r = await fetch(url); if (!r.ok) throw new Error("weekly failed");
+            const r = await fetch(url); if (!r.ok) throw new Error(`OpenLibrary search failed with status ${r.status}`);
             return await r.json();
         },
         async workExtras(workKey) {
@@ -135,7 +141,7 @@
                     if (w.description) description = typeof w.description === "string" ? w.description : (w.description.value || "");
                     if (Array.isArray(w.subjects)) subjects = w.subjects.map(s => String(s).toLowerCase());
                 }
-            } catch { }
+            } catch (e) { console.warn("Failed to fetch OL work details", e); }
             try {
                 const rr = await fetch(`https://openlibrary.org${key}/ratings.json`);
                 if (rr.ok) {
@@ -143,12 +149,49 @@
                     avg = j?.summary?.average ?? null;
                     count = j?.summary?.count ?? null;
                 }
-            } catch { }
+            } catch (e) { console.warn("Failed to fetch OL ratings", e); }
             return { description, avg, count, subjects };
         }
     };
 
-    /* ----------------- Drawer (Genres) ----------------- */
+    function getGoogleApiKey() {
+        // IMPORTANT: This API key is now public. For security, you should go to your
+        // Google Cloud Console, create a NEW key, restrict it to your website's domain,
+        // and then delete the old key.
+        return "AIzaSyDO4ennyLK1qzHiWox_my5IpDTPX_YZOOs";
+    }
+
+    const GBOOKS = {
+        normalize(item) {
+            const vi = item.volumeInfo || {};
+            const img = vi.imageLinks || {};
+            return {
+                id: item.id,
+                title: vi.title || "Untitled",
+                author: (vi.authors || ["Unknown"])[0],
+                year: (vi.publishedDate || "").slice(0, 4),
+                cover: (img.thumbnail || img.smallThumbnail || "").replace("http://", "https://"),
+                workKey: `gbooks:${item.id}`,
+                subjects: (vi.categories || []).map(c => c.toLowerCase()),
+                pages: vi.pageCount || null,
+                editionCount: 0
+            };
+        },
+        async search(query, limit = 20) {
+            const url = new URL("https://www.googleapis.com/books/v1/volumes");
+            url.searchParams.set("q", query);
+            url.searchParams.set("maxResults", String(limit));
+            url.searchParams.set("key", getGoogleApiKey());
+            const r = await fetch(url);
+            if (!r.ok) throw new Error(`Google Books search failed with status ${r.status}`);
+            const data = await r.json();
+            return (data.items || []).map(this.normalize);
+        }
+    };
+
+    // =================================================================================
+    // UI COMPONENTS (DRAWER, SHEET)
+    // =================================================================================
     function ensureDrawer() {
         let drawer = $("#discDrawer");
         if (drawer) return drawer;
@@ -188,7 +231,7 @@
             const link = e.target.closest(".side-link");
             if (!link) return;
             drawer.classList.remove("show");
-            showSubjectSeeAll(link.getAttribute("data-sub"));
+            showSeeAllPage(`subject:"${link.getAttribute("data-sub")}"`, cap(link.getAttribute("data-sub")));
         });
 
         drawer.addEventListener("click", (e) => { if (e.target.hasAttribute("data-close")) drawer.classList.remove("show"); });
@@ -196,24 +239,6 @@
         return drawer;
     }
 
-    function ensureActionbarButton() {
-        if ($("#discMenuBtn")) return;
-        const searchRow = $(".search-row");
-        const card = document.createElement("div");
-        card.className = "card disc-actionbar";
-        card.innerHTML = `
-      <button class="btn btn-secondary small" id="discMenuBtn">
-        <i class="fa-solid fa-bars"></i> Genres
-      </button>`;
-        if (searchRow && searchRow.parentNode) {
-            searchRow.parentNode.insertBefore(card, searchRow.nextSibling);
-        } else {
-            const main = $(".disc-main") || document.body;
-            main.prepend(card);
-        }
-    }
-
-    /* ----------------- Sheet (Book details) ----------------- */
     function ensureSheet() {
         let el = $("#bookSheet");
         if (el) return el;
@@ -312,32 +337,27 @@
             const chip = t.closest("[data-subj]");
             if (chip) {
                 sheet.classList.remove("show");
-                showSubjectSeeAll(chip.getAttribute("data-subj"));
+                showSeeAllPage(`subject:"${chip.getAttribute("data-subj")}"`, cap(chip.getAttribute("data-subj")));
             }
         };
     }
 
-    /* ----------------- Rendering helpers ----------------- */
+    // =================================================================================
+    // RENDERING HELPERS
+    // =================================================================================
     function railSkeleton(n = 10) {
         return `<div class="rail-list">
-      ${Array.from({ length: n }).map(() => `
-        <div class="tile is-skel" style="width:160px">
-          <div class="cover" style="background:#e9e9ef"></div>
-          <div class="muted" style="height:14px;background:#eee;border-radius:6px;margin:6px 0"></div>
-          <div class="muted" style="height:12px;background:#eee;border-radius:6px;width:60%"></div>
-        </div>`).join("")}
-    </div>`;
+            ${Array.from({ length: n }).map(() => `
+                <div class="tile is-skel">
+                    <div class="cover"></div>
+                    <div class="skel-line skel-line--title"></div>
+                    <div class="skel-line skel-line--author"></div>
+                </div>`).join("")}
+        </div>`;
     }
 
     function railsHost() {
-        let host = $("#railsHost");
-        if (!host) {
-            host = document.createElement("div");
-            host.id = "railsHost";
-            const main = $(".disc-main") || document.body;
-            main.appendChild(host);
-        }
-        return host;
+        return $("#railsHost");
     }
 
     function makeSection(id, title, tags = []) {
@@ -388,12 +408,10 @@
         setTimeout(() => el.classList.remove("show"), 1600);
     }
 
-    // Desktop-vennlig rail-scroll – men la klikk slippe gjennom ved små bevegelser.
     function enhanceRailScroll(root) {
         if (!root || root.__pbEnhanced) return;
         root.__pbEnhanced = true;
 
-        // Wheel → horisontal
         root.addEventListener("wheel", (e) => {
             if (root.scrollWidth > root.clientWidth && !e.shiftKey) {
                 root.scrollLeft += (e.deltaY || 0) + (e.deltaX || 0);
@@ -401,10 +419,9 @@
             }
         }, { passive: false });
 
-        // Pointer-drag (med terskel). Svelger kun klikk hvis vi faktisk dro.
         let down = false, startX = 0, startLeft = 0, dragged = false;
         root.addEventListener("pointerdown", (e) => {
-            if (e.button !== 0) return; // kun venstre
+            if (e.button !== 0) return;
             down = true; dragged = false;
             startX = e.clientX; startLeft = root.scrollLeft;
             root.classList.add("dragging");
@@ -437,7 +454,6 @@
 
     function bindSectionClicks(sec) {
         sec.addEventListener("click", async (e) => {
-            // Add-knapp?
             const add = e.target.closest("[data-add]");
             if (add) {
                 add.disabled = true;
@@ -454,7 +470,6 @@
                 }
                 return;
             }
-            // Klikk på tile for sheet (unngå chip/add)
             const tile = e.target.closest(".tile");
             if (!tile || e.target.closest(".chip,[data-add]")) return;
             try {
@@ -464,7 +479,40 @@
         });
     }
 
-    /* ----------------- Rails: data builders ----------------- */
+    // =================================================================================
+    // DATA FETCHING & RAIL BUILDERS
+    // =================================================================================
+    async function fetchCombinedSearchResults(query, olLimit = 20, gbooksLimit = 20) {
+        const [olResult, gbooksResult] = await Promise.allSettled([
+            OL.search(query, 1, olLimit),
+            GBOOKS.search(query, gbooksLimit)
+        ]);
+
+        let olBooks = [];
+        if (olResult.status === 'fulfilled' && olResult.value.docs) {
+            olBooks = olResult.value.docs.map(OL.normalize);
+        } else if (olResult.status === 'rejected') {
+            console.warn("OpenLibrary search failed:", olResult.reason);
+        }
+
+        let gbooks = [];
+        if (gbooksResult.status === 'fulfilled') {
+            gbooks = gbooksResult.value;
+        } else if (gbooksResult.status === 'rejected') {
+            console.warn("Google Books search failed:", gbooksResult.reason);
+        }
+
+        const combined = [];
+        const seen = new Set();
+        const bookKey = (b) => `${(b.title || "").toLowerCase().trim()}::${(b.author || "").toLowerCase().trim()}`;
+
+        [...gbooks, ...olBooks].forEach(book => {
+            const key = bookKey(book);
+            if (book.title && !seen.has(key)) { combined.push(book); seen.add(key); }
+        });
+        return combined;
+    }
+
     async function buildBecauseYouRead(libMap) {
         const sec = makeSection("because", "Because you read …", []);
         bindSectionClicks(sec);
@@ -476,377 +524,308 @@
             counts[k] = (counts[k] || 0) + 1;
         });
         const top = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k]) => k);
-        if (!top.length) top.push("romance", "fantasy", "mystery");
+        const rail = sec.querySelector(".rail-list");
+        if (!top.length || !rail) {
+            rail.innerHTML = `<div class="muted">Add books with genres to get recommendations.</div>`;
+            return;
+        }
 
         const tagsHost = sec.querySelector("[data-tags]");
         if (tagsHost) tagsHost.innerHTML = top.map(t => `<span class="chip muted-small">${esc(cap(t))}</span>`).join("");
 
-        let docs = [];
-        for (const s of top) {
-            try {
-                const { docs: part } = await OL.search(`subject:${JSON.stringify(s)}`, 1, 24);
-                docs = docs.concat(part || []);
-            } catch { }
-            await sleep(80);
-        }
-        const items = docs.map(OL.normalize);
-        const html = items.map(b => tileHTML(b, markInLib(b, libMap))).join("");
-        const rail = document.createElement("div");
-        rail.className = "rail-list";
-        rail.innerHTML = html;
-        sec.querySelector(".rail-list")?.replaceWith(rail);
+        const query = top.map(s => `subject:"${s}"`).join(" OR ");
+        const items = await fetchCombinedSearchResults(query, 15, 15);
+
+        const filteredItems = items.filter(b => !markInLib(b, libMap));
+        if (filteredItems.length === 0) { rail.innerHTML = `<div class="muted">No new recommendations for you in this category.</div>`; return; }
+
+        rail.innerHTML = filteredItems.slice(0, 20).map(b => tileHTML(b, false)).join("");
         enhanceRailScroll(rail);
     }
 
-    async function buildNewThisWeek(libMap) {
-        const sec = makeSection("newweek", "Trending this week", []);
+    async function buildTrendingAmongFriends(libMap, user) {
+        const sec = makeSection("trending_friends", "Trending Among Friends", []);
         bindSectionClicks(sec);
-        let docs = [];
-        try {
-            const w = await OL.trendingWeekly(32);
-            docs = Array.isArray(w?.works) ? w.works : [];
-        } catch { }
-        if (!docs.length) {
-            try {
-                const res = await OL.search(`first_publish_year:[${nowYear - 1} TO ${nowYear}]`, 1, 40);
-                docs = res.docs || [];
-                docs.sort((a, b) => (yearOf(b) || 0) - (yearOf(a) || 0));
-            } catch { }
+
+        const friendUids = await getFriendsUids(user);
+        const rail = sec.querySelector(".rail-list");
+        if (!rail) { console.warn("Could not find rail list for trending_friends"); return; }
+
+        if (friendUids.length === 0) {
+            rail.innerHTML = `<div class="muted">Add some friends to see what they're reading!</div>`;
+            return;
         }
-        const items = (docs || []).map(OL.normalize).slice(0, 24);
-        const html = items.map(b => tileHTML(b, markInLib(b, libMap))).join("");
-        const rail = document.createElement("div");
-        rail.className = "rail-list";
-        rail.innerHTML = html || `<div class="muted">Could not load “New this week”.</div>`;
-        sec.querySelector(".rail-list")?.replaceWith(rail);
+
+        const bookCounts = new Map();
+        const bookData = new Map();
+
+        const friendLibraries = await Promise.all(
+            friendUids.map(uid => window.fb.db.collection("users").doc(uid).collection("books").limit(100).get())
+        );
+
+        friendLibraries.forEach(snap => {
+            snap.forEach(doc => {
+                const book = doc.data();
+                const key = (book.workKey || book.title || "").toLowerCase();
+
+                if (!key || libMap.work.has(key) || libMap.title.has(key.toLowerCase())) return;
+
+                bookCounts.set(key, (bookCounts.get(key) || 0) + 1);
+                if (!bookData.has(key)) {
+                    bookData.set(key, { ...book, id: doc.id });
+                }
+            });
+        });
+
+        const sorted = Array.from(bookCounts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 20);
+        const items = sorted.map(([key]) => OL.normalize(bookData.get(key)));
+
+        rail.innerHTML = items.length > 0 ? items.map(b => tileHTML(b, false)).join("") : `<div class="muted">No trending books among your friends right now.</div>`;
         enhanceRailScroll(rail);
     }
 
-    async function buildBookTok(libMap) {
-        const sec = makeSection("booktok", "Popular on BookTok", []);
-        bindSectionClicks(sec);
-        let docs = [];
-        try {
-            const r1 = await OL.search(`subject:booktok`, 1, 40);
-            docs = r1.docs || [];
-        } catch { }
-        if (!docs.length) {
-            try {
-                const r2 = await OL.search(`"tiktok made me buy it"`, 1, 40);
-                docs = r2.docs || [];
-            } catch { }
-        }
-        const items = (docs || []).map(OL.normalize).slice(0, 24);
-        const html = items.map(b => tileHTML(b, markInLib(b, libMap))).join("");
-        const rail = document.createElement("div");
-        rail.className = "rail-list";
-        rail.innerHTML = html || `<div class="muted">Could not load “Popular on BookTok”.</div>`;
-        sec.querySelector(".rail-list")?.replaceWith(rail);
-        enhanceRailScroll(rail);
-    }
-
-    async function buildCuratedRail(id, title, query, libMap, { filter = null, tags = [] } = {}) {
+    async function buildCuratedRail(id, title, query, libMap, { tags = [] } = {}) {
         const sec = makeSection(id, title, tags);
         bindSectionClicks(sec);
         try {
-            const res = await OL.search(query, 1, 50);
-            let docs = res.docs || [];
-            if (typeof filter === "function") docs = docs.filter(filter);
-            docs.sort((a, b) => (b.edition_count || 0) - (a.edition_count || 0));
-            const items = docs.map(OL.normalize).slice(0, 24);
-            const rail = document.createElement("div");
-            rail.className = "rail-list";
-            rail.innerHTML = items.map(b => tileHTML(b, markInLib(b, libMap))).join("");
-            sec.querySelector(".rail-list")?.replaceWith(rail);
+            const items = await fetchCombinedSearchResults(query, 20, 20);
+            const rail = sec.querySelector(".rail-list");
+            if (!rail) return;
+
+            const displayItems = libMap ? items.filter(b => !markInLib(b, libMap)) : items;
+
+            if (displayItems.length === 0) {
+                if (libMap && libMap.work.size > 0 && items.length > 0) {
+                    rail.innerHTML = `<div class="muted">No new recommendations for you in this category.</div>`;
+                } else {
+                    rail.innerHTML = `<div class="muted">No books found for this collection.</div>`;
+                }
+                return;
+            }
+            rail.innerHTML = displayItems.slice(0, 24).map(b => tileHTML(b, markInLib(b, libMap))).join("");
             enhanceRailScroll(rail);
         } catch (e) {
-            console.warn(id, e);
-            sec.querySelector(".rail-list").innerHTML = `<div class="muted">Could not load “${esc(title)}”.</div>`;
+            console.warn(`Failed to build rail for "${id}":`, e);
+            sec.querySelector(".rail-list")?.innerHTML = `<div class="muted">Could not load “${esc(title)}”.</div>`;
         }
     }
 
-    /* ----------------- Search / See all ----------------- */
+    async function buildNewFromFaveAuthors(libMap) {
+        const authors = Array.from(libMap.authors || []).slice(0, 3);
+        if (authors.length === 0) return;
+
+        const sec = makeSection("fave_authors", "New from Your Favorite Authors", ["Personalized"]);
+        bindSectionClicks(sec);
+
+        const query = authors.map(a => `inauthor:"${a}"`).join(" OR ");
+        const fullQuery = `(${query}) AND published:${nowYear - 2}`;
+        const items = await fetchCombinedSearchResults(fullQuery, 15, 15);
+
+        const rail = sec.querySelector(".rail-list");
+        if (!rail) { console.warn("Could not find rail list for fave_authors"); return; }
+
+        const filteredItems = items.filter(b => !markInLib(b, libMap));
+        filteredItems.sort((a, b) => (Number(b.year) || 0) - (Number(a.year) || 0));
+
+        if (filteredItems.length === 0) { rail.innerHTML = `<div class="muted">No new releases found from your favorite authors.</div>`; return; }
+
+        rail.innerHTML = filteredItems.slice(0, 20).map(b => tileHTML(b, false)).join("");
+        enhanceRailScroll(rail);
+    }
+
+    // =================================================================================
+    // SEARCH & "SEE ALL" PAGE LOGIC
+    // =================================================================================
+    function renderBookList(books, containerEl, title = "Results") {
+        if (!containerEl) return;
+
+        const listHTML = books.map(b => `
+        <div class="list-tile" data-book='${encodeURIComponent(JSON.stringify(b))}'>
+            <img class="cover" src="${esc(b.cover || "")}" alt="" onerror="this.src='';this.style.background='#eee'" draggable="false"/>
+            <div>
+                <div class="t">${esc(b.title)}</div>
+                <div class="a">${esc(b.author)} ${b.year ? "· " + esc(b.year) : ""}</div>
+                ${(b.subjects || []).slice(0, 4).map(g => `<span class="chip muted-small">${esc(cap(g))}</span>`).join(" ")}
+            </div>
+            <div class="row" style="justify-content:flex-end">
+                ${markInLib(b, LIB_CACHE) ?
+                `<span class="muted-small">Already in ✓</span>` :
+                `<button class="btn btn-secondary small" data-add='${encodeURIComponent(JSON.stringify(b))}'>+ Add</button>`
+            }
+            </div>
+        </div>
+    `).join("");
+
+        containerEl.innerHTML = `
+        <div class="card">
+            <div class="card-head"><h3 style="margin:0">${esc(title)}</h3></div>
+            <div class="list">${listHTML}</div>
+        </div>
+    `;
+
+        containerEl.onclick = async (e) => {
+            const add = e.target.closest("[data-add]");
+            if (add) {
+                add.disabled = true;
+                try {
+                    const book = JSON.parse(decodeURIComponent(add.getAttribute("data-add")));
+                    await addToLibrary(book);
+                    add.parentElement.innerHTML = `<span class="muted-small">Already in ✓</span>`;
+                    toast("Added to your library ✓");
+                } catch { add.disabled = false; alert("Could not add this book."); }
+                return;
+            }
+            const tile = e.target.closest(".list-tile");
+            if (tile && !e.target.closest(".chip")) {
+                try { openBookSheet(JSON.parse(decodeURIComponent(tile.getAttribute("data-book")))); } catch { }
+            }
+        };
+        containerEl.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
     function wireUI() {
-        ensureActionbarButton();
-        $("#discMenuBtn")?.addEventListener("click", () => ensureDrawer().classList.add("show"));
-        $("#qBtn")?.addEventListener("click", () => doSearch());
+        $("#discMenuBtn")?.addEventListener("click", () => {
+            const drawer = ensureDrawer();
+            drawer.classList.add("show");
+        });
+        $("#qBtn")?.addEventListener("click", doSearch);
         $("#q")?.addEventListener("keydown", (e) => { if (e.key === "Enter") doSearch(); });
     }
 
     async function doSearch() {
         const q = ($("#q")?.value || "").trim();
         const host = $("#results");
+        const railsHostEl = $("#railsHost");
+
         if (!host) return;
+
+        if (railsHostEl) {
+            railsHostEl.style.display = q ? 'none' : 'block';
+        }
+
         if (!q) { host.innerHTML = ""; return; }
 
         host.innerHTML = `<div class="muted" style="padding:10px">Searching…</div>`;
         try {
-            const res = await OL.search(q, 1, 40);
-            const items = (res.docs || []).map(OL.normalize);
-            host.innerHTML = `
-        <div class="list">
-          ${items.map(b => `
-            <div class="tile" data-book='${encodeURIComponent(JSON.stringify(b))}' style="grid-template-columns:92px 1fr auto">
-              <img class="cover" src="${esc(b.cover || "")}" alt="" onerror="this.src='';this.style.background='#eee'" draggable="false"/>
-              <div>
-                <div class="t">${esc(b.title)}</div>
-                <div class="a">${esc(b.author)} ${b.year ? "· " + esc(b.year) : ""}</div>
-                ${(b.subjects || []).slice(0, 4).map(g => `<span class="chip muted-small">${esc(cap(g))}</span>`).join(" ")}
-              </div>
-              <div class="row" style="justify-content:flex-end">
-                ${(markInLib(b, LIB_CACHE) ? `<span class="muted-small">Already in ✓</span>`
-                    : `<button class="btn btn-secondary small" data-add='${encodeURIComponent(JSON.stringify(b))}'>+ Add</button>`)}
-              </div>
-            </div>
-          `).join("")}
-        </div>
-      `;
-            host.onclick = async (e) => {
-                const add = e.target.closest("[data-add]");
-                if (add) {
-                    add.disabled = true;
-                    try {
-                        const book = JSON.parse(decodeURIComponent(add.getAttribute("data-add")));
-                        await addToLibrary(book);
-                        add.parentElement.innerHTML = `<span class="muted-small">Already in ✓</span>`;
-                        toast("Added to your library ✓");
-                    } catch { add.disabled = false; alert("Could not add this book."); }
-                    return;
-                }
-                const tile = e.target.closest(".tile");
-                if (tile && !e.target.closest(".chip")) {
-                    try { openBookSheet(JSON.parse(decodeURIComponent(tile.getAttribute("data-book")))); } catch { }
-                }
-            };
+            const combined = await fetchCombinedSearchResults(q, 20, 20);
+            if (combined.length === 0) { host.innerHTML = `<div class="muted" style="padding:10px">No results found for "${esc(q)}".</div>`; return; }
+            renderBookList(combined, host, `Search results for "${q}"`);
         } catch (e) {
             console.warn(e);
             host.innerHTML = `<div class="muted" style="padding:10px">Search failed.</div>`;
         }
     }
 
-    async function showSubjectSeeAll(subject) {
+    async function showSeeAllPage(query, title) {
         const host = $("#results");
         if (!host) return;
-        host.innerHTML = `<div class="muted" style="padding:10px">Loading “${esc(cap(subject))}”…</div>`;
+        host.innerHTML = `<div class="muted" style="padding:10px">Loading “${esc(title)}”…</div>`;
         try {
-            const res = await OL.search(`subject:${JSON.stringify(subject)}`, 1, 60);
-            const items = (res.docs || []).map(OL.normalize);
-            host.innerHTML = `
-        <div class="card">
-          <div class="card-head"><h3 style="margin:0">${esc(cap(subject))}</h3></div>
-          <div class="list">
-          ${items.map(b => `
-            <div class="tile" data-book='${encodeURIComponent(JSON.stringify(b))}' style="grid-template-columns:92px 1fr auto">
-              <img class="cover" src="${esc(b.cover || "")}" alt="" onerror="this.src='';this.style.background='#eee'" draggable="false"/>
-              <div>
-                <div class="t">${esc(b.title)}</div>
-                <div class="a">${esc(b.author)} ${b.year ? "· " + esc(b.year) : ""}</div>
-                ${(b.subjects || []).slice(0, 6).map(g => `<span class="chip muted-small">${esc(cap(g))}</span>`).join(" ")}
-              </div>
-              <div class="row" style="justify-content:flex-end">
-                ${markInLib(b, LIB_CACHE) ? `<span class="muted-small">Already in ✓</span>`
-                    : `<button class="btn btn-secondary small" data-add='${encodeURIComponent(JSON.stringify(b))}'>+ Add</button>`}
-              </div>
-            </div>
-          `).join("")}
-          </div>
-        </div>
-      `;
-            host.onclick = async (e) => {
-                const add = e.target.closest("[data-add]");
-                if (add) {
-                    add.disabled = true;
-                    try {
-                        const book = JSON.parse(decodeURIComponent(add.getAttribute("data-add")));
-                        await addToLibrary(book);
-                        add.parentElement.innerHTML = `<span class="muted-small">Already in ✓</span>`;
-                        toast("Added to your library ✓");
-                    } catch { add.disabled = false; alert("Could not add this book."); }
-                    return;
-                }
-                const tile = e.target.closest(".tile");
-                if (tile && !e.target.closest(".chip")) {
-                    try { openBookSheet(JSON.parse(decodeURIComponent(tile.getAttribute("data-book")))); } catch { }
-                }
-            };
-            host.scrollIntoView({ behavior: "smooth", block: "start" });
+            const items = await fetchCombinedSearchResults(query, 40, 40);
+            renderBookList(items, host, title);
         } catch (e) {
             console.warn(e);
-            host.innerHTML = `<div class="muted" style="padding:10px">Could not load “${esc(cap(subject))}”.</div>`;
+            host.innerHTML = `<div class="muted" style="padding:10px">Could not load “${esc(title)}”.</div>`;
         }
     }
 
     function openSeeAllFor(railId) {
-        const map = {
-            because: () => showSubjectSeeAll("romance"),
-            booktok: () => showSubjectSeeAll("booktok"),
-            newweek: () => showSubjectSeeAll(String(nowYear)),
-            romance: () => showSubjectSeeAll("romance"),
-            modern: () => doSearchSeeAll(`first_publish_year:[1980 TO ${nowYear}]`),
-            banned: () => doSearchSeeAll(`subject:"banned books" OR subject:censorship OR "challenged books"`),
-            ya: () => showSubjectSeeAll("young adult fiction"),
-            newadult: () => showSubjectSeeAll("new adult fiction"),
-            darkacad: () => doSearchSeeAll(`"dark academia" OR subject:"dark academia"`),
-            cozyaut: () => doSearchSeeAll(`subject:"cozy mystery" OR subject:autumn`),
-            beach: () => doSearchSeeAll(`"beach read" OR subject:summer`),
-            twisty: () => doSearchSeeAll(`subject:mystery OR subject:thriller`),
-            norsk: () => doSearchSeeAll(`language:nor OR subject:norway`),
-            movies: () => doSearchSeeAll(`subject:"film adaptations" OR subject:"motion pictures" OR subject:"television adaptations"`),
-            holiday: () => doSearchSeeAll(`subject:christmas AND subject:romance`),
-            short: () => doSearchSeeAll(`number_of_pages_median:[1 TO 300]`),
-            debut: () => showSubjectSeeAll("debut"),
-            // --- nye:
-            darkrom: () => doSearchSeeAll(`"dark romance" OR subject:"dark romance" OR subject:"adult romance" OR subject:romantasy OR subject:romance`),
-            smut: () => doSearchSeeAll(`subject:erotica OR "spicy romance" OR subject:"adult romance" OR subject:"erotic fiction"`),
-            splatter: () => doSearchSeeAll(`"splatterpunk" OR subject:"splatterpunk" OR subject:"extreme horror" OR subject:gore OR subject:"body horror" OR subject:horror`),
-            xmas: () => doSearchSeeAll(`subject:christmas OR subject:"christmas stories" OR subject:"holiday fiction" OR "christmas romance"`),
-            forb: () => doSearchSeeAll(`subject:"banned books" OR subject:censorship OR "challenged books"`),
-            found: () => doSearchSeeAll(`"found family" OR subject:"friendship" OR subject:"families"`),
-            enemies: () => doSearchSeeAll(`"enemies to lovers" OR subject:rivals OR (subject:romance AND "enemies")`)
-        };
-        (map[railId] || (() => { }))();
-    }
+        // Handle special, personalized rails first
+        if (railId === 'fave_authors') {
+            const authors = Array.from(LIB_CACHE.authors || []).slice(0, 10);
+            if (!authors.length) { $("#results").innerHTML = `<div class="muted">Add books to your library to see this.</div>`; return; }
+            const query = authors.map(a => `author:"${a}"`).join(" OR ");
+            showSeeAllPage(query, "New from Your Favorite Authors");
+            return;
+        }
+        if (railId === 'because') {
+            const counts = {};
+            (LIB_CACHE.subjects || []).forEach(s => {
+                const k = String(s || "").toLowerCase();
+                if (!k) return;
+                counts[k] = (counts[k] || 0) + 1;
+            });
+            const top = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k]) => k);
+            const query = top.length > 0 ? top.map(s => `subject:"${s}"`).join(" OR ") : "subject:fiction"; // Fallback query
+            showSeeAllPage(query, "Because You Read...");
+            return;
+        }
+        if (railId === 'trending_friends') {
+            $("#results").innerHTML = `<div class="muted" style="padding:10px">This collection doesn't have a "See All" page.</div>`;
+            return;
+        }
 
-    async function doSearchSeeAll(query) {
-        const host = $("#results");
-        if (!host) return;
-        host.innerHTML = `<div class="muted" style="padding:10px">Loading…</div>`;
-        try {
-            const res = await OL.search(query, 1, 60);
-            const items = (res.docs || []).map(OL.normalize);
-            host.innerHTML = `
-        <div class="card">
-          <div class="card-head"><h3 style="margin:0">Results</h3></div>
-          <div class="list">
-            ${items.map(b => `
-              <div class="tile" data-book='${encodeURIComponent(JSON.stringify(b))}' style="grid-template-columns:92px 1fr auto">
-                <img class="cover" src="${esc(b.cover || "")}" alt="" onerror="this.src='';this.style.background='#eee'" draggable="false"/>
-                <div>
-                  <div class="t">${esc(b.title)}</div>
-                  <div class="a">${esc(b.author)} ${b.year ? "· " + esc(b.year) : ""}</div>
-                  ${(b.subjects || []).slice(0, 6).map(g => `<span class="chip muted-small">${esc(cap(g))}</span>`).join(" ")}
-                </div>
-                <div class="row" style="justify-content:flex-end">
-                  ${markInLib(b, LIB_CACHE) ? `<span class="muted-small">Already in ✓</span>`
-                    : `<button class="btn btn-secondary small" data-add='${encodeURIComponent(JSON.stringify(b))}'>+ Add</button>`}
-                </div>
-              </div>
-            `).join("")}
-          </div>
-        </div>`;
-            host.onclick = async (e) => {
-                const add = e.target.closest("[data-add]");
-                if (add) {
-                    add.disabled = true;
-                    try {
-                        const book = JSON.parse(decodeURIComponent(add.getAttribute("data-add")));
-                        await addToLibrary(book);
-                        add.parentElement.innerHTML = `<span class="muted-small">Already in ✓</span>`;
-                        toast("Added to your library ✓");
-                    } catch { add.disabled = false; alert("Could not add this book."); }
-                    return;
-                }
-                const tile = e.target.closest(".tile");
-                if (tile && !e.target.closest(".chip")) {
-                    try { openBookSheet(JSON.parse(decodeURIComponent(tile.getAttribute("data-book")))); } catch { }
-                }
-            };
-            host.scrollIntoView({ behavior: "smooth", block: "start" });
-        } catch (e) {
-            console.warn(e);
-            host.innerHTML = `<div class="muted" style="padding:10px">Could not load.</div>`;
+        // For all other rails, use the central definition
+        const railDef = window.PB_RAILS?.[railId];
+        if (railDef) {
+            showSeeAllPage(railDef.query, railDef.title);
+        } else {
+            console.warn(`No "See All" definition for rail: ${railId}`);
         }
     }
 
-    /* ----------------- Home rails boot ----------------- */
-    async function buildHomeRails() {
-        try { LIB_CACHE = await myLibraryMap(); } catch { LIB_CACHE = { work: new Set(), title: new Set(), subjects: [] }; }
+    // =================================================================================
+    // INITIALIZATION & BOOTSTRAPPING
+    // =================================================================================
+    async function buildHomeRails(user) {
+        const host = railsHost();
+        if (!host) {
+            console.error("Discover page: Could not find #railsHost container.");
+            return;
+        }
 
-        await buildBecauseYouRead(LIB_CACHE);
-        await buildNewThisWeek(LIB_CACHE);
-        await buildBookTok(LIB_CACHE);
+        while (host.firstChild) { host.removeChild(host.firstChild); }
+        const loadingEl = document.createElement('div');
+        loadingEl.className = 'card muted';
+        loadingEl.style.padding = '16px';
+        loadingEl.textContent = 'Loading collections...';
+        host.appendChild(loadingEl);
 
-        const defs = [
-            { id: "romance", title: "Romance Reads", query: `subject:romance`, tags: ["HEA", "Spice varies"] },
-            { id: "modern", title: "Modern Classics (1980–now)", query: `first_publish_year:[1980 TO ${nowYear}]`, tags: ["Popular", "Iconic"] },
-            { id: "banned", title: "Banned & Forbidden Books", query: `subject:"banned books" OR subject:censorship OR "challenged books"`, tags: ["Controversial"] },
-            { id: "ya", title: "Young Adult Favorites", query: `subject:"young adult fiction"`, tags: ["YA"] },
-            { id: "newadult", title: "New Adult Romance", query: `subject:"new adult" OR subject:"new adult fiction"`, tags: ["Romance"] },
-            { id: "darkacad", title: "Dark Academia", query: `"dark academia" OR subject:"dark academia"`, tags: ["Aesthetic"] },
-            { id: "cozyaut", title: "Cozy Autumn Reads", query: `subject:"cozy mystery" OR subject:autumn`, tags: ["Cozy"] },
-            { id: "beach", title: "Beach & Summer Vibes", query: `"beach read" OR subject:summer`, tags: ["Light"] },
-            { id: "twisty", title: "Twisty Mysteries & Thrillers", query: `subject:mystery OR subject:thriller`, tags: ["Plot twists"] },
-            { id: "norsk", title: "Norwegian picks", query: `language:nor OR subject:norway`, tags: ["NO"] },
-            { id: "movies", title: "Books → Movies/Series", query: `subject:"film adaptations" OR subject:"motion pictures" OR subject:"television adaptations"`, tags: ["Adapted"] },
-            { id: "holiday", title: "Holiday Romance", query: `subject:christmas AND subject:romance`, tags: ["Seasonal"] },
-            {
-                id: "short", title: "Books under 300 pages", query: `number_of_pages_median:[1 TO 300]`, tags: ["Short"],
-                filter: (d) => (d.number_of_pages_median || 999) <= 300
-            },
-            { id: "debut", title: "Debut Authors to Watch", query: `subject:debut`, tags: ["Debut"] },
+        LIB_CACHE = await myLibraryMap(user);
 
-            // --- NYE RAILS ---
-            {
-                id: "darkrom",
-                title: "Dark Romance",
-                query: `"dark romance" OR subject:"dark romance" OR subject:"adult romance" OR subject:romantasy OR subject:romance`,
-                tags: ["18+", "Angst"],
-                filter: (d) => !((d.subject || []).some(s => /young adult/i.test(String(s))))
-            },
-            {
-                id: "smut",
-                title: "Smut / Erotica",
-                query: `subject:erotica OR "spicy romance" OR subject:"adult romance" OR subject:"erotic fiction"`,
-                tags: ["18+"],
-                filter: (d) => !((d.subject || []).some(s => /young adult/i.test(String(s))))
-            },
-            {
-                id: "splatter",
-                title: "Splatterpunk & Extreme Horror",
-                query: `"splatterpunk" OR subject:"splatterpunk" OR subject:"extreme horror" OR subject:gore OR subject:"body horror" OR subject:horror`,
-                tags: ["Graphic"]
-            },
-            {
-                id: "xmas",
-                title: "Christmas Books",
-                query: `subject:christmas OR subject:"christmas stories" OR subject:"holiday fiction" OR "christmas romance"`,
-                tags: ["Seasonal"]
-            },
-            {
-                id: "forb",
-                title: "Forbidden / Challenged",
-                query: `subject:"banned books" OR subject:censorship OR "challenged books"`,
-                tags: ["Controversial"]
-            },
-            {
-                id: "found",
-                title: "Found Family",
-                query: `"found family" OR subject:"friendship" OR subject:"families"`,
-                tags: ["Wholesome"]
-            },
-            {
-                id: "enemies",
-                title: "Enemies to Lovers",
-                query: `"enemies to lovers" OR subject:rivals OR (subject:romance AND "enemies")`,
-                tags: ["Trope"]
-            },
-        ];
+        if (host.contains(loadingEl)) { host.removeChild(loadingEl); }
 
-        for (const d of defs) {
-            await buildCuratedRail(d.id, d.title, d.query, LIB_CACHE, { filter: d.filter, tags: d.tags });
-            await sleep(60);
+        // --- Curated collections (for all users) from the central definition file ---
+        const railsToShowOnHome = ['new_releases', 'booktok', 'epic_fantasy', 'psych_thrillers', 'romance_reads'];
+
+        for (const railId of railsToShowOnHome) {
+            const railDef = window.PB_RAILS?.[railId];
+            if (railDef) {
+                try {
+                    await buildCuratedRail(railId, railDef.title, railDef.query, LIB_CACHE, { tags: railDef.tags });
+                } catch (e) {
+                    console.warn(`Failed to build curated rail for "${railId}"`, e);
+                }
+            }
+            await sleep(100); // Be nice to APIs
+        }
+
+        // --- Personalized collections (for logged-in users) ---
+        if (user) {
+            try { await buildBecauseYouRead(LIB_CACHE); } catch (e) { console.warn("Failed to build 'Because You Read'", e); }
+            try { await buildNewFromFaveAuthors(LIB_CACHE); } catch (e) { console.warn("Failed to build 'Fave Authors'", e); }
+            try { await buildTrendingAmongFriends(LIB_CACHE, user); } catch (e) { console.warn("Failed to build 'Trending Friends'", e); }
         }
     }
 
-    /* ----------------- BOOT ----------------- */
     function bootDiscover() {
-        // Fjern gamle sidebaren helt, og bruk drawer i stedet
-        document.querySelector(".disc-side")?.remove();
-        document.querySelector(".disc-shell")?.classList.add("disc-shell--drawer");
+        console.log("PageBud Discover: Initializing...");
+        try {
+            wireUI();
+        } catch (e) {
+            console.error("Failed to initialize UI buttons:", e);
+        }
 
-        ensureActionbarButton();
-        wireUI();
-        buildHomeRails();
+        // Wait for Firebase auth to be ready before loading any data.
+        if (window.onAuthReady) {
+            window.onAuthReady.then(user => {
+                buildHomeRails(user).catch(e => console.error("Failed to build home rails:", e));
+            });
+        } else {
+            console.error("Firebase onAuthReady promise not found. Cannot load collections.");
+            const host = railsHost();
+            if (host) host.innerHTML = '<div class="card muted" style="padding:16px; color: red;">Error: Firebase not initialized correctly.</div>';
+        }
     }
 
     if (document.readyState === "loading") {

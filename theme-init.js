@@ -1,183 +1,199 @@
-/* theme-init.js
-   Apply app theme early and keep it in sync across tabs and system changes.
-   Adds palette-based CSS variable overrides so theme switching actually changes colors.
-*/
+// theme-init.js
 (function () {
-    "use strict";
+    'use strict';
 
-    // ---- Palette map (id -> CSS variable overrides) ----
-    // Only color tokens; layout tokens untouched.
-    const PALETTES = {
-        "default": {
-            "--background": "#f6f7fb",
-            "--text": "#1c1c1c",
-            "--muted": "#5b616a",
-            "--card": "#ffffff",
-            "--surface": "#f2f4f7",
-            "--border": "#e6e8ee",
-            "--primary": "#2f4156",
-            "--btn-bg": "#2f4156",
-            "--btn-text": "#ffffff"
-        },
-        "light": {  // generic light
-            "--background": "#f6f7fb",
-            "--text": "#111827",
-            "--muted": "#6b7280",
-            "--card": "#ffffff",
-            "--surface": "#eef2f7",
-            "--border": "#e5e7eb",
-            "--primary": "#2f4156",
-            "--btn-bg": "#2f4156",
-            "--btn-text": "#ffffff"
-        },
-        "dark": {   // generic dark
-            "--background": "#0b1220",
-            "--text": "#f8fafc",
-            "--muted": "#9aa6b2",
-            "--card": "#111827",
-            "--surface": "#1f2937",
-            "--border": "#263244",
-            "--primary": "#38bdf8",
-            "--btn-bg": "#38bdf8",
-            "--btn-text": "#0b1220"
-        },
+    // This script should be placed in the <head> of your HTML files to avoid a flash of unstyled content.
 
-        // ---- Your named themes from settings.js ----
-        "porcelain": {             // Soft Neutrals (light)
-            "--background": "#f7f7fb",
-            "--text": "#1f2937",
-            "--muted": "#6b7280",
-            "--card": "#ffffff",
-            "--surface": "#eceff6",
-            "--border": "#cbd5e1",
-            "--primary": "#475569",
-            "--btn-bg": "#475569",
-            "--btn-text": "#ffffff"
+    const THEMES = {
+        'default': {
+            '--background': '#f6f7fb',
+            '--text': '#1c1c1c',
+            '--muted': '#5b616a',
+            '--card': '#fff',
+            '--surface': '#f2f4f7',
+            '--border': '#e6e8ee',
+            '--hover': '#eef1f6',
+            '--primary': '#2f4156',
+            '--btn-text': '#fff',
+            // B&W toggle overrides
+            '--toggle-bg': '#ffffff',
+            '--toggle-text': '#1c1c1c',
+            '--toggle-bg-active': '#1c1c1c',
+            '--toggle-text-active': '#ffffff',
         },
-        "moss": {                  // Moss Forest (dark-ish)
-            "--background": "#0f172a",
-            "--text": "#e5e7eb",
-            "--muted": "#94a3b8",
-            "--card": "#111827",
-            "--surface": "#1e293b",
-            "--border": "#223046",
-            "--primary": "#34d399",
-            "--btn-bg": "#34d399",
-            "--btn-text": "#0b1220"
+        'light': {
+            '--background': '#f6f7fb',
+            '--text': '#1c1c1c',
+            '--muted': '#5b616a',
+            '--card': '#fff',
+            '--surface': '#f2f4f7',
+            '--border': '#e5e7eb',
+            '--hover': '#eef1f6',
+            '--primary': '#2f4156',
+            '--btn-text': '#fff',
+            // B&W toggle overrides
+            '--toggle-bg': '#ffffff',
+            '--toggle-text': '#1c1c1c',
+            '--toggle-bg-active': '#1c1c1c',
+            '--toggle-text-active': '#ffffff',
         },
-        "navy": {                  // Navy & Teal (dark)
-            "--background": "#0b1220",
-            "--text": "#f8fafc",
-            "--muted": "#9aa6b2",
-            "--card": "#111827",
-            "--surface": "#1f2937",
-            "--border": "#243041",
-            "--primary": "#0f766e",
-            "--btn-bg": "#0f766e",
-            "--btn-text": "#ffffff"
+        'dark': {
+            '--background': '#0b1220',
+            '--text': '#e5e7eb',
+            '--muted': '#9ca3af',
+            '--card': '#111827',
+            '--surface': '#1f2937',
+            '--border': '#263244',
+            '--hover': '#374151',
+            '--primary': '#38bdf8',
+            '--btn-text': '#0b1220',
+            // B&W toggle overrides
+            '--toggle-bg': '#111827',
+            '--toggle-text': '#e5e7eb',
+            '--toggle-bg-active': '#ffffff',
+            '--toggle-text-active': '#111827',
         },
-        "blush": {                 // Soft Blush (light)
-            "--background": "#fff7f9",
-            "--text": "#1f2937",
-            "--muted": "#6b7280",
-            "--card": "#ffffff",
-            "--surface": "#ffdce7",
-            "--border": "#f3cfe0",
-            "--primary": "#f472b6",
-            "--btn-bg": "#f472b6",
-            "--btn-text": "#ffffff"
+        'porcelain': {
+            '--background': '#f7f7fb',
+            '--text': '#1c1c1c',
+            '--muted': '#5b616a',
+            '--card': '#fff',
+            '--surface': '#eef1f6',
+            '--border': '#cbd5e1',
+            '--hover': '#e6e8ee',
+            '--primary': '#475569',
+            '--btn-text': '#fff'
         },
-        "sunset": {                // Sunset Pastel (dark bg + warm accent)
-            "--background": "#0f0f12",
-            "--text": "#f8fafc",
-            "--muted": "#cbd5e1",
-            "--card": "#111113",
-            "--surface": "#1b1b1f",
-            "--border": "#26262d",
-            "--primary": "#fb7185",
-            "--btn-bg": "#fb7185",
-            "--btn-text": "#0b1220"
+        'moss': {
+            '--background': '#0f172a',
+            '--text': '#e5e7eb',
+            '--muted': '#9ca3af',
+            '--card': '#111827',
+            '--surface': '#1e293b',
+            '--border': '#223046',
+            '--hover': '#334155',
+            '--primary': '#34d399',
+            '--btn-text': '#0f172a'
         },
-        "espresso-peony": {        // Espresso & Peony (light, warm)
-            "--background": "#f5e1e9",
-            "--text": "#14110f",
-            "--muted": "#6b5f5a",
-            "--card": "#ffffff",
-            "--surface": "#f1d8e2",
-            "--border": "#e5c9d5",
-            "--primary": "#854d0e",
-            "--btn-bg": "#854d0e",
-            "--btn-text": "#ffffff"
+        'navy': {
+            '--background': '#0b1220',
+            '--text': '#e5e7eb',
+            '--muted': '#9ca3af',
+            '--card': '#111827',
+            '--surface': '#1e293b',
+            '--border': '#243041',
+            '--hover': '#334155',
+            '--primary': '#0f766e',
+            '--btn-text': '#fff'
         },
-        "glow": {                  // Navy & Gold (dark bg + gold)
-            "--background": "#0b1220",
-            "--text": "#f8fafc",
-            "--muted": "#9aa6b2",
-            "--card": "#0f172a",
-            "--surface": "#111827",
-            "--border": "#223046",
-            "--primary": "#f59e0b",
-            "--btn-bg": "#f59e0b",
-            "--btn-text": "#0b1220"
+        'blush': {
+            '--background': '#fff7f9',
+            '--text': '#442c35',
+            '--muted': '#8c6b76',
+            '--card': '#fff',
+            '--surface': '#fdeff4',
+            '--border': '#f3cfe0',
+            '--hover': '#fce8f0',
+            '--primary': '#f472b6',
+            '--btn-text': '#fff'
         },
-        "bakery": {                // Bakery Pastels (light + playful)
-            "--background": "#fffdfa",
-            "--text": "#1f2937",
-            "--muted": "#6b7280",
-            "--card": "#ffffff",
-            "--surface": "#f6eef2",
-            "--border": "#f0dce3",
-            "--primary": "#bde0fe",
-            "--btn-bg": "#bde0fe",
-            "--btn-text": "#0b1220"
+        'sunset': {
+            '--background': '#0f0f12',
+            '--text': '#e5e7eb',
+            '--muted': '#9ca3af',
+            '--card': '#111113',
+            '--surface': '#1c1c1f',
+            '--border': '#26262d',
+            '--hover': '#2a2a2e',
+            '--primary': '#fb7185',
+            '--btn-text': '#0f0f12'
+        },
+        'pastel-dream': {
+            '--background': '#e0f7fa',
+            '--text': '#263238',
+            '--muted': '#546e7a',
+            '--card': '#ffffff',
+            '--surface': '#cfedf2',
+            '--border': '#b2ebf2',
+            '--hover': '#b2ebf2',
+            '--primary': '#ff8a80',
+            '--btn-text': '#fff'
+        },
+        'espresso-peony': {
+            '--background': '#f5e1e9',
+            '--text': '#4d2d07',
+            '--muted': '#7c5b3d',
+            '--card': '#fff',
+            '--surface': '#f8eef2',
+            '--border': '#e5c9d5',
+            '--hover': '#f0e2e8',
+            '--primary': '#854d0e',
+            '--btn-text': '#fff'
+        },
+        'glow': {
+            '--background': '#0b1220',
+            '--text': '#e5e7eb',
+            '--muted': '#9ca3af',
+            '--card': '#0f172a',
+            '--surface': '#1e293b',
+            '--border': '#223046',
+            '--hover': '#334155',
+            '--primary': '#f59e0b',
+            '--btn-text': '#0b1220'
+        },
+        'bakery': {
+            '--background': '#fffdfa',
+            '--text': '#4a4a4a',
+            '--muted': '#7a7a7a',
+            '--card': '#fff',
+            '--surface': '#fef6f2',
+            '--border': '#f0dce3',
+            '--hover': '#faede7',
+            '--primary': '#bde0fe',
+            '--btn-text': '#2f4156'
         }
     };
 
-    function setVars(vars) {
-        const r = document.documentElement;
-        for (const [k, v] of Object.entries(vars || {})) {
-            r.style.setProperty(k, v);
+    function applyTheme(themeId) {
+        const root = document.documentElement;
+        const theme = THEMES[themeId] || THEMES['default'];
+
+        Object.keys(theme).forEach(key => {
+            root.style.setProperty(key, theme[key]);
+        });
+
+        root.setAttribute('data-theme', themeId);
+    }
+
+    function setInitialTheme() {
+        try {
+            const storedTheme = localStorage.getItem('pb:theme');
+
+            if (storedTheme === 'system') {
+                const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                applyTheme(systemPrefersDark ? 'dark' : 'default');
+            } else if (storedTheme && THEMES[storedTheme]) {
+                applyTheme(storedTheme);
+            } else {
+                applyTheme('default');
+            }
+        } catch (e) {
+            console.error("Failed to apply theme", e);
+            applyTheme('default');
         }
     }
 
-    function resolvedKey(raw) {
-        if (raw === "system") {
-            return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    // Listen for changes from the settings page
+    window.addEventListener('pb:themeChanged', setInitialTheme);
+
+    // Listen for system theme changes and apply if 'system' is selected
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+        if (localStorage.getItem('pb:theme') === 'system') {
+            setInitialTheme();
         }
-        return raw || "default";
-    }
-
-    function apply() {
-        const raw = localStorage.getItem("pb:theme") || "default";
-        const key = resolvedKey(raw);
-        // data attributes (if you ever want CSS to branch on theme name)
-        document.documentElement.setAttribute("data-theme", key);
-        document.documentElement.setAttribute("data-tone", "pastel");
-
-        // colors via CSS variables
-        const palette = PALETTES[key] || PALETTES["default"];
-        setVars(PALETTES["default"]); // baseline to ensure all tokens exist
-        setVars(palette);
-    }
-
-    // 1) Apply immediately
-    try { apply(); } catch { }
-
-    // 2) React to OS change when using “system”
-    const mq = matchMedia("(prefers-color-scheme: dark)");
-    mq.addEventListener?.("change", function () {
-        if ((localStorage.getItem("pb:theme") || "default") === "system") apply();
     });
 
-    // 3) Cross-tab updates
-    window.addEventListener("storage", function (e) {
-        if (e.key === "pb:theme") apply();
-    });
+    // Apply theme on initial load
+    setInitialTheme();
 
-    // 4) Local custom event (from settings)
-    window.addEventListener("pb:themeChanged", apply);
-
-    // Expose
-    window.pbApplyTheme = apply;
-    window.PBTheme = { apply, resolvedKey };
 })();

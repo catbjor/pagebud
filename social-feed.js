@@ -114,6 +114,24 @@
     return `${userName} updated ${title}`;
   }
 
+  async function addReaction(ownerUid, itemId, emoji) {
+    const me = auth().currentUser;
+    if (!me) return;
+    const itemRef = db().collection("users").doc(ownerUid).collection("activity").doc(itemId);
+    try {
+      // Use dot notation for nested fields in an update
+      const fieldPath = `reactions.${emoji}`;
+      await itemRef.update({
+        [fieldPath]: firebase.firestore.FieldValue.increment(1)
+      });
+    } catch (e) {
+      // If the update fails (e.g., field doesn't exist), set it instead.
+      await itemRef.set({ reactions: { [emoji]: 1 } }, { merge: true });
+    }
+  }
+
+  const randomId = () => Math.random().toString(36).slice(2, 10);
+
   async function itemHTML(it) {
     const me = auth().currentUser;
     const user = await getUserInfo(it.owner);
@@ -121,6 +139,10 @@
     const whenTxt = when ? when.toLocaleString() : "";
     const likeN = Number(it.likeCount || 0);
     const comN = Number(it.commentCount || 0);
+    const reactions = it.reactions || {};
+    const reactionHTML = Object.entries(reactions)
+      .sort((a, b) => b[1] - a[1]) // Sort by count
+      .map(([emoji, count]) => `<span class="react-chip">${emoji} ${count}</span>`).join('');
 
     // Check if the current user has liked this item
     let isLiked = false;
@@ -136,16 +158,22 @@
     const inLibrary = bookTitle ? libraryCache.has(bookTitle) : false;
 
     // Conditionally create the "Add to Library" button
-    let addToLibraryBtn = '';
+    let actionButton = '';
     const isBookActivity = it.action?.startsWith('book_') || it.type?.startsWith('book_');
     if (isBookActivity && !inLibrary && it.owner !== me.uid) {
       const bookData = JSON.stringify({
         title: it.meta?.title || 'Unknown Title',
         author: it.meta?.author || 'Unknown Author',
+        coverUrl: it.meta?.coverUrl || '',
+        workKey: it.meta?.workKey || null,
       });
-      addToLibraryBtn = `<button class="btn btn-secondary btn-add-to-lib" data-book='${esc(bookData)}'><i class="fa-solid fa-plus"></i> Add to Library</button>`;
+      actionButton = `<button class="btn btn-secondary btn-add-to-tbr" data-book='${esc(bookData)}'><i class="fa-solid fa-plus"></i> Add to TBR</button>`;
     }
 
+    const quickReacts = ['❤️', '🎉', '🤯'];
+    const quickReactHTML = quickReacts.map(emoji =>
+      `<button class="btn btn-secondary btn-quick-react" data-emoji="${emoji}">${emoji}</button>`
+    ).join('');
     return `
       <div class="feed-item" data-owner="${it.owner}" data-id="${it.id}"
            style="display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--border)">
@@ -153,10 +181,11 @@
         <div style="flex:1;min-width:0">
           <div style="font-weight:500;margin:2px 0">${lineFor(it, user)}</div>
           <div class="muted" style="font-size:.85rem; margin-top: 4px;"><i class="fa-solid ${iconFor(it.type || it.action)}"></i> ${whenTxt}</div>
+          ${reactionHTML ? `<div class="reacts-display">${reactionHTML}</div>` : ''}
           <div class="row" style="display:flex;gap:8px;align-items:center;margin-top:8px">
-            <button class="btn btn-secondary btn-like ${isLiked ? 'active' : ''}"><i class="fa-solid fa-heart"></i> ${likeN}</button>
+            ${quickReactHTML}
             <button class="btn btn-secondary btn-comment"><i class="fa-solid fa-comment"></i> ${comN}</button>
-            ${addToLibraryBtn}
+            ${actionButton}
           </div>
           <div class="comments-section" style="display:none;margin-top:12px;">
             <div class="comments-list"></div>
@@ -169,18 +198,21 @@
       </div>`;
   }
 
-  async function saveBookToLibrary(bookData) {
+  async function saveBookToTBR(bookData) {
     const user = auth().currentUser;
     if (!user) throw new Error("Not signed in");
     const payload = {
+      id: `feed_${randomId()}`,
       title: bookData.title,
       author: bookData.author,
-      status: 'tbr', // Default to TBR
+      coverUrl: bookData.coverUrl || '',
+      workKey: bookData.workKey || null,
+      status: 'tbr',
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     };
     const col = db().collection("users").doc(user.uid).collection("books");
-    await col.add(payload);
+    await col.doc(payload.id).set(payload);
   }
 
   async function loadAndRenderComments(rootEl) {
@@ -224,15 +256,6 @@
       const root = e.target.closest(".feed-item"); if (!root) return;
       const owner = root.dataset.owner, id = root.dataset.id;
 
-      if (e.target.closest(".btn-like")) {
-        const btn = e.target.closest(".btn-like");
-        try {
-          const liked = await window.PBActivity?.like(owner, id);
-          const n = Number((btn.textContent || "0").replace(/\D/g, "")) || 0;
-          btn.innerHTML = `<i class="fa-solid fa-heart"></i> ${liked ? n + 1 : Math.max(0, n - 1)}`;
-          btn.classList.toggle('active', liked);
-        } catch { /* noop */ }
-      }
       if (e.target.closest(".btn-comment")) {
         const commentsSection = root.querySelector(".comments-section");
         if (commentsSection) {
@@ -256,12 +279,12 @@
           window.toast?.("Comment posted ✓");
         } catch { /* noop */ }
       }
-      if (e.target.closest(".btn-add-to-lib")) {
-        const btn = e.target.closest(".btn-add-to-lib");
+      if (e.target.closest(".btn-add-to-tbr")) {
+        const btn = e.target.closest(".btn-add-to-tbr");
         const bookData = JSON.parse(btn.dataset.book);
         btn.disabled = true;
         try {
-          await saveBookToLibrary(bookData);
+          await saveBookToTBR(bookData);
           btn.textContent = 'Added ✓';
           libraryCache.add(bookData.title.toLowerCase()); // Update cache
         } catch (err) {
@@ -269,6 +292,11 @@
           alert("Could not add book.");
           btn.disabled = false;
         }
+      }
+      if (e.target.closest(".btn-quick-react")) {
+        const btn = e.target.closest(".btn-quick-react");
+        await addReaction(owner, id, btn.dataset.emoji);
+        btn.style.borderColor = 'var(--primary)'; // Visual feedback
       }
     });
   }

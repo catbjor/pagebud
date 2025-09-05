@@ -16,95 +16,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script src="firebase-config.js"></script>
   <script src="firebase-init.js"></script>
-
-  <style>
-    /* lite, diskret layout – rører ikke farger/typografi */
-    .friends-wrap {
-      display: grid;
-      gap: 12px;
-      padding: 12px
-    }
-
-    .search-row {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 8px
-    }
-
-    .section {
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      background: var(--card);
-      padding: 12px
-    }
-
-    .section h2 {
-      font-size: 16px;
-      margin: 0 0 8px 0
-    }
-
-    .friend-row {
-      padding: 8px 0
-    }
-
-    .friend-row+.friend-row {
-      border-top: 1px solid var(--border)
-    }
-
-    .friend-left {
-      display: flex;
-      align-items: center;
-      gap: 10px
-    }
-
-    .friend-text-wrap {
-      display: grid;
-      line-height: 1.1
-    }
-
-    .friend-name {
-      font-weight: 700
-    }
-
-    .friend-sub {
-      font-size: 12px;
-      opacity: .75
-    }
-
-    .modal-backdrop {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, .15);
-      display: none;
-      z-index: 2000
-    }
-
-    .modal-sheet {
-      position: fixed;
-      left: 50%;
-      bottom: 16px;
-      transform: translateX(-50%);
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      min-width: 260px;
-      max-width: min(92vw, 420px);
-      padding: 12px;
-      z-index: 2001;
-      display: none
-    }
-
-    .modal-sheet h3 {
-      margin: 0 0 8px 0;
-      font-size: 16px
-    }
-
-    .modal-actions {
-      display: flex;
-      gap: 8px;
-      justify-content: flex-end
-    }
-  </style>
 </head>
 
 <body>
@@ -118,48 +29,50 @@
       </div>
     </header>
 
-    <div class="content-wrapper">
-      <div class="friends-wrap">
-        <!-- Search -->
-        <div class="section">
-          <div class="search-row">
-            <input id="friendSearch" type="search" placeholder="Search by @username, email or name…" />
-            <button id="btnFriendSearch" class="btn">Search</button>
-          </div>
-          <div id="searchResults" style="margin-top:10px"></div>
+    <main class="container">
+      <!-- Search -->
+      <section class="card">
+        <div class="search-row">
+          <input id="friendSearch" type="search" placeholder="Search by @username, email or name…" />
+          <button id="btnFriendSearch" class="btn">Search</button>
         </div>
+        <div id="searchResults" class="results-list"></div>
+      </section>
 
-        <!-- Requests -->
-        <div class="section">
+      <!-- Requests -->
+      <section class="card">
+        <div class="card-head">
           <h2>Requests</h2>
-          <div style="display:grid;gap:10px">
-            <div>
-              <div class="muted" style="font-weight:700;margin-bottom:6px">Incoming</div>
-              <div id="incomingList"></div>
-            </div>
-            <div>
-              <div class="muted" style="font-weight:700;margin-bottom:6px">Sent</div>
-              <div id="outgoingList"></div>
-            </div>
+        </div>
+        <div class="requests-grid">
+          <div class="request-col">
+            <h3 class="request-title">Incoming</h3>
+            <div id="incomingList" class="results-list"></div>
+          </div>
+          <div class="request-col">
+            <h3 class="request-title">Sent</h3>
+            <div id="outgoingList" class="results-list"></div>
           </div>
         </div>
+      </section>
 
-        <!-- Friends -->
-        <div class="section">
-          <h2>Your friends</h2>
-          <div id="friendsList"></div>
+      <!-- Friends -->
+      <section class="card">
+        <div class="card-head">
+          <h2>Your Friends</h2>
         </div>
-      </div>
-    </div>
+        <div id="friendsList" class="results-list"></div>
+      </section>
+    </main>
   </div>
 
-  <!-- Modal (valg på venn) -->
+  <!-- Modal (for clicking on a friend) -->
   <div id="friendModalBackdrop" class="modal-backdrop"></div>
   <div id="friendModal" class="modal-sheet">
     <h3 id="friendModalTitle">Friend</h3>
     <div class="modal-actions">
-      <button id="friendModalProfile" class="btn btn-secondary">View profile</button>
-      <button id="friendModalChat" class="btn">Send message</button>
+      <button id="friendModalProfile" class="btn btn-secondary">View Profile</button>
+      <button id="friendModalChat" class="btn">Send Message</button>
     </div>
   </div>
 

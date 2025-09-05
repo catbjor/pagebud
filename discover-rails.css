@@ -1,113 +1,80 @@
 /* discover-rails.css — rails, skeletons, chips, drawer, preview, responsive */
 
-/* Hold siden i ro, rails scroller lokalt */
+/* --- Base Layout & Behavior --- */
 html,
 body {
     overflow-x: hidden;
+    max-width: 100%;
+    touch-action: pan-y;
 }
 
-/* --- Skjul legacy sidepanel + tving 1-kol layout når vi bruker drawer --- */
+/* Force single-column layout for the drawer-based UI */
 .disc-shell.disc-shell--drawer {
-    grid-template-columns: 1fr !important;
+    display: block;
 }
 
 .disc-shell.disc-shell--drawer .disc-side {
     display: none !important;
 }
 
-/* --- Horisontale rails --- */
-.rail-list {
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: clamp(140px, 44vw, 186px);
-    gap: 10px;
-    overflow-x: auto;
-    padding-bottom: 6px;
-    scroll-snap-type: x mandatory;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior-inline: contain;
+.disc-shell--drawer .disc-main,
+#railsHost {
+    max-width: var(--content-max);
+    margin: 0 auto;
+    padding: 0 var(--page-pad);
 }
 
-.rail-list>.tile {
-    scroll-snap-align: start;
-}
-
-/* Seksjonsboks */
 section.card[data-rail] {
     overflow: hidden;
 }
 
-/* --- Seksjonsheader --- */
-.rail-head {
+/* --- Action Bar (for "Genres" button) --- */
+.card.disc-actionbar {
+    padding: 8px 12px;
+    margin: 10px 0;
     display: flex;
-    align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
     gap: 8px;
-    margin-bottom: 8px;
 }
 
-.rail-actions {
+/* --- Horizontal Rails --- */
+.rail-list {
     display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-wrap: wrap;
+    gap: 12px;
+    padding: 10px 6px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    cursor: grab;
+    scrollbar-gutter: stable;
 }
 
-.seg {
-    display: inline-flex;
-    border: 1px solid var(--border);
+.rail-list.dragging {
+    cursor: grabbing;
+}
+
+/* Prevent image dragging and text selection during scroll */
+.rail-list.dragging,
+.rail-list.dragging .tile {
+    user-select: none;
+}
+
+.rail-list .tile img {
+    -webkit-user-drag: none;
+    user-select: none;
+}
+
+/* Smal scrollbar kun på rails */
+.rail-list::-webkit-scrollbar {
+    height: 8px;
+}
+
+.rail-list::-webkit-scrollbar-thumb {
+    background: var(--border);
     border-radius: 999px;
-    overflow: hidden;
 }
 
-.seg .seg-btn {
-    border: 0;
-    padding: 4px 10px;
-    background: transparent;
-    cursor: pointer;
-    font-size: .85rem;
-}
-
-.seg .seg-btn.active {
-    background: var(--surface);
-    font-weight: 700;
-}
-
-/* --- Chips --- */
-.chips {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-wrap: wrap;
-}
-
-.chip {
-    font-size: .75rem;
-    color: var(--muted);
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    padding: 2px 8px;
-    white-space: nowrap;
-}
-
-.chip.active {
-    background: var(--surface);
-    font-weight: 700;
-}
-
-/* --- Tile som kort --- */
-.tile.card {
-    display: grid;
-    grid-template-rows: auto 1fr;
-    gap: 8px;
-    padding: 10px;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    background: var(--card);
-    overflow: hidden;
-    min-height: 240px;
-}
-
+/* --- Book Tile in Rail --- */
 .tile .cover {
     width: 100%;
     height: 160px;
@@ -155,44 +122,50 @@ section.card[data-rail] {
     white-space: nowrap;
 }
 
-/* --- Skeleton --- */
-.skel {
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 10px;
-    background: var(--card);
+/* --- Skeleton Loaders --- */
+.tile.is-skel {
+    pointer-events: none;
+    user-select: none;
 }
 
-.skel .ph {
-    background: linear-gradient(90deg, #eaeaea 0%, #f4f4f4 50%, #eaeaea 100%);
+/* The base for all shimmering placeholder elements */
+.tile.is-skel .cover,
+.tile.is-skel .skel-line {
+    background-color: var(--surface);
+    background-image: linear-gradient(100deg,
+            var(--surface) 0%,
+            var(--hover) 50%,
+            var(--surface) 100%);
     background-size: 200% 100%;
-    animation: skel 1.2s ease-in-out infinite;
-    border-radius: 8px;
+    animation: skel-shine 1.5s linear infinite;
 }
 
-.skel .ph.cover {
+/* Specific shapes for each part of the skeleton card */
+.tile.is-skel .cover {
     height: 160px;
+    /* Matches the real cover height */
+    border-radius: 8px;
+    margin-bottom: 8px;
 }
 
-.skel .ph.t {
+.tile.is-skel .skel-line {
+    border-radius: 6px;
+    margin-top: 6px;
+}
+
+.tile.is-skel .skel-line--title {
     height: 14px;
-    margin-top: 10px;
     width: 90%;
 }
 
-.skel .ph.a {
+.tile.is-skel .skel-line--author {
     height: 12px;
-    margin-top: 6px;
     width: 60%;
 }
 
-@keyframes skel {
-    0% {
-        background-position: 0% 0
-    }
-
-    100% {
-        background-position: -200% 0
+@keyframes skel-shine {
+    to {
+        background-position: -200% 0;
     }
 }
 
@@ -226,192 +199,6 @@ section.card[data-rail] {
     100% {
         content: "⋯"
     }
-}
-
-/* --- Drawer --- */
-.drawer-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, .35);
-    display: none;
-    z-index: 9999;
-}
-
-.drawer-backdrop.show {
-    display: block;
-}
-
-.drawer-panel {
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: min(86vw, 320px);
-    background: var(--card);
-    border-right: 1px solid var(--border);
-    transform: translateX(-100%);
-    transition: transform .24s ease-out;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, .18);
-    padding: 12px;
-}
-
-.drawer-backdrop.show .drawer-panel {
-    transform: translateX(0);
-}
-
-.drawer-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    margin-bottom: 8px;
-}
-
-.drawer-search {
-    display: flex;
-    gap: 6px;
-    margin-bottom: 8px;
-}
-
-.drawer-list {
-    max-height: calc(100% - 92px);
-    overflow: auto;
-}
-
-.drawer-list .side-link {
-    padding: 8px 10px;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    margin-bottom: 8px;
-    cursor: pointer;
-}
-
-.drawer-list .side-link:hover {
-    background: var(--surface);
-}
-
-/* --- Preview popover --- */
-.preview-pop {
-    position: absolute;
-    z-index: 99999;
-    max-width: min(360px, 90vw);
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 10px;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, .25);
-    display: none;
-}
-
-.preview-pop.show {
-    display: block;
-}
-
-.preview-pop .ttl {
-    font-weight: 900;
-}
-
-.preview-pop .muted {
-    color: var(--muted);
-    font-size: .9rem;
-}
-
-/* Smal scrollbar kun på rails */
-.rail-list::-webkit-scrollbar {
-    height: 8px;
-}
-
-.rail-list::-webkit-scrollbar-thumb {
-    background: var(--border);
-    border-radius: 999px;
-}
-
-/* --- Keep page fixed, rails scroll independently --- */
-html,
-body {
-    overflow-x: hidden;
-    max-width: 100%;
-    touch-action: pan-y;
-}
-
-.app-container,
-.disc-main,
-.card {
-    overflow-x: clip;
-}
-
-/* Seksjonsboks “eier” scrollen og hindrer lekkasje */
-section.card[data-rail] {
-    overflow: hidden;
-}
-
-/* Railene: ekte horisontal scroll, smooth på touch */
-.rail-list {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    touch-action: pan-x;
-    /* horisontale sveip går til railen */
-    scroll-snap-type: x mandatory;
-    /* snap til tile-kort */
-    scrollbar-gutter: stable;
-}
-
-/* Litt defensivt for å forhindre at noe presser bredden */
-.rail-list .tile,
-.rail-list img,
-.rail-list .cover {
-    max-width: 100%;
-}
-
-/* Actionbar under søk (for Genres-knappen) */
-.disc-actionbar {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    margin: 8px 0 12px;
-}
-
-.disc-actionbar {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    margin: 8px 0 12px;
-}
-
-.rail-list {
-    cursor: grab;
-}
-
-.rail-list.dragging {
-    cursor: grabbing;
-}
-
-/* Rail skal se “drabar” ut på desktop */
-.rail-list {
-    cursor: grab;
-}
-
-.rail-list.dragging {
-    cursor: grabbing;
-}
-
-/* Seksjonsboks eier scrollen; ikke la hele siden lekke bredde */
-html,
-body {
-    overflow-x: hidden;
-    max-width: 100%;
-    touch-action: pan-y;
-}
-
-section.card[data-rail] {
-    overflow: hidden;
-}
-
-.rail-list {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    touch-action: pan-x;
-    scroll-snap-type: x mandatory;
 }
 
 /* ----- Drawer (genres) ----- */
@@ -449,109 +236,6 @@ section.card[data-rail] {
     justify-content: space-between;
     align-items: center;
     gap: 8px;
-}
-
-/* ----- Fjern sidebar-kolonnen helt i “drawer”-modus ----- */
-.disc-shell--drawer {
-    display: block;
-}
-
-/* dropp grid */
-.disc-shell--drawer .disc-side {
-    display: none !important;
-}
-
-.disc-shell--drawer .disc-main {
-    max-width: var(--content-max);
-    margin: 0 auto;
-    padding: 0 var(--page-pad);
-}
-
-/* Host for rails – sentrer og gi samme side-”kanter” som ellers */
-#railsHost {
-    max-width: var(--content-max);
-    margin: 0 auto;
-    padding: 0 var(--page-pad);
-}
-
-/* Hver seksjon er allerede .card – sørg for at rails ikke “lekker” ut */
-section.card[data-rail] {
-    overflow: hidden;
-}
-
-/* ----- Rail scroll (horisontal, men isolert per seksjon) ----- */
-.rail-list {
-    display: flex;
-    gap: 12px;
-    padding: 10px 6px;
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    -webkit-overflow-scrolling: touch;
-    cursor: grab;
-}
-
-.rail-list.dragging {
-    cursor: grabbing;
-}
-
-/* Actionbar under søk (der Genres-knappen ligger) */
-.card.disc-actionbar {
-    padding: 8px 12px;
-    margin: 10px 0;
-    display: flex;
-    justify-content: flex-end;
-}
-
-/* Ikke la hele siden side-scrolle pga gamle grid-spor */
-html,
-body {
-    overflow-x: hidden;
-}
-
-.disc-shell--drawer {
-    display: block;
-}
-
-.disc-shell--drawer .disc-side {
-    display: none !important;
-}
-
-.disc-shell--drawer .disc-main {
-    max-width: var(--content-max);
-    margin: 0 auto;
-    padding: 0 var(--page-pad);
-}
-
-#railsHost {
-    max-width: var(--content-max);
-    margin: 0 auto;
-    padding: 0 var(--page-pad);
-}
-
-.rail-list {
-    display: flex;
-    gap: 12px;
-    padding: 10px 6px;
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    -webkit-overflow-scrolling: touch;
-    cursor: grab;
-}
-
-.rail-list.dragging {
-    cursor: grabbing;
-}
-
-.card.disc-actionbar {
-    padding: 8px 12px;
-    margin: 10px 0;
-    display: flex;
-    justify-content: flex-end;
-}
-
-html,
-body {
-    overflow-x: hidden;
 }
 
 /* ---- Book detail sheet ---- */
@@ -597,13 +281,82 @@ body {
     }
 }
 
-/* Klikk-vennlig rail: ikke dra bilder, ikke marker */
-.rail-list .tile img {
-    -webkit-user-drag: none;
-    user-select: none;
+/* --- Preview popover (not currently used, but good to have) --- */
+.preview-pop {
+    position: absolute;
+    z-index: 99999;
+    max-width: min(360px, 90vw);
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, .25);
+    display: none;
 }
 
-.rail-list.dragging,
-.rail-list .tile {
-    user-select: none;
+.preview-pop.show {
+    display: block;
+}
+
+.preview-pop .ttl {
+    font-weight: 900;
+}
+
+.preview-pop .muted {
+    color: var(--muted);
+    font-size: .9rem;
+}
+
+/* --- discover-list.js specific styles --- */
+.side-link {
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 8px;
+    cursor: pointer;
+}
+
+.side-link:hover {
+    background: var(--surface);
+}
+
+/* --- Search Results List --- */
+.search-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.search-row input {
+    flex: 1;
+}
+
+.list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.list-tile {
+    display: grid;
+    grid-template-columns: 92px 1fr auto;
+    gap: 12px;
+    align-items: center;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    border-radius: 12px;
+    padding: 8px;
+}
+
+.list-tile .cover {
+    width: 92px;
+    height: 125px;
+    object-fit: cover;
+    border-radius: 8px;
+    background: #eee;
+}
+
+.list-tile .a {
+    color: var(--muted);
+    font-size: .9rem;
 }

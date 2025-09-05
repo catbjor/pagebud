@@ -7,6 +7,8 @@
 }
 
 .profile-card {
+    position: relative;
+    /* For positioning child elements */
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: 16px;
@@ -16,6 +18,14 @@
     align-items: center;
     text-align: center;
     box-shadow: 0 4px 12px rgba(0, 0, 0, .06);
+}
+
+.profile-header-actions {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    display: flex;
+    gap: 8px;
 }
 
 .profile-photo-wrap {
@@ -148,32 +158,42 @@
 /* --- Achievements --- */
 .achievements-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: 16px;
     margin-top: 12px;
 }
 
 .achievement-item {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 12px;
-    padding: 12px;
+    text-align: center;
+    gap: 8px;
+    padding: 16px;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: 16px;
+    transition: transform 0.2s, box-shadow 0.2s;
 }
 
 .achievement-item.locked {
-    opacity: 0.6;
+    opacity: 0.5;
+    background: transparent;
+    border-style: dashed;
 }
 
 .achievement-icon {
-    font-size: 24px;
+    font-size: 2.5rem;
     color: var(--primary);
 }
 
+.achievement-item.locked .achievement-icon {
+    color: var(--muted);
+}
+
 .achievement-title {
-    font-weight: 800;
+    font-weight: 900;
+    font-size: 1rem;
 }
 
 .achievement-desc {
