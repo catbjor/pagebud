@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="en">
 
 <head>
@@ -7,47 +6,55 @@
     <meta charset="utf-8" />
     <meta content="width=device-width, initial-scale=1" name="viewport" />
     <title>Discover – PageBud</title>
-    <!-- Put this inline snippet in the <head> of EVERY page BEFORE style.css -->
 
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet" />
-    <link href="style.css" rel="stylesheet" />
-    <link rel="stylesheet" href="discover-rails.css">
+    <link href="style.css?v=dev-4" rel="stylesheet" />
+    <link href="discover-rails.css?v=dev-4" rel="stylesheet" />
 
     <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
-    <script src="firebase-config.js"></script>
-    <script src="firebase-init.js?v=dev-1"></script>
+    <script src="firebase-config.js?v=dev-4"></script>
+    <script src="firebase-init.js?v=dev-4"></script>
 </head>
 
 <body>
     <div class="app-container">
         <header class="header">
             <h1>Discover</h1>
-            <div class="header-actions"><!-- (tom) --></div>
+            <div class="header-actions"></div>
         </header>
 
         <main>
-            <div class="search-row">
+            <div class="search-row" style="position:relative;z-index:10">
                 <input class="form-control" id="q" placeholder="Search by keyword…" />
-                <button class="btn" id="qBtn" style="width:auto">Search</button>
+                <!-- Inline onclick = siste sikkerhetsnett -->
+                <button class="btn" id="qBtn" style="width:auto"
+                    onclick="window.__pbDoSearch && window.__pbDoSearch()">Search</button>
             </div>
-            <div class="card disc-actionbar">
-                <button class="btn btn-secondary small" id="discMenuBtn">
+
+            <div class="card disc-actionbar" style="position:relative;z-index:10">
+                <!-- Inline onclick = siste sikkerhetsnett -->
+                <button class="btn btn-secondary small" id="discMenuBtn"
+                    onclick="window.__pbEnsureDrawer && window.__pbEnsureDrawer().classList.add('show')">
                     <i class="fa-solid fa-bars"></i> Genres
                 </button>
             </div>
-            <!-- Container for search results -->
-            <div aria-live="polite" class="list" id="results"></div>
-            <!-- Container for collections -->
+
+            <!-- Search results -->
+            <div class="list" id="results" aria-live="polite"></div>
+
+            <!-- Collections -->
             <div id="railsHost"></div>
         </main>
-        <script src="rail-definitions.js" defer></script>
-        <script src="discover.js" defer></script>
-        <script defer="" src="nav.js"></script>
-        <script src="library-enricher.js" defer></script>
+
+        <!-- rail-definitions MÅ lastes før discover -->
+        <script src="rail-definitions.js?v=dev-4" defer></script>
+        <script src="discover.js?v=dev-4" defer></script>
+        <script src="nav.js?v=dev-4" defer></script>
+        <script src="library-enricher.js?v=dev-4" defer></script>
     </div>
 </body>
 

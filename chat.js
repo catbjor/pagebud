@@ -150,8 +150,11 @@
 
         if (!chatSnap.exists) {
             try {
-                await chatRef.set({ // Use an array for participants to simplify security rules
-                    participants: [me.uid, friendUid],
+                await chatRef.set({
+                    participants: {
+                        [me.uid]: true,
+                        [friendUid]: true
+                    },
                     read: {
                         [me.uid]: true,
                         [friendUid]: true,
