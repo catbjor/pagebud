@@ -135,10 +135,9 @@
                 headerTitle.textContent = "My Profile";
             }
 
-            // This will now correctly calculate and display the streak
-            const streak = await calculateStreak(profileUid); // New function call
-            loadAndDisplayStats(profileUid, streak); // Pass streak to stats
-            calculateAndShowAchievements(profileUid, streak); // Pass streak to achievements
+            const streak = await calculateStreak(profileUid); // This function was missing
+            loadAndDisplayStats(profileUid, streak);
+            calculateAndShowAchievements(profileUid, streak);
 
             loadCurrentlyReading(profileUid, isMyProfile);
             loadFavoritesShelf(profileUid, isMyProfile);
@@ -398,7 +397,42 @@
             return Array.from(editQuirksContainer.querySelectorAll('.category.active')).map(c => c.dataset.value);
         }
 
-        async function loadAndDisplayStats(uid) {
+        // --- This function was missing ---
+        async function calculateStreak(uid) {
+            try {
+                const ninetyDaysAgo = new Date();
+                ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
+                const sessionsSnap = await db().collection("users").doc(uid).collection("sessions")
+                    .where("at", ">=", ninetyDaysAgo).orderBy("at", "desc").get();
+
+                if (sessionsSnap.empty) return 0;
+
+                const toDayStr = (d) => { const x = new Date(d); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`; };
+                const readingDays = [...new Set(sessionsSnap.docs.map(d => d.data().date))].sort().reverse();
+                if (readingDays.length === 0) return 0;
+
+                let streak = 0;
+                const today = new Date();
+                const yesterday = new Date(today);
+                yesterday.setDate(today.getDate() - 1);
+
+                if (readingDays[0] === toDayStr(today) || readingDays[0] === toDayStr(yesterday)) {
+                    streak = 1;
+                    for (let i = 0; i < readingDays.length - 1; i++) {
+                        const diffTime = new Date(readingDays[i]).getTime() - new Date(readingDays[i + 1]).getTime();
+                        if (Math.round(diffTime / (1000 * 60 * 60 * 24)) === 1) streak++;
+                        else break;
+                    }
+                }
+                return streak;
+            } catch (error) {
+                console.warn("Could not calculate streak:", error);
+                return 0;
+            }
+        }
+
+        async function loadAndDisplayStats(uid, streak) { // Added streak parameter
             const statsContainer = $("#readingStats");
             if (!statsContainer) return;
 

@@ -47,10 +47,20 @@
   // Guarded auth gate
   window.requireAuth = function (cb) {
     const u = auth.currentUser;
-    if (u) { try { cb(u); } catch { }; return; }
+    if (u) {
+      try { cb(u); } catch (e) {
+        console.error("requireAuth callback failed:", e);
+      }
+      return;
+    }
     const off = auth.onAuthStateChanged(user => {
       off();
-      if (user) { try { cb(user); } catch { }; return; }
+      if (user) {
+        try { cb(user); } catch (e) {
+          console.error("requireAuth callback failed:", e);
+        }
+        return;
+      }
       const here = (location.pathname || "").split("/").pop();
       if (here !== "auth.html") location.href = "auth.html";
     });
