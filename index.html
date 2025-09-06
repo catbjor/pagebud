@@ -8,6 +8,50 @@
   <script src="theme-init.js"></script> <!-- Styles -->
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet" />
   <link href="style.css?v=cards2" rel="stylesheet" /> <!-- Firebase -->
+  <style>
+    .loader {
+      border: 5px solid var(--surface, #f3f3f3);
+      border-top: 5px solid var(--primary, #2f4156);
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+      margin: 40px auto;
+    }
+
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* Book card fade-in animation */
+    .book-card {
+      opacity: 0;
+      transform: translateY(15px);
+      transition: opacity 0.4s ease-out, transform 0.4s ease-out;
+    }
+
+    .book-card.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Arrange book card action buttons side-by-side */
+    .book-card .actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .book-card .actions .btn {
+      flex: 1;
+      /* Make buttons share space equally */
+    }
+  </style>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -106,11 +150,13 @@
           <i class="fa-regular fa-heart"></i>
         </button>
       </div>
-      <div class="title"></div>
-      <div class="author"></div>
-      <div class="card-ratings">
-        <div class="card-row rating-stars" aria-label="rating"></div>
-        <div class="card-row spice-chilis" aria-label="spice"></div>
+      <div class="card-body">
+        <div class="title"></div>
+        <div class="author"></div>
+        <div class="card-ratings">
+          <div class="card-row rating-stars" aria-label="rating"></div>
+          <div class="card-row spice-chilis" aria-label="spice"></div>
+        </div>
       </div>
       <div class="actions">
         <button class="btn btn-secondary" data-action="open">

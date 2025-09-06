@@ -57,12 +57,18 @@ function createCardElement(doc) {
   const d = doc.data() || {};
   const id = doc.id;
 
+  const rating = Number(d.rating || 0);
+  const statusList = (Array.isArray(d.statuses) && d.statuses.length > 0)
+    ? d.statuses
+    : (d.status ? [d.status] : []);
+
   // Set data attributes for filtering
   card.dataset.id = id;
-  card.dataset.status = (d.status || "").toLowerCase();
+  card.dataset.status = statusList.map(s => String(s || '').toLowerCase().trim()).join(' ');
   card.dataset.fav = d.favorite ? "1" : "0";
   card.dataset.format = (d.format || "").toLowerCase();
-  card.dataset.rated = (d.rating || 0) > 0 ? "1" : "0";
+  card.dataset.rated = rating > 0 ? "1" : "0";
+  card.dataset.rating = String(rating);
 
   // Populate content
   const cover = d.coverUrl || d.coverDataUrl || phCover;
@@ -76,7 +82,6 @@ function createCardElement(doc) {
   card.querySelector('.author').textContent = d.author || "";
 
   // Conditional UI: Rating badge
-  const rating = Number(d.rating || 0);
   if (rating > 0) {
     const ratingBadge = card.querySelector('.rated-badge');
     const ratingLabel = Number.isInteger(rating) ? String(rating) : String(Math.round(rating * 10) / 10);
@@ -117,7 +122,7 @@ async function loadAndRenderLibrary(user) {
   if (!db || !user || !grid) return;
 
   // Add a loading state for better UX
-  grid.innerHTML = '<p class="muted" style="grid-column: 1 / -1;">Loading your library...</p>';
+  grid.innerHTML = '<div style="grid-column: 1 / -1;"><div class="loader"></div></div>';
   if (empty) empty.style.display = "none";
 
   try {
@@ -155,13 +160,35 @@ async function loadAndRenderLibrary(user) {
     grid.innerHTML = ""; // Clear loading message
     grid.appendChild(fragment);
 
+    // Add a fade-in animation to the newly loaded cards
+    requestAnimationFrame(() => {
+      const cards = grid.querySelectorAll(".book-card:not(.visible)");
+      cards.forEach((card, index) => {
+        // Stagger the animation for a pleasant cascade effect
+        card.style.transitionDelay = `${index * 40}ms`;
+        card.classList.add("visible");
+      });
+    });
+
     // The filtering logic is now handled by index-actions.js.
     // To apply the initial filter, we can simulate a click on the active chip.
     const activeChip = $("#filter-chips .category.active");
     if (activeChip) activeChip.click();
   } catch (error) {
     console.error("Failed to load library:", error);
-    grid.innerHTML = '<p class="muted" style="color:red; grid-column: 1 / -1;">Could not load your library. Please try again later.</p>';
+    grid.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 20px 0;">
+        <p class="muted" style="color:red; margin-bottom: 16px;">Could not load your library.</p>
+        <button id="retryLoadBtn" class="btn">Retry</button>
+      </div>
+    `;
+    // Add a listener to the new retry button
+    const retryBtn = grid.querySelector('#retryLoadBtn');
+    if (retryBtn) {
+      retryBtn.addEventListener('click', () => {
+        loadAndRenderLibrary(user);
+      });
+    }
   }
 }
 

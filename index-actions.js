@@ -233,7 +233,9 @@
                 if (filterBy === 'all') {
                     show = true;
                 } else if (filterBy === 'favorites') {
-                    show = card.dataset.fav === '1';
+                    const isFavorite = card.dataset.fav === '1';
+                    const highRating = Number(card.dataset.rating || 0) >= 5;
+                    show = isFavorite || highRating;
                 } else {
                     // Generic status filter logic that works for all statuses
                     const status = card.dataset.status || '';
