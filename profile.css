@@ -2,7 +2,7 @@
 
 .profile-content {
     max-width: 700px;
-    margin: 24px auto;
+    margin: 34px auto;
     padding: 0 16px;
 }
 
@@ -55,6 +55,8 @@
     background: var(--primary);
     color: var(--btn-text);
     border: 2px solid var(--card);
+    font-size: 18px; /* Ensures consistent icon size */
+    line-height: 1; /* Helps with perfect vertical centering */
     display: grid;
     place-items: center;
     cursor: pointer;
@@ -104,8 +106,8 @@
 
 .quirk-chip {
     display: inline-block;
-    padding: 6px 12px;
-    border-radius: 10px;
+    padding: 12px 12px;
+    border-radius: 20px;
     background: var(--surface);
     border: 1px solid var(--border);
     font-weight: 600;
@@ -152,6 +154,7 @@
 /* Achievements */
 .achievements-grid {
     display: grid;
+    grid-template-columns:rid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: 16px;
     margin-top: 12px;

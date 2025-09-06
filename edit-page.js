@@ -169,7 +169,7 @@
     populateChips($("#moodsBox .categories"), moods);
     populateChips($("#tropesBox .categories"), tropes);
     // Also populate status and format if they are empty
-    populateChips($("#statusChips"), getLists().statuses);
+    populateChips($("#statusChips"), statuses);
     populateChips($("#formatChips"), formats);
 
     // Activate chips visually
@@ -261,7 +261,7 @@
 
     // If the book was marked as finished, check for challenge progress.
     if (payload.status === 'finished') {
-        window.PBChallenges?.updateChallengeProgress?.(u.uid, { id, ...payload });
+      window.PBChallenges?.updateChallengeProgress?.(u.uid, { id, ...payload });
     }
 
     // Toast

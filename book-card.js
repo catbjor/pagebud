@@ -68,8 +68,11 @@ function cardHTML(doc) {
   const rating = Number(d.rating || 0);
   const spice = Number(d.spice || 0);
   // Handle both string (old) and array (new) for status
-  const status = Array.isArray(d.status)
-    ? d.status.join(' ') : (d.status || "").toLowerCase();
+  // Handle both statuses (array) and status (legacy string) for filtering
+  const statusList = (Array.isArray(d.statuses) && d.statuses.length > 0)
+    ? d.statuses
+    : (d.status ? [d.status] : []);
+  const status = statusList.map(s => String(s || '').toLowerCase().trim()).join(' ');
   const favorite = !!d.favorite;
   const format = (d.format || "").toLowerCase();
 

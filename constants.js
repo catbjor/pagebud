@@ -42,6 +42,16 @@
         "Cries over fictional characters", "Buys more books than they can read"
     ];
 
+    // Statuses for books (multi-select)
+    const STATUSES = [
+        "Reading", "Finished", "TBR", "DNF", "Owned", "Wishlist"
+    ];
+
+    // Formats for books (single-select)
+    const FORMATS = [
+        "Ebook", "Paperback", "Hardcover", "Audiobook"
+    ];
+
     // and an array of character names as values.
     const CHARACTERS = {
         // Example:
@@ -53,5 +63,5 @@
         ]
     };
 
-    window.PB_CONST = { GENRES, MOODS, TROPES, QUIRKS, CHARACTERS };
+    window.PB_CONST = { GENRES, MOODS, TROPES, QUIRKS, CHARACTERS, STATUSES, FORMATS };
 })();
