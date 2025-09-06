@@ -2,6 +2,14 @@
 (function () {
     "use strict";
 
+    // Helper to wait for an authenticated user
+    async function requireUser() {
+        const a = (window.fb?.auth) || (window.firebase?.auth?.());
+        if (!a) return null;
+        if (a.currentUser) return a.currentUser;
+        return new Promise((res) => { const off = a.onAuthStateChanged(u => { off(); res(u || null); }); });
+    }
+
     const DAY_KEY = "pb:enrich:lastDay";
     const RUNNING_KEY = "pb:enrich:running";
 
@@ -39,19 +47,28 @@
         if (localStorage.getItem(RUNNING_KEY) === "1") return { status: "skipped" };
         try { localStorage.setItem(RUNNING_KEY, "1"); } catch { }
 
-        let mode = "local", books = [], user = null, db = null;
-        try {
-            user = fb?.auth?.currentUser || null;
-            db = fb?.db || null;
-            if (user && db) {
-                mode = "firestore";
-                const snap = await db.collection("users").doc(user.uid).collection("books").limit(500).get();
-                books = []; snap.forEach(d => { const x = d.data() || {}; x.__id = d.id; books.push(x); });
-            }
-        } catch { }
+        // This script now ONLY works with Firestore to avoid using stale local data.
+        const user = await requireUser();
+        const db = (window.fb?.db) || (window.firebase?.firestore?.());
 
-        if (mode === "local") {
-            try { books = JSON.parse(localStorage.getItem("pb:books") || "[]"); } catch { books = []; }
+        if (!user || !db) {
+            console.warn("Enricher: User not signed in or DB not ready. Skipping.");
+            try { localStorage.removeItem(RUNNING_KEY); } catch { }
+            return { status: "skipped_no_auth" };
+        }
+
+        let books = [];
+        try {
+            const snap = await db.collection("users").doc(user.uid).collection("books").limit(500).get();
+            snap.forEach(d => {
+                const x = d.data() || {};
+                x.__id = d.id;
+                books.push(x);
+            });
+        } catch (e) {
+            console.warn("Enricher failed to get books:", e);
+            try { localStorage.removeItem(RUNNING_KEY); } catch { }
+            return { status: "error_fetching" };
         }
 
         const needs = books.filter(b => !b.subjects?.length || !b.workKey).slice(0, limit);
@@ -70,15 +87,9 @@
                 if (year && !b.year) patch.year = year;
                 if (cover && !b.coverUrl) patch.coverUrl = cover;
                 if (Object.keys(patch).length) {
-                    if (mode === "firestore") {
-                        await db.collection("users").doc(user.uid)
-                            .collection("books").doc(b.__id || b.id)
-                            .set({ ...patch, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
-                    } else {
-                        const all = JSON.parse(localStorage.getItem("pb:books") || "[]");
-                        const idx = all.findIndex(x => x.id === b.id);
-                        if (idx !== -1) { all[idx] = { ...all[idx], ...patch }; localStorage.setItem("pb:books", JSON.stringify(all)); }
-                    }
+                    await db.collection("users").doc(user.uid)
+                        .collection("books").doc(b.__id || b.id)
+                        .set({ ...patch, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
                 }
             } catch { }
             await sleep(900); // snilt mot OL

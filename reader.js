@@ -626,7 +626,7 @@
 
         const t = (src.type || "").toLowerCase();
         if (t === "epub") await renderEPUB(src.url, uid, id, doc.title, saved);
-        else await renderPDFPaged(src.url, uid, id, doc.title, saved);
+        else await renderPDFPaged(src.url, uid, id, saved);
     }
 
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);

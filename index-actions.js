@@ -2,6 +2,14 @@
 (function () {
     "use strict";
 
+    // --- Proactive Cache Cleanup ---
+    // The app has a history of using a "pb:books" localStorage key which can become
+    // stale and cause deleted books to reappear. This line proactively removes that
+    // key on every load of the homepage to ensure that other scripts are forced
+    // to fetch fresh data from Firestore, the single source of truth.
+    try { localStorage.removeItem("pb:books"); }
+    catch (e) { console.warn("Could not remove stale book cache.", e); }
+
     const $ = (s, r = document) => r.querySelector(s);
     const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 

@@ -121,7 +121,10 @@ async function loadAndRenderLibrary(user) {
   if (empty) empty.style.display = "none";
 
   try {
-    const snap = await db.collection("users").doc(user.uid).collection("books").get();
+    // Force a server read to bypass the local cache, which can sometimes be stale
+    // and cause deleted books to reappear after a quick reload.
+    const snap = await db.collection("users").doc(user.uid).collection("books")
+      .get({ source: 'server' });
 
     const docs = snap.docs.slice().sort((a, b) => {
       const da = a.data(), dbb = b.data();
@@ -152,7 +155,10 @@ async function loadAndRenderLibrary(user) {
     grid.innerHTML = ""; // Clear loading message
     grid.appendChild(fragment);
 
-    applyCurrentFilter();
+    // The filtering logic is now handled by index-actions.js.
+    // To apply the initial filter, we can simulate a click on the active chip.
+    const activeChip = $("#filter-chips .category.active");
+    if (activeChip) activeChip.click();
   } catch (error) {
     console.error("Failed to load library:", error);
     grid.innerHTML = '<p class="muted" style="color:red; grid-column: 1 / -1;">Could not load your library. Please try again later.</p>';
@@ -201,7 +207,8 @@ function initGridActions(user) {
         favBtn.classList.toggle("active", next);
         if (card) {
           card.dataset.fav = next ? "1" : "0";
-          applyCurrentFilter();
+          // Re-apply the active filter to hide/show the card if needed
+          document.querySelector('#filter-chips .category.active')?.click();
         }
       } catch (err) {
         console.warn(err);
@@ -225,48 +232,6 @@ function initSearch() {
       card.classList.toggle("filter-hide-text", !match);
       applyVisibility(card);
     });
-  });
-}
-
-let currentFilter = "all";
-
-function initFilterChips() {
-  const chips = $$("#filter-chips .category");
-  if (!chips.length) return;
-
-  chips.forEach(c => c.addEventListener("click", () => {
-    chips.forEach(x => x.classList.toggle("active", x === c));
-    currentFilter = c.dataset.filter || "all";
-    applyCurrentFilter();
-  }));
-}
-
-function applyCurrentFilter() {
-  const grid = $("#books-grid");
-  if (!grid) return;
-
-  grid.querySelectorAll(".book-card").forEach(card => {
-    card.classList.remove("filter-hide-chip");
-
-    const st = (card.dataset.status || "");
-    const fav = card.dataset.fav === "1";
-    const fmt = (card.dataset.format || "");
-
-    switch (currentFilter) {
-      case "all": break;
-      case "reading": if (st !== "reading") card.classList.add("filter-hide-chip"); break;
-      case "finished": if (st !== "finished") card.classList.add("filter-hide-chip"); break;
-      case "tbr": if (st !== "tbr") card.classList.add("filter-hide-chip"); break;
-      case "dnf": if (st !== "dnf") card.classList.add("filter-hide-chip"); break;
-      case "favorites": if (!fav) card.classList.add("filter-hide-chip"); break;
-      case "ebook": if (fmt !== "ebook") card.classList.add("filter-hide-chip"); break;
-      case "paperback": if (fmt !== "paperback") card.classList.add("filter-hide-chip"); break;
-      case "hardcover": if (fmt !== "hardcover") card.classList.add("filter-hide-chip"); break;
-      case "audiobook": if (fmt !== "audiobook") card.classList.add("filter-hide-chip"); break;
-      default: break;
-    }
-
-    applyVisibility(card);
   });
 }
 
@@ -296,18 +261,18 @@ function initViewToggle() {
 document.addEventListener("DOMContentLoaded", () => {
   initViewToggle();
   initSearch();
-  initFilterChips();
+  // initFilterChips(); // This is now handled by index-actions.js
 
   // New logic to handle filter from URL
   const urlParams = new URLSearchParams(window.location.search);
   const filterFromUrl = urlParams.get('filter');
   if (filterFromUrl) {
     const chips = $$("#filter-chips .category");
-    const targetChip = chips.find(c => c.dataset.filter === filterFromUrl);
-    if (targetChip) {
+    const chipToActivate = chips.find(c => c.dataset.filter === filterFromUrl);
+    if (chipToActivate) {
       chips.forEach(c => c.classList.remove('active'));
-      targetChip.classList.add('active');
-      currentFilter = filterFromUrl;
+      chipToActivate.classList.add('active');
+      // The active filter will be applied when loadAndRenderLibrary programmatically clicks the active chip.
     }
   }
 
