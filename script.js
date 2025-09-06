@@ -126,12 +126,29 @@ async function loadAndRenderLibrary(user) {
   if (empty) empty.style.display = "none";
 
   try {
-    // Force a server read to bypass the local cache, which can sometimes be stale
-    // and cause deleted books to reappear after a quick reload.
-    const snap = await db.collection("users").doc(user.uid).collection("books")
-      .get({ source: 'server' });
+    const urlParams = new URLSearchParams(window.location.search);
+    const shelfId = urlParams.get('shelf');
+    let docs = [];
 
-    const docs = snap.docs.slice().sort((a, b) => {
+    if (shelfId) {
+      // Shelf view logic: fetch only books from the specified shelf.
+      const shelfDoc = await db.collection("users").doc(user.uid).collection("shelves").doc(shelfId).get();
+      if (shelfDoc.exists) {
+        const bookIds = shelfDoc.data().bookIds || [];
+        if (bookIds.length > 0) {
+          // Using Promise.all with individual gets is robust for any number of books.
+          const bookPromises = bookIds.map(id => db.collection("users").doc(user.uid).collection("books").doc(id).get());
+          const bookSnaps = await Promise.all(bookPromises);
+          docs = bookSnaps.filter(snap => snap.exists);
+        }
+      }
+    } else {
+      // Default library view: fetch all books.
+      const snap = await db.collection("users").doc(user.uid).collection("books").get({ source: 'server' });
+      docs = snap.docs;
+    }
+
+    const sortedDocs = docs.slice().sort((a, b) => {
       const da = a.data(), dbb = b.data();
       const ta = da.createdAt?.toMillis?.()
         ?? (da.createdAt ? new Date(da.createdAt).getTime() : 0);
@@ -140,7 +157,7 @@ async function loadAndRenderLibrary(user) {
       return tb - ta;
     });
 
-    if (!docs.length) {
+    if (!sortedDocs.length) {
       if (empty) empty.style.display = "grid";
       grid.innerHTML = "";
       return;
@@ -148,7 +165,7 @@ async function loadAndRenderLibrary(user) {
     if (empty) empty.style.display = "none";
 
     const fragment = document.createDocumentFragment();
-    docs.forEach(doc => {
+    sortedDocs.forEach(doc => {
       try {
         const cardElement = createCardElement(doc);
         fragment.appendChild(cardElement);

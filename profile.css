@@ -55,8 +55,10 @@
     background: var(--primary);
     color: var(--btn-text);
     border: 2px solid var(--card);
-    font-size: 18px; /* Ensures consistent icon size */
-    line-height: 1; /* Helps with perfect vertical centering */
+    font-size: 18px;
+    /* Ensures consistent icon size */
+    line-height: 1;
+    /* Helps with perfect vertical centering */
     display: grid;
     place-items: center;
     cursor: pointer;
@@ -151,10 +153,15 @@
     }
 }
 
+/* Add extra space before achievements for better separation */
+#achievementsSection {
+    margin-top: 32px;
+}
+
 /* Achievements */
 .achievements-grid {
     display: grid;
-    grid-template-columns:rid;
+    grid-template-columns: rid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: 16px;
     margin-top: 12px;
@@ -605,23 +612,9 @@
 
 /* Grid of books inside a shelf */
 .profile-shelf .shelf-grid {
-    display: grid;
     gap: var(--gap-sm);
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    /* two book cards per row on phones */
-}
-
-/* More columns as screens get wider */
-@media (min-width:640px) {
-    .profile-shelf .shelf-grid {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-}
-
-@media (min-width:1024px) {
-    .profile-shelf .shelf-grid {
-        grid-template-columns: repeat(5, minmax(0, 1fr));
-    }
+    /* Use auto-fill to create wider, more flexible cards. */
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
 }
 
 /* Book card normalization */
@@ -915,4 +908,28 @@ html,
 body {
     max-width: 100%;
     overflow-x: hidden;
+}
+
+/* --- Drag & Drop for Shelves --- */
+.shelf-handle {
+    padding: 4px 8px;
+    margin-left: -8px;
+    /* Offset padding to keep text aligned */
+    border-radius: 6px;
+    transition: background-color 0.2s ease-in-out;
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    cursor: grab;
+    color: var(--muted);
+}
+
+.shelf-handle:hover {
+    background-color: var(--surface);
+}
+
+/* Style for the placeholder element while dragging */
+.sortable-ghost {
+    opacity: 0.4;
+    background: var(--primary);
 }

@@ -75,8 +75,9 @@
             out += `<span class="${i <= full ? "card-chili--on" : "card-chili"}"></span>`;
         return out;
     }
-    function createCardElement(doc, isMyProfile) {
+    function createCardElement(doc, isMyProfile, options = {}) {
         const tpl = document.getElementById("book-card-template");
+        const { showActions = true } = options;
         if (!tpl) return null;
         const card = tpl.content.cloneNode(true).firstElementChild;
 
@@ -127,23 +128,30 @@
         if (stars) stars.innerHTML = starsRow(rating);
         if (chilis) chilis.innerHTML = chilisRow(Number(d.spice || 0));
 
-        const editBtn = card.querySelector('[data-action="open"]');
-        const readBtn = card.querySelector('[data-action="read"]');
-        const addBtn = card.querySelector('[data-action="addtoshelf"]'); // optional
+        const actionsContainer = card.querySelector('.actions');
+        if (actionsContainer) {
+            if (showActions) {
+                const editBtn = card.querySelector('[data-action="open"]');
+                const readBtn = card.querySelector('[data-action="read"]');
+                const addBtn = card.querySelector('[data-action="addtoshelf"]'); // optional
 
-        if (isMyProfile) {
-            if (editBtn) editBtn.dataset.id = id;
-            if (addBtn) {
-                addBtn.dataset.id = id;
-                addBtn.style.display = "";
+                if (isMyProfile) {
+                    if (editBtn) editBtn.dataset.id = id;
+                    if (addBtn) {
+                        addBtn.dataset.id = id;
+                        addBtn.style.display = "";
+                    }
+                } else {
+                    if (editBtn) editBtn.style.display = "none";
+                    if (addBtn) addBtn.style.display = "none";
+                }
+                if (d.hasFile && readBtn) {
+                    readBtn.dataset.id = id;
+                    readBtn.style.display = "";
+                }
+            } else {
+                actionsContainer.remove();
             }
-        } else {
-            if (editBtn) editBtn.style.display = "none";
-            if (addBtn) addBtn.style.display = "none";
-        }
-        if (d.hasFile && readBtn) {
-            readBtn.dataset.id = id;
-            readBtn.style.display = "";
         }
 
         return card;
@@ -152,6 +160,7 @@
     // ------------------ init ------------------
     async function init(me) {
         const urlParams = new URLSearchParams(window.location.search);
+        const shelfToManage = urlParams.get("manageShelf");
         const profileUid = urlParams.get("uid") || me.uid;
         const isMyProfile = profileUid === me.uid;
 
@@ -444,6 +453,7 @@
                         name: shelfName.trim(),
                         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                         bookIds: [],
+                        order: -1 // Ensure new shelves appear first and are included in profile page queries.
                     });
                 await loadAndRenderCustomShelves(me.uid, true);
             } catch (error) {
@@ -463,78 +473,72 @@
         async function loadAndRenderCustomShelves(uid, isMy) {
             const container = $("#customShelvesContainer");
             if (!container) return;
+            const section = $("#customShelvesSection");
+
             container.innerHTML = "";
 
             try {
-                const snap = await db()
-                    .collection("users")
-                    .doc(uid)
-                    .collection("shelves")
-                    .orderBy("order", "asc")
-                    .orderBy("createdAt", "desc")
-                    .get();
+                let snap;
+                try {
+                    // The ideal query, which requires a composite index in Firestore.
+                    snap = await db()
+                        .collection("users")
+                        .doc(uid)
+                        .collection("shelves")
+                        .orderBy("order", "asc")
+                        .orderBy("createdAt", "desc")
+                        .get();
+                } catch (err) {
+                    // If the query fails due to a missing index, fall back to client-side sorting.
+                    if (err?.code === "failed-precondition") {
+                        console.warn("Falling back to client-side shelf sorting. Consider creating a composite index in Firestore for (order ASC, createdAt DESC) on the 'shelves' collection for better performance.");
+                        const rawSnap = await db().collection("users").doc(uid).collection("shelves").get();
+                        const docs = rawSnap.docs
+                            .map(d => ({ id: d.id, ...d.data() }))
+                            .sort((a, b) => {
+                                const orderA = typeof a.order === 'number' ? a.order : Infinity;
+                                const orderB = typeof b.order === 'number' ? b.order : Infinity;
+                                if (orderA !== orderB) return orderA - orderB;
+                                const timeA = a.createdAt?.toDate?.().getTime() || 0;
+                                const timeB = b.createdAt?.toDate?.().getTime() || 0;
+                                return timeB - timeA; // descending for createdAt
+                            })
+                            .map(d => ({ data: () => d, id: d.id, exists: true }));
+                        snap = { empty: docs.length === 0, docs: docs };
+                    } else {
+                        throw err; // For any other error, re-throw it.
+                    }
+                }
 
-                if (snap.empty) return;
+                if (snap.empty) {
+                    if (section) section.style.display = "none";
+                    return;
+                }
 
-                for (const shelfDoc of snap.docs) {
+                if (section) section.style.display = "block";
+
+                snap.docs.forEach(shelfDoc => {
                     const shelf = shelfDoc.data() || {};
                     const shelfId = shelfDoc.id;
                     const name = shelf.name || "Untitled Shelf";
-                    const bookIds = Array.isArray(shelf.bookIds) ? shelf.bookIds.slice(0, 24) : [];
+                    const bookCount = Array.isArray(shelf.bookIds) ? shelf.bookIds.length : 0;
 
-                    const sec = document.createElement("section");
-                    sec.className = "profile-shelf card";
-                    sec.dataset.shelfId = shelfId;
+                    const shelfLink = document.createElement("a");
+                    shelfLink.href = `index.html?shelf=${shelfId}`;
+                    shelfLink.className = "profile-shelf-box";
+                    shelfLink.dataset.shelfId = shelfId; // For SortableJS
 
-                    const head = document.createElement("div");
-                    head.className = "card-head";
-                    head.innerHTML = `<h3><span class="shelf-handle" style="display:none; cursor:grab; margin-right:8px;">☰</span>${esc(
-                        name
-                    )}</h3>`;
+                    shelfLink.innerHTML = `
+                        <span class="see-all-label">See All <i class="fa-solid fa-arrow-right fa-xs"></i></span>
+                        <h3>${esc(name)}</h3>
+                        <div class="book-count">(${bookCount} book${bookCount !== 1 ? 's' : ''})</div>
+                    `;
 
                     if (isMy) {
-                        const actions = document.createElement("div");
-                        actions.className = "shelf-actions";
-                        actions.innerHTML = `
-              <button class="btn btn-icon" title="Rename shelf" data-rename="${esc(
-                            shelfId
-                        )}"><i class="fa fa-pen"></i></button>
-              <button class="btn btn-icon" title="Manage books in this shelf" data-manage="${esc(
-                            shelfId
-                        )}"><i class="fa-solid fa-list-check"></i></button>
-              <button class="btn btn-icon" title="Delete shelf" data-delete="${esc(
-                            shelfId
-                        )}"><i class="fa fa-trash"></i></button>
-            `;
-                        head.appendChild(actions);
-                        head.querySelector(".shelf-handle").style.display = "inline-block";
+                        shelfLink.innerHTML += `<span class="shelf-handle" title="Drag to reorder">☰</span>`;
                     }
-
-                    const grid = document.createElement("div");
-                    grid.className = "shelf-grid";
-                    sec.appendChild(head);
-                    sec.appendChild(grid);
-                    container.appendChild(sec);
-
-                    if (bookIds.length) {
-                        renderSkeletons(grid, Math.min(bookIds.length, 5));
-                        const refs = bookIds.map((id) =>
-                            db().collection("users").doc(uid).collection("books").doc(id).get()
-                        );
-                        const bookSnaps = await Promise.all(refs);
-                        const frag = document.createDocumentFragment();
-                        bookSnaps.forEach((bs) => {
-                            if (!bs.exists) return;
-                            const card = createCardElement(bs, isMy);
-                            if (card) frag.appendChild(card);
-                        });
-                        grid.innerHTML = "";
-                        grid.appendChild(frag);
-                        wireShelfGridActions(grid, isMy, "customShelf");
-                    } else {
-                        grid.innerHTML = `<div class="muted">No books yet.</div>`;
-                    }
-                }
+                    container.appendChild(shelfLink);
+                });
 
                 // Drag-and-drop reordering (optional)
                 if (isMy && typeof Sortable !== "undefined") {
@@ -559,39 +563,6 @@
                         },
                     });
                 }
-
-                // delegated actions
-                container.onclick = async (e) => {
-                    const renameBtn = e.target.closest("[data-rename]");
-                    const delBtn = e.target.closest("[data-delete]");
-                    const manageBtn = e.target.closest("[data-manage]");
-
-                    if (renameBtn) {
-                        const id = renameBtn.getAttribute("data-rename");
-                        const newName = prompt("New shelf name:");
-                        if (!newName || !newName.trim()) return;
-                        await db()
-                            .collection("users")
-                            .doc(uid)
-                            .collection("shelves")
-                            .doc(id)
-                            .set({ name: newName.trim() }, { merge: true });
-                        await loadAndRenderCustomShelves(uid, isMy);
-                    }
-                    if (delBtn) {
-                        const id = delBtn.getAttribute("data-delete");
-                        if (!confirm("Delete this shelf? This does NOT delete your books.")) return;
-                        await db().collection("users").doc(uid).collection("shelves").doc(id).delete();
-                        await loadAndRenderCustomShelves(uid, isMy);
-                    }
-                    if (manageBtn) {
-                        const id = manageBtn.getAttribute("data-manage");
-                        const name =
-                            manageBtn.closest("section")?.querySelector(".card-head h3")?.textContent || "Shelf";
-                        await openShelfPicker(uid, id, name);
-                        await loadAndRenderCustomShelves(uid, isMy);
-                    }
-                };
             } catch (e) {
                 console.warn("Custom shelves failed:", e);
             }
@@ -1092,8 +1063,8 @@
                     .get();
                 if (snap.empty) return;
                 const frag = document.createDocumentFragment();
-                snap.forEach((doc) => {
-                    const card = createCardElement(doc, isMyProfile);
+                snap.forEach(doc => {
+                    const card = createCardElement(doc, isMyProfile, { showActions: false });
                     if (card) frag.appendChild(card);
                 });
                 grid.innerHTML = "";
@@ -1120,8 +1091,8 @@
                     .get();
                 if (snap.empty) return;
                 const frag = document.createDocumentFragment();
-                snap.forEach((doc) => {
-                    const card = createCardElement(doc, isMyProfile);
+                snap.forEach(doc => {
+                    const card = createCardElement(doc, isMyProfile, { showActions: false });
                     if (card) frag.appendChild(card);
                 });
                 grid.innerHTML = "";
@@ -1177,8 +1148,8 @@
 
                 if (snap.empty) return;
                 const frag = document.createDocumentFragment();
-                snap.forEach((doc) => {
-                    const card = createCardElement(doc, isMyProfile);
+                snap.forEach(doc => {
+                    const card = createCardElement(doc, isMyProfile, { showActions: false });
                     if (card) frag.appendChild(card);
                 });
                 grid.innerHTML = "";
@@ -1205,8 +1176,8 @@
                     .get();
                 if (snap.empty) return;
                 const frag = document.createDocumentFragment();
-                snap.forEach((doc) => {
-                    const card = createCardElement(doc, isMyProfile);
+                snap.forEach(doc => {
+                    const card = createCardElement(doc, isMyProfile, { showActions: false });
                     if (card) frag.appendChild(card);
                 });
                 grid.innerHTML = "";
