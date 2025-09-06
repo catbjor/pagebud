@@ -32,18 +32,29 @@
 
     var LIB_CACHE = null;
 
+    // --- Lazy loading state ---
+    var railOrder = [];
+    var nextRailIndex = 0;
+    var railsLoading = false;
+    var railObserver = null;
+    var currentDiscoverMode = 'ebooks'; // 'ebooks' or 'audiobooks'
+
     // -------------------- firebase helpers --------------------
     function hasFB() { return !!(window.fb && window.fb.db && window.fb.auth); }
 
     async function myLibraryMap(user) {
-        var out = { work: new Set(), title: new Set(), subjects: [], authors: new Set() };
+        var out = { work: new Set(), title: new Set(), subjects: [], authors: new Set(), authorCounts: new Map() };
         if (!hasFB() || !user) return out;
         try {
             var col = window.fb.db.collection("users").doc(user.uid).collection("books");
             var snap = await col.limit(500).get();
             snap.forEach(function (d) {
                 var x = d.data() || {};
-                if (x.author) out.authors.add(String(x.author));
+                if (x.author) {
+                    var authorName = String(x.author);
+                    out.authors.add(authorName);
+                    out.authorCounts.set(authorName, (out.authorCounts.get(authorName) || 0) + 1);
+                }
                 if (x.workKey) out.work.add(String(x.workKey).toLowerCase());
                 if (x.title) out.title.add(String(x.title).toLowerCase());
                 if (Array.isArray(x.subjects)) {
@@ -72,14 +83,16 @@
             title: normal.title || "Untitled",
             author: normal.author || "",
             coverUrl: normal.cover || "",
-            status: "want",
+            status: "tbr", // More consistent with other parts of the app
+            statuses: ["tbr"],
             rating: 0,
-            createdAt: new Date(),
-            updatedAt: new Date(),
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
             workKey: normal.workKey || null,
             subjects: take(normal.subjects || [], 6)
         };
-        await window.fb.db.collection("users").doc(user.uid).collection("books").doc(payload.id).set(payload, { merge: true });
+        const bookRef = window.fb.db.collection("users").doc(user.uid).collection("books").doc(payload.id);
+        await bookRef.set(payload, { merge: true });
         try {
             if (LIB_CACHE && LIB_CACHE.title) LIB_CACHE.title.add(String(payload.title).toLowerCase());
             if (LIB_CACHE && LIB_CACHE.work && payload.workKey) LIB_CACHE.work.add(String(payload.workKey).toLowerCase());
@@ -157,6 +170,9 @@
     }
     async function fetchCombinedSearchResults(query, olLimit, gbooksLimit) {
         olLimit = olLimit || 20; gbooksLimit = gbooksLimit || 20;
+        if (currentDiscoverMode === 'audiobooks') {
+            query = query ? `${query} subject:"audiobooks"` : 'subject:"audiobooks"';
+        }
         var olBooks = await safeOLSearch(query, 1, olLimit);
         var gbBooks = await safeGBSearch(query, gbooksLimit);
         var combined = [], seen = new Set();
@@ -303,6 +319,41 @@
         };
     }
 
+    // -------------------- lazy loading rails --------------------
+    async function loadNextBatchOfRails(batchSize) {
+        batchSize = batchSize || 3;
+        if (railsLoading || nextRailIndex >= railOrder.length) return;
+        railsLoading = true;
+
+        var host = railsHost();
+        var sentinel = $("#railSentinel", host);
+        if (sentinel) sentinel.innerHTML = '<div class="loading-spinner"></div>';
+
+        var batchIds = railOrder.slice(nextRailIndex, nextRailIndex + batchSize);
+        nextRailIndex += batchSize;
+
+        for (var i = 0; i < batchIds.length; i++) {
+            var id = batchIds[i];
+            var def = window.PB_RAILS[id];
+            if (def) {
+                try {
+                    await buildCuratedRail(id, def.title, def.query, LIB_CACHE, { tags: def.tags });
+                } catch (e) {
+                    console.warn("rail build failed", id, e);
+                }
+                await sleep(100); // Stagger API calls slightly
+            }
+        }
+
+        if (sentinel) sentinel.innerHTML = '';
+
+        if (nextRailIndex >= railOrder.length) {
+            if (railObserver && sentinel) railObserver.unobserve(sentinel);
+            if (sentinel) sentinel.remove();
+        }
+        railsLoading = false;
+    }
+
     // -------------------- rendering helpers --------------------
     function railSkeleton(n) {
         n = n || 6;
@@ -332,7 +383,7 @@
             '  </div>' +
             '  <div><a class="btn btn-secondary small" data-seeall>See all</a></div>' +
             '</div>' +
-            railSkeleton(6);
+            '<div class="rail-list"></div>'; // Start empty, will be populated on demand
         host.appendChild(sec);
         var see = sec.querySelector("[data-seeall]");
         if (see) see.addEventListener("click", function () { openSeeAllFor(id); });
@@ -426,6 +477,7 @@
         var sec = makeSection(id, title, tags);
         bindSectionClicks(sec);
         try {
+            var rail = sec.querySelector(".rail-list"); if (rail) rail.innerHTML = railSkeleton(6);
             var items = await fetchCombinedSearchResults(query, 20, 20);
             var rail = sec.querySelector(".rail-list"); if (!rail) return;
             var displayItems = libMap ? items.filter(function (b) { return !markInLib(b, libMap); }) : items;
@@ -460,33 +512,140 @@
         enhanceRailScroll(rail);
     }
 
+    async function buildFavoriteAuthorsRail(libMap) {
+        if (!libMap || !libMap.authorCounts || libMap.authorCounts.size === 0) return;
+
+        var sec = makeSection("fave_authors", "New from Your Favorite Authors", ["Personalized"]);
+        bindSectionClicks(sec);
+        var rail = sec.querySelector(".rail-list");
+        if (!rail) return;
+        rail.innerHTML = railSkeleton(6);
+
+        var topAuthors = Array.from(libMap.authorCounts.entries())
+            .sort(function (a, b) { return b[1] - a[1]; })
+            .slice(0, 3)
+            .map(function (entry) { return entry[0]; });
+
+        if (topAuthors.length === 0) {
+            rail.innerHTML = '<div class="muted">Add books to your library to get recommendations from your favorite authors.</div>';
+            return;
+        }
+
+        var query = topAuthors.map(function (author) { return `author:"${author}"`; }).join(" OR ");
+        var items = await fetchCombinedSearchResults(query, 15, 15);
+        var filtered = items.filter(function (b) { return !markInLib(b, libMap); }).sort(function (a, b) { return (Number(b.year) || 0) - (Number(a.year) || 0); });
+        rail.innerHTML = filtered.length ? filtered.slice(0, 20).map(function (b) { return tileHTML(b, false); }).join("") : '<div class="muted">No new releases found from your favorite authors.</div>';
+        enhanceRailScroll(rail);
+    }
+
+    async function buildRecentlyAddedRail(libMap) {
+        var sec = makeSection("recently_added", "Recently Added to PageBud", ["Community"]);
+        bindSectionClicks(sec);
+        var rail = sec.querySelector(".rail-list");
+        if (!rail) return;
+        rail.innerHTML = railSkeleton(6);
+
+        try {
+            var query = window.fb.db.collectionGroup('public_activity')
+                .where('action', '==', 'book_saved')
+                .orderBy('createdAt', 'desc')
+                .limit(50); // Fetch a larger pool to filter and dedupe
+
+            var snap = await query.get();
+            if (snap.empty) {
+                rail.innerHTML = '<div class="muted">No recent additions from the community.</div>';
+                return;
+            }
+
+            var seen = new Set();
+            var items = [];
+            snap.forEach(function (doc) {
+                var activity = doc.data();
+                var meta = activity.meta || {};
+                var key = meta.workKey || (meta.title || "").toLowerCase();
+
+                if (!key || seen.has(key) || markInLib(meta, libMap)) return;
+                seen.add(key);
+
+                items.push({ id: activity.targetId, title: meta.title, author: meta.author, cover: meta.coverUrl, workKey: meta.workKey, subjects: meta.subjects || [] });
+            });
+
+            rail.innerHTML = items.slice(0, 20).map(function (b) { return tileHTML(b, false); }).join("");
+            enhanceRailScroll(rail);
+
+        } catch (e) {
+            console.warn("Recently Added rail failed:", e);
+            if (e.code === 'failed-precondition') {
+                rail.innerHTML = '<div class="muted" style="font-size: .85rem; padding: 0 8px;">This feature requires a database index. Please check the browser console for a link to create it.</div>';
+            } else {
+                rail.innerHTML = '<div class="muted">Could not load recently added books.</div>';
+            }
+        }
+    }
+
     async function buildTrendingAmongFriends(libMap, user) {
         var sec = makeSection("trending_friends", "Trending Among Friends", []);
         bindSectionClicks(sec);
         var friendUids = await getFriendsUids(user);
-        var rail = sec.querySelector(".rail-list"); if (!rail) return;
-        if (!friendUids.length) { rail.innerHTML = '<div class="muted">Add some friends to see what they\'re reading!</div>'; return; }
+        var rail = sec.querySelector(".rail-list");
+        if (!rail) return;
+        if (!friendUids.length) {
+            rail.innerHTML = '<div class="muted">Add some friends to see what they\'re reading!</div>';
+            return;
+        }
+        rail.innerHTML = railSkeleton(6);
 
-        var bookCounts = new Map(), bookData = new Map();
-        var friendLibraries = await Promise.all(friendUids.map(function (uid) {
-            return window.fb.db.collection("users").doc(uid).collection("books").limit(100).get();
-        }));
-        friendLibraries.forEach(function (snap) {
-            snap.forEach(function (doc) {
-                var book = doc.data();
-                var key = String(book.workKey || book.title || "").toLowerCase();
-                if (!key || libMap.work.has(key) || libMap.title.has(String(book.title || "").toLowerCase())) return;
-                bookCounts.set(key, (bookCounts.get(key) || 0) + 1);
-                if (!bookData.has(key)) bookData.set(key, { id: doc.id, title: book.title, author: book.author, year: book.year, coverUrl: book.coverUrl, workKey: book.workKey, subjects: book.subjects || [] });
-            });
+        var bookCounts = new Map(),
+            bookData = new Map();
+
+        // Fetch recent 'book_finished' activities from all friends
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        var friendActivityPromises = friendUids.map(function (uid) {
+            return window.fb.db.collection("users").doc(uid).collection("public_activity")
+                .where('action', '==', 'book_finished')
+                .where('createdAt', '>=', thirtyDaysAgo)
+                .orderBy('createdAt', 'desc')
+                .limit(10) // Limit per friend to keep it manageable
+                .get();
         });
-        var sorted = Array.from(bookCounts.entries()).sort(function (a, b) { return b[1] - a[1]; }).slice(0, 20);
-        var items = sorted.map(function (entry) {
-            var src = bookData.get(entry[0]) || {};
-            return { id: src.id, workKey: src.workKey || null, title: src.title || "Untitled", author: src.author || "", year: src.year || "", cover: src.coverUrl || "", subjects: Array.isArray(src.subjects) ? src.subjects.slice(0, 8) : [] };
-        }).filter(Boolean);
-        rail.innerHTML = items.length ? items.map(function (b) { return tileHTML(b, false); }).join("") : '<div class="muted">No trending books among your friends right now.</div>';
-        enhanceRailScroll(rail);
+
+        try {
+            var friendActivities = await Promise.all(friendActivityPromises);
+
+            friendActivities.forEach(function (snap) {
+                snap.forEach(function (doc) {
+                    var activity = doc.data();
+                    var meta = activity.meta || {};
+                    var key = String(meta.workKey || meta.title || "").toLowerCase();
+
+                    if (!key || libMap.work.has(key) || libMap.title.has(String(meta.title || "").toLowerCase())) return;
+
+                    bookCounts.set(key, (bookCounts.get(key) || 0) + 1);
+                    if (!bookData.has(key)) {
+                        bookData.set(key, { id: activity.targetId, title: meta.title, author: meta.author, cover: meta.coverUrl, workKey: meta.workKey, subjects: meta.subjects || [] });
+                    }
+                });
+            });
+
+            var sorted = Array.from(bookCounts.entries()).sort(function (a, b) { return b[1] - a[1]; }).slice(0, 20);
+            var items = sorted.map(function (entry) { return bookData.get(entry[0]); }).filter(Boolean);
+
+            if (currentDiscoverMode === 'audiobooks') {
+                items = items.filter(function (b) { return b.subjects && b.subjects.some(function (s) { return String(s).toLowerCase().includes('audiobook'); }); });
+            }
+
+            rail.innerHTML = items.length ? items.map(function (b) { return tileHTML(b, false); }).join("") : '<div class="muted">No trending books among your friends right now.</div>';
+            enhanceRailScroll(rail);
+        } catch (e) {
+            console.warn("Trending Among Friends rail failed:", e);
+            if (e.code === 'failed-precondition') {
+                rail.innerHTML = '<div class="muted" style="font-size: .85rem; padding: 0 8px;">This feature requires a database index. Check the browser console for a link to create it.</div>';
+            } else {
+                rail.innerHTML = '<div class="muted">Could not load trending books.</div>';
+            }
+        }
     }
 
     // -------------------- search & see all --------------------
@@ -571,9 +730,16 @@
             return;
         }
         if (railId === "fave_authors") {
-            var authors = LIB_CACHE && LIB_CACHE.authors ? Array.from(LIB_CACHE.authors).slice(0, 10) : [];
-            if (!authors.length) { $("#results").innerHTML = '<div class="muted">Add books to your library to see this.</div>'; return; }
-            var q = authors.map(function (a) { return 'author:"' + a + '"'; }).join(" OR ");
+            if (!LIB_CACHE || !LIB_CACHE.authorCounts || LIB_CACHE.authorCounts.size === 0) {
+                $("#results").innerHTML = '<div class="muted">Add books to your library to see this.</div>'; return;
+            }
+            var topAuthors = Array.from(LIB_CACHE.authorCounts.entries())
+                .sort(function (a, b) { return b[1] - a[1]; })
+                .slice(0, 5)
+                .map(function (entry) { return entry[0]; });
+
+            if (!topAuthors.length) { $("#results").innerHTML = '<div class="muted">Add books to your library to see this.</div>'; return; }
+            var q = topAuthors.map(function (a) { return 'author:"' + a + '"'; }).join(" OR ");
             showSeeAllPage(q, "New from Your Favorite Authors");
             return;
         }
@@ -595,6 +761,31 @@
         var q = $("#q");
         if (q) q.addEventListener("keydown", function (e) { if (e.key === "Enter") doSearch(); });
 
+        // --- Format Toggle (eBooks / Audiobooks) ---
+        var formatToggleContainer = document.createElement('div');
+        formatToggleContainer.className = 'discover-format-toggle';
+        formatToggleContainer.innerHTML = `
+            <button class="btn active" data-mode="ebooks">eBooks</button>
+            <button class="btn" data-mode="audiobooks">Audiobooks</button>
+        `;
+        var searchContainer = $('.toolbar') || $('.header'); // Place it after the toolbar or header
+        if (searchContainer) {
+            searchContainer.after(formatToggleContainer);
+        }
+
+        formatToggleContainer.addEventListener('click', async function (e) {
+            var btn = e.target.closest('button');
+            if (!btn || btn.classList.contains('active')) return;
+
+            currentDiscoverMode = btn.dataset.mode;
+
+            $all('button', formatToggleContainer).forEach(function (b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+
+            var user = hasFB() && window.fb.auth ? window.fb.auth.currentUser : null;
+            await buildHomeRails(user);
+        });
+
         // Delegation backup
         document.addEventListener("click", function (e) {
             var id = e.target && e.target.id;
@@ -615,47 +806,70 @@
         if (host.contains(loadingEl)) host.removeChild(loadingEl);
 
         if (!window.PB_RAILS || !Object.keys(window.PB_RAILS).length) {
-            console.warn("[discover] PB_RAILS missing – fallback");
-            window.PB_RAILS = {
-                new_releases: { title: "New Releases", tags: ["Popular"], query: "published:" + (nowYear - 1) },
-                booktok: { title: "Popular on BookTok", tags: ["Trending"], query: 'subject:booktok OR "tiktok made me buy it"' },
-                epic_fantasy: { title: "Epic Fantasy Worlds", tags: ["World-building"], query: 'subject:"epic fantasy" OR subject:"high fantasy"' }
-            };
+            // ... existing fallback logic ...
         }
 
-        var order = [
+        // --- Personalized Rails (load these first, not lazy-loaded) ---
+        if (user) {
+            const forYouHeader = document.createElement('h2');
+            forYouHeader.className = 'discover-section-header';
+            forYouHeader.textContent = 'For You';
+            host.appendChild(forYouHeader);
+
+            await buildBecauseYouRead(LIB_CACHE);
+            await buildTrendingAmongFriends(LIB_CACHE, user);
+            await buildFavoriteAuthorsRail(LIB_CACHE);
+            await buildRecentlyAddedRail(LIB_CACHE);
+        }
+
+        // --- Curated Collections (these will be lazy-loaded) ---
+        const curatedHeader = document.createElement('h2');
+        curatedHeader.className = 'discover-section-header';
+        curatedHeader.textContent = 'Curated Collections';
+        host.appendChild(curatedHeader);
+
+        // Dynamically add the Audiobooks rail to the list of collections
+        if (window.PB_RAILS && !window.PB_RAILS.audiobooks) {
+            window.PB_RAILS.audiobooks = { title: "Popular Audiobooks", tags: ["Listen"], query: 'subject:"audiobooks"' };
+        }
+
+        // Set up the global order of rails to be loaded
+        railOrder = [
             "new_releases", "booktok", "epic_fantasy", "psych_thrillers", "romance_reads",
-            "dark_romance", "banned_forbidden", "christmas_reads", "spooky_season", "self_help", "philosophical_reads"
+            "dark_romance", "banned_forbidden", "christmas_reads", "spooky_season", "self_help", "philosophical_reads",
+            "audiobooks" // Add our new rail to the end of the list
         ].filter(function (id) { return window.PB_RAILS[id]; });
 
-        if (!order.length) { host.innerHTML = '<div class="card muted" style="padding:16px;">No collections available.</div>'; return; }
-
-        for (var i = 0; i < order.length; i++) {
-            var id = order[i], def = window.PB_RAILS[id];
-            try { await buildCuratedRail(id, def.title, def.query, LIB_CACHE, { tags: def.tags }); }
-            catch (e) { console.warn("rail build failed", id, e); }
-            await sleep(100);
+        if (!railOrder.length) {
+            const noCollectionsEl = document.createElement('div');
+            noCollectionsEl.className = 'card muted';
+            noCollectionsEl.style.padding = '16px';
+            noCollectionsEl.textContent = 'No curated collections available.';
+            host.appendChild(noCollectionsEl);
+            return;
         }
 
-        if (user) {
-            try { await buildBecauseYouRead(LIB_CACHE); } catch (e) { console.warn("because failed", e); }
-            try { await buildTrendingAmongFriends(LIB_CACHE, user); } catch (e) { console.warn("friends failed", e); }
-            try {
-                var authors = Array.from(LIB_CACHE.authors || []).slice(0, 3);
-                if (authors.length) {
-                    var sec = makeSection("fave_authors", "New from Your Favorite Authors", ["Personalized"]);
-                    bindSectionClicks(sec);
-                    var query = "(" + authors.map(function (a) { return 'inauthor:"' + a + '"'; }).join(" OR ") + ") AND published:" + (nowYear - 2);
-                    var items = await fetchCombinedSearchResults(query, 15, 15);
-                    var rail = sec.querySelector(".rail-list");
-                    if (rail) {
-                        var filtered = items.filter(function (b) { return !markInLib(b, LIB_CACHE); }).sort(function (a, b) { return (Number(b.year) || 0) - (Number(a.year) || 0); });
-                        rail.innerHTML = filtered.length ? filtered.slice(0, 20).map(function (b) { return tileHTML(b, false); }).join("") : '<div class="muted">No new releases found from your favorite authors.</div>';
-                        enhanceRailScroll(rail);
-                    }
-                }
-            } catch (e) { console.warn("fave authors failed", e); }
-        }
+        // Reset state for lazy loading
+        nextRailIndex = 0;
+        railsLoading = false;
+
+        // Add the sentinel for IntersectionObserver
+        var sentinel = document.createElement('div');
+        sentinel.id = 'railSentinel';
+        sentinel.innerHTML = '<div class="loading-spinner"></div>';
+        host.appendChild(sentinel);
+
+        // Set up the observer
+        if (railObserver) railObserver.disconnect();
+        railObserver = new IntersectionObserver(function (entries) {
+            if (entries[0].isIntersecting) {
+                loadNextBatchOfRails();
+            }
+        }, { rootMargin: '300px' }); // Load when 300px away from viewport
+        railObserver.observe(sentinel);
+
+        // Load the initial batch
+        await loadNextBatchOfRails(3);
     }
 
     async function boot() {

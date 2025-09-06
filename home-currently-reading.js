@@ -61,7 +61,7 @@
         return card;
     }
 
-    async function boot() {
+    async function loadAndRender() {
         const container = $("#currentlyReadingContainer");
         if (!container) return;
 
@@ -83,14 +83,6 @@
                 }
 
                 snap.forEach(doc => container.appendChild(createBookCard({ id: doc.id, ...doc.data() })));
-
-                // Add event listener for the new update buttons
-                container.addEventListener('click', (e) => {
-                    const updateBtn = e.target.closest('.quick-update-btn');
-                    if (updateBtn) {
-                        window.PB?.ProgressModal?.show(updateBtn.closest('.book-card').dataset.bookId);
-                    }
-                });
             } catch (error) {
                 console.error("Failed to load currently reading books:", error);
                 container.innerHTML = '<p class="muted" style="scroll-snap-align: none;">Could not load your books.</p>';
@@ -98,9 +90,27 @@
         });
     }
 
+    function init() {
+        const container = $("#currentlyReadingContainer");
+        if (!container) return;
+
+        loadAndRender(); // Initial load
+
+        // Listen for changes to re-render
+        document.addEventListener("pb:booksChanged", loadAndRender);
+
+        // Single event listener for all cards
+        container.addEventListener('click', (e) => {
+            const updateBtn = e.target.closest('.quick-update-btn');
+            if (updateBtn) {
+                window.PB?.ProgressModal?.show(updateBtn.closest('.book-card').dataset.bookId);
+            }
+        });
+    }
+
     if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", boot);
+        document.addEventListener("DOMContentLoaded", init);
     } else {
-        boot();
+        init();
     }
 })();

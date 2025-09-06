@@ -96,12 +96,21 @@
     async function fbAddToLibrary(book) {
         const user = window.fb?.auth?.currentUser;
         if (!user) throw new Error("Not signed in");
+
         const payload = {
-            id: book.id || randomId(), title: book.title || "Untitled", author: book.author || "",
-            coverUrl: book.cover || "", status: "want", rating: 0, createdAt: new Date(), updatedAt: new Date(),
-            workKey: book.workKey || null, subjects: take(book.subjects || [], 6)
+            id: book.id || randomId(),
+            title: book.title || "Untitled",
+            author: book.author || "",
+            coverUrl: book.cover || "",
+            status: "tbr",
+            statuses: ["tbr"],
+            rating: 0,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            workKey: book.workKey || null,
+            subjects: take(book.subjects || [], 6)
         };
-        await window.fb.db.collection("users").doc(user.uid).collection("books").doc(payload.id).set(payload, { merge: true });
+        await window.fb.db.collection("users").doc(user.uid).collection("books").doc(payload.id).set(payload);
     }
 
     function card(b) {

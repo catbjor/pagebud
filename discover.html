@@ -28,15 +28,11 @@
         </header>
 
         <main>
-            <div class="search-row" style="position:relative;z-index:10">
-                <input class="form-control" id="q" placeholder="Search by keyword…" />
-                <!-- Inline onclick = siste sikkerhetsnett -->
-                <button class="btn" id="qBtn" style="width:auto"
-                    onclick="window.__pbDoSearch && window.__pbDoSearch()">Search</button>
-            </div>
-
-            <div class="card disc-actionbar" style="position:relative;z-index:10">
-                <!-- Inline onclick = siste sikkerhetsnett -->
+            <div class="toolbar discover-toolbar-layout" style="position:relative;z-index:10">
+                <div class="discover-search-wrapper">
+                    <input class="form-control" id="q" placeholder="Search by keyword…" />
+                    <button class="btn" id="qBtn">Search</button>
+                </div>
                 <button class="btn btn-secondary small" id="discMenuBtn"
                     onclick="window.__pbEnsureDrawer && window.__pbEnsureDrawer().classList.add('show')">
                     <i class="fa-solid fa-bars"></i> Genres

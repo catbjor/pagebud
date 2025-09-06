@@ -2223,4 +2223,119 @@ input[type="file"]::file-selector-button:hover {
 .progress-modal-backdrop.show .progress-modal-sheet {
   transform: scale(1);
 }
+
+/* --- Progress Update Modal --- */
+.progress-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  z-index: 3000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.progress-modal-backdrop.show {
+  display: flex;
+  opacity: 1;
+}
+
+.progress-modal-sheet {
+  background: var(--card);
+  border-radius: 14px;
+  padding: 20px;
+  width: 100%;
+  max-width: 380px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  transform: scale(0.95);
+  transition: transform 0.2s ease;
+}
+
+.progress-modal-backdrop.show .progress-modal-sheet {
+  transform: scale(1);
+}
+
+.discover-section-header {
+  padding: 16px 16px 0;
+  max-width: var(--content-max);
+  margin: 24px auto 0;
+  font-size: 1.4rem;
+  border-top: 1px solid var(--border);
+  padding-top: 24px;
+}
+
+/* --- Generic Loading Spinner --- */
+.loading-spinner {
+  border: 5px solid var(--surface-alt);
+  border-top: 5px solid var(--primary);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+  margin: 24px auto;
+  /* Give it some space and center it */
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* --- Discover Page Format Toggle --- */
+.discover-format-toggle {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin: 16px auto;
+    max-width: var(--content-max);
+    padding: 0 16px;
+}
+
+.discover-format-toggle .btn {
+    background: var(--surface);
+    color: var(--text);
+    border-color: var(--border);
+}
+
+.discover-format-toggle .btn.active {
+    background: var(--primary);
+    color: var(--btn-text);
+    border-color: var(--primary);
+}
+
+/* --- Discover Page Toolbar Layout --- */
+.toolbar.discover-toolbar-layout {
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.discover-search-wrapper {
+    display: flex;
+    flex-grow: 1;
+    max-width: 500px;
+}
+
+.discover-search-wrapper #q {
+    flex-grow: 1;
+    border-right: none;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.discover-search-wrapper #qBtn {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    flex-shrink: 0;
+}
 }

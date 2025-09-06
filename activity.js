@@ -29,6 +29,8 @@
         if (typeof meta.rating === "number") out.rating = meta.rating;  // short
         if (typeof meta.author === "string") out.author = meta.author.slice(0, 100);
         if (typeof meta.coverUrl === "string") out.coverUrl = meta.coverUrl;
+        if (typeof meta.workKey === "string") out.workKey = meta.workKey;
+        if (Array.isArray(meta.subjects)) out.subjects = meta.subjects.slice(0, 6);
         // (legg til korte, ufarlige felter ved behov)
         return out;
     }
@@ -114,7 +116,9 @@
                     bookId: bookId,
                     title: newData.title,
                     author: newData.author,
-                    coverUrl: newData.coverUrl
+                    coverUrl: newData.coverUrl,
+                    workKey: newData.workKey,
+                    subjects: newData.subjects
                 });
             }
 
@@ -151,7 +155,7 @@
                 uid: u.uid,
                 action: "book_finished",
                 targetId: p.bookId || null,
-                meta: { title: p.title, author: p.author, coverUrl: p.coverUrl }
+                meta: { title: p.title, author: p.author, coverUrl: p.coverUrl, workKey: p.workKey, subjects: p.subjects }
             });
         },
         rated: async (p = {}) => {
