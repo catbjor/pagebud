@@ -201,11 +201,49 @@
         })();
     }
 
+    // ---------- Robust book filtering ----------
+    function wireBookFilters() {
+        const container = $('#filter-chips');
+        const grid = $('#books-grid');
+        if (!container || !grid) return;
+
+        // This logic correctly handles all status filters, including 'owned' and 'wishlist'.
+        // It replaces potentially incomplete logic from other scripts.
+        container.addEventListener('click', (e) => {
+            const chip = e.target.closest('.category[data-filter]');
+            if (!chip) return;
+
+            // Update active chip
+            $$('.category', container).forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+
+            const filterBy = chip.dataset.filter;
+            const cards = $$('.book-card', grid);
+
+            cards.forEach(card => {
+                let show = false;
+                if (filterBy === 'all') {
+                    show = true;
+                } else if (filterBy === 'favorites') {
+                    show = card.dataset.fav === '1';
+                } else {
+                    // Generic status filter logic that works for all statuses
+                    const status = card.dataset.status || '';
+                    if (status.includes(filterBy)) {
+                        show = true;
+                    }
+                }
+                card.style.display = show ? '' : 'none';
+            });
+        });
+    }
+
     // ---------- boot ----------
     function boot() {
         initGreeting();
         enhanceCardsWithReading();
         centerHeartIcons();
+        wireBookFilters();
     }
 
     if (document.readyState === "loading") {
