@@ -25,6 +25,20 @@
     function db() { return (window.fb?.db) || (window.firebase?.firestore?.()) || firebase.firestore(); }
     function storage() { return (window.fb?.storage) || (window.firebase?.storage?.()) || firebase.storage(); }
 
+    function playSound(url) {
+        // Check the user's preference before playing a sound.
+        if (localStorage.getItem("pb:notifications:sound") === "false") return;
+
+        if (typeof Audio === "undefined") return;
+        try {
+            const audio = new Audio(url);
+            // Don't show console errors if the browser blocks autoplay
+            audio.play().catch(() => { });
+        } catch (e) {
+            console.error("Failed to play sound:", e);
+        }
+    }
+
     // State
     let unsubMsgs = null;
     let unsubGroup = null;
@@ -122,6 +136,15 @@
         unsubMsgs = messagesRef(currentGid)
             .orderBy("t", "asc")
             .onSnapshot(snap => {
+                // Play sound for new incoming messages after initial load
+                if (lastMsgId) {
+                    snap.docChanges().forEach(change => {
+                        if (change.type === 'added' && change.doc.data().uid !== me.uid) {
+                            playSound('sound effect folder/chat-received.mp3');
+                        }
+                    });
+                }
+
                 const arr = [];
                 snap.forEach(doc => arr.push({ id: doc.id, ...(doc.data() || {}) }));
                 renderMessages(arr, me.uid);

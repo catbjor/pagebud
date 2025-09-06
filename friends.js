@@ -25,6 +25,21 @@
     function button(label, cls = "btn") { const b = el("button", cls, label); b.type = "button"; return b; }
     function clear(node) { if (node) node.innerHTML = ""; }
 
+    let requestsBooted = false;
+
+    function playSound(url) {
+        // Check the user's preference before playing a sound.
+        if (localStorage.getItem("pb:notifications:sound") === "false") return;
+
+        if (typeof Audio === "undefined") return;
+        try {
+            const audio = new Audio(url);
+            audio.play().catch(() => {});
+        } catch (e) {
+            warn("playSound failed:", e);
+        }
+    }
+
     function getEls() {
         return {
             input: qsAny(["#friendSearch", "#searchUser", "#searchInput"]),
@@ -291,6 +306,14 @@
             db().collection("friend_requests")
                 .where("to", "==", me.uid).where("status", "==", "pending")
                 .onSnapshot(async (snap) => {
+                    if (requestsBooted) {
+                        snap.docChanges().forEach(change => {
+                            if (change.type === 'added') {
+                                playSound('sound effect folder/plop-plop-chat-sound.mp3');
+                            }
+                        });
+                    }
+                    requestsBooted = true;
                     clear(els.incomingList);
                     for (const doc of snap.docs) {
                         const req = doc.data();

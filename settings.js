@@ -94,6 +94,9 @@
         const dockLeft = $("#dockLeft");
         const dockRight = $("#dockRight");
         const startCollapsed = $("#startCollapsed");
+        const yearlyGoalInput = $("#yearlyGoalInput");
+        const yearlyGoalVal = $("#yearlyGoalVal");
+        const yearlyGoalSaveBtn = $("#yearlyGoalSave");
 
         if (!goalInput) return;
 
@@ -112,6 +115,18 @@
             localStorage.setItem("pb:timer:goal", goalInput.value);
             showSavedToast();
         });
+
+        if (yearlyGoalInput) {
+            const currentYearlyGoal = localStorage.getItem("pb:goal:yearly") || "12";
+            yearlyGoalInput.value = currentYearlyGoal;
+            yearlyGoalVal.textContent = currentYearlyGoal;
+
+            yearlyGoalInput.addEventListener("input", () => { yearlyGoalVal.textContent = yearlyGoalInput.value; });
+            yearlyGoalSaveBtn.addEventListener("click", () => {
+                localStorage.setItem("pb:goal:yearly", yearlyGoalInput.value);
+                showSavedToast();
+            });
+        }
 
         const saveDockSettings = () => {
             localStorage.setItem("pb:timer:side", dockLeft.checked ? "left" : "right");
@@ -154,10 +169,26 @@
         $("#btnFullReset")?.addEventListener("click", () => window.pbResetCaches?.({ full: true }));
     }
 
+    // --- Notification Settings ---
+    function initNotificationSettings() {
+        const soundToggle = $("#soundEffectsToggle");
+        if (!soundToggle) return;
+
+        // Default to 'true' (enabled) if the setting doesn't exist
+        const soundEnabled = localStorage.getItem("pb:notifications:sound") !== "false";
+        soundToggle.checked = soundEnabled;
+
+        soundToggle.addEventListener("change", () => {
+            localStorage.setItem("pb:notifications:sound", soundToggle.checked ? "true" : "false");
+            showSavedToast();
+        });
+    }
+
     function boot() {
         initThemes();
         initTimerSettings();
         initAppActions();
+        initNotificationSettings();
     }
 
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot, { once: true });

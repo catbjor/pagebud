@@ -13,6 +13,20 @@
     const $ = (s, r = document) => r.querySelector(s);
     const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 
+    function playSound(url) {
+        // Check the user's preference before playing a sound.
+        if (localStorage.getItem("pb:notifications:sound") === "false") return;
+
+        if (typeof Audio === "undefined") return;
+        try {
+            const audio = new Audio(url);
+            // Don't show console errors if the browser blocks autoplay
+            audio.play().catch(() => { });
+        } catch (e) {
+            console.error("Failed to play sound:", e);
+        }
+    }
+
     function auth() { return (window.fb?.auth) || (window.firebase?.auth?.()) || firebase.auth(); }
     function db() { return (window.fb?.db) || (window.firebase?.firestore?.()) || firebase.firestore(); }
 
@@ -181,14 +195,30 @@
         chatBadge.style.right = "-6px";
         reqBadge.style.right = "16px";
 
+        let chatsBooted = false;
+        let requestsBooted = false;
+
         (async () => {
             const a = auth();
             const u = a.currentUser || await new Promise(res => { const off = a.onAuthStateChanged(x => { off(); res(x); }); });
             if (!u) return;
 
             // Chat-unreads
-            db().collection("chats").where(`participants.${u.uid}`, "==", true)
+            db().collection("chats").where(`participants.${u.uid}`, "==", true).orderBy("lastMessage.at", "desc")
                 .onSnapshot((snap) => {
+                    if (chatsBooted) {
+                        snap.docChanges().forEach(change => {
+                            // Play sound on modification if it's a new message for me
+                            if (change.type === 'modified') {
+                                const chatData = change.doc.data();
+                                if (chatData.read?.[u.uid] === false && chatData.lastMessage?.from !== u.uid) {
+                                    playSound('sound effect folder/chat-received.mp3');
+                                }
+                            }
+                        });
+                    }
+                    chatsBooted = true;
+
                     let total = 0;
                     snap.forEach(doc => {
                         const d = doc.data() || {};
@@ -202,6 +232,15 @@
             db().collection("friend_requests")
                 .where("to", "==", u.uid).where("status", "==", "pending")
                 .onSnapshot((snap) => {
+                    if (requestsBooted) {
+                        snap.docChanges().forEach(change => {
+                            if (change.type === 'added') {
+                                playSound('sound effect folder/plop-plop-chat-sound.mp3');
+                            }
+                        });
+                    }
+                    requestsBooted = true;
+
                     const n = snap.size;
                     reqBadge.textContent = String(n);
                     reqBadge.style.display = n > 0 ? "inline-grid" : "none";

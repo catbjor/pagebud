@@ -10,6 +10,15 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet" />
     <link href="style.css" rel="stylesheet" />
 
+    <style>
+        /* Center the "My Profile" section at the top of the settings page */
+        main>.card:first-of-type .card-head {
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+    </style>
+
     <!-- Firebase (må være med for logout/språk) -->
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -69,6 +78,17 @@
                     </div>
                 </div>
                 <div class="row">
+                    <label class="row-label" for="yearlyGoalInput">Yearly reading goal</label>
+                    <div class="row-grow">
+                        <div class="row between">
+                            <input class="range" id="yearlyGoalInput" max="200" min="1" step="1" type="range"
+                                value="12" />
+                            <div class="muted"><span id="yearlyGoalVal">12</span> books</div>
+                        </div>
+                        <button class="btn" id="yearlyGoalSave" style="margin-top:6px;">Save</button>
+                    </div>
+                </div>
+                <div class="row">
                     <div class="row-label">Dock side</div>
                     <div class="chips">
                         <label class="chip"><input id="dockLeft" name="dockSide" type="radio" value="left" />
@@ -100,16 +120,16 @@
                 <p class="muted small">Force the app to check for a new version.</p>
             </section>
 
-            <!-- Language (EN / NO) -->
+            <!-- Notifications -->
             <section class="card">
                 <div class="card-head">
-                    <h2>Language</h2>
+                    <h2>Notifications</h2>
                 </div>
-                <div id="langChips" class="chips scroll-x">
-                    <span class="category" data-lang="en">English</span>
-                    <span class="category" data-lang="no">Norsk</span>
+                <div class="row">
+                    <label class="chip">
+                        <input id="soundEffectsToggle" type="checkbox" /> Enable sound effects
+                    </label>
                 </div>
-                <p class="muted small">Changes the app’s interface language.</p>
             </section>
 
             <!-- Account -->
@@ -150,10 +170,6 @@
     <script src="timer.js" defer></script>
     <script src="settings.js" defer></script>
     <script src="export-notes.js" defer></script>
-
-    <!-- i18n og språkstyring -->
-    <script src="i18n.js"></script>
-    <script src="settings-lang.js"></script>
 
     <!-- Log out handler -->
     <script>

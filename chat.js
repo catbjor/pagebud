@@ -6,6 +6,20 @@
     const auth = () => window.fb?.auth;
     const db = () => window.fb?.db;
 
+    function playSound(url) {
+        // Check the user's preference before playing a sound.
+        if (localStorage.getItem("pb:notifications:sound") === "false") return;
+
+        if (typeof Audio === "undefined") return;
+        try {
+            const audio = new Audio(url);
+            // Don't show console errors if the browser blocks autoplay
+            audio.play().catch(() => { });
+        } catch (e) {
+            console.error("Failed to play sound:", e);
+        }
+    }
+
     const els = {
         headerName: $("#chatFriendName"),
         headerPhoto: $("#chatFriendPhoto"),
@@ -17,6 +31,11 @@
         replyBanner: null, // Will be created dynamically
         replyBannerText: null,
         replyBannerCancel: null,
+        imageUploadBtn: null,
+        imageFileInput: null,
+        lightbox: null,
+        lightboxImg: null,
+        emojiPicker: null, // Will be created dynamically
     };
 
     let me = null;
@@ -27,6 +46,10 @@
     let chatDocData = null;
     let friendData = null; // To store friend's profile data
     let typingTimeout = null;
+    let activeReactionPicker = { // To track which message the picker is for
+        messageId: null,
+        bubbleElement: null
+    };
     let replyContext = null; // To store info about the message we're replying to
     let isBooted = false; // Flag to check if chat is fully initialized
 
@@ -68,6 +91,7 @@
     function createMessageBubble(msg, isSent, friendUid, chatData) {
         const bubble = document.createElement("div");
         bubble.className = `message-bubble ${isSent ? "sent" : "received"}`;
+        bubble.dataset.messageId = msg.id;
 
         // --- Render Reply Snippet ---
         if (msg.replyTo) {
@@ -93,9 +117,25 @@
             bubble.appendChild(snippet);
         }
 
-        const textSpan = document.createElement("span");
-        textSpan.className = "message-text";
-        textSpan.textContent = msg.text;
+        if (msg.imageUrl) {
+            const img = document.createElement('img');
+            img.className = 'message-image';
+            img.src = msg.imageUrl;
+            img.alt = 'Image from chat';
+            img.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent reply-click
+                if (els.lightbox && els.lightboxImg) {
+                    els.lightboxImg.src = img.src;
+                    els.lightbox.style.display = 'flex';
+                }
+            });
+            bubble.appendChild(img);
+        } else {
+            const textSpan = document.createElement("span");
+            textSpan.className = "message-text";
+            textSpan.textContent = msg.text;
+            bubble.appendChild(textSpan);
+        }
 
         const timeSpan = document.createElement("span");
         timeSpan.className = "message-timestamp";
@@ -109,8 +149,58 @@
             });
         }
 
-        bubble.appendChild(textSpan);
         bubble.appendChild(timeSpan);
+
+        // --- Message Actions (React, Delete) ---
+        const actionsContainer = document.createElement('div');
+        actionsContainer.className = 'actions-container';
+
+        const reactBtn = document.createElement('button');
+        reactBtn.className = 'btn-action btn-react';
+        reactBtn.innerHTML = '<i class="fa-regular fa-face-smile"></i>';
+        reactBtn.title = 'Add reaction';
+        reactBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent reply-click
+            showEmojiPicker(bubble, msg.id);
+        });
+        actionsContainer.appendChild(reactBtn);
+
+        if (isSent) {
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'btn-action btn-delete';
+            deleteBtn.innerHTML = '<i class="fa-solid fa-trash"></i>';
+            deleteBtn.title = 'Delete message';
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                deleteMessage(msg.id);
+            });
+            actionsContainer.appendChild(deleteBtn);
+        }
+
+        bubble.appendChild(actionsContainer);
+
+        // --- Render Reactions ---
+        if (msg.reactions && Object.keys(msg.reactions).length > 0) {
+            const reactionsContainer = document.createElement('div');
+            reactionsContainer.className = 'reactions-container';
+
+            for (const [emoji, uids] of Object.entries(msg.reactions)) {
+                if (!uids || uids.length === 0) continue;
+
+                const chip = document.createElement('div');
+                chip.className = 'reaction-chip';
+                chip.textContent = `${emoji} ${uids.length}`;
+                if (uids.includes(me.uid)) {
+                    chip.classList.add('reacted-by-me');
+                }
+                chip.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    toggleReaction(msg.id, emoji);
+                });
+                reactionsContainer.appendChild(chip);
+            }
+            bubble.appendChild(reactionsContainer);
+        }
 
         if (isSent) {
             // Add timestamp to bubble for later updates
@@ -118,20 +208,16 @@
                 bubble.dataset.timestamp = msg.at.toMillis();
             }
 
-            const receiptSpan = document.createElement("span");
-            receiptSpan.className = "read-receipt";
-
             const friendLastRead = chatData?.lastRead?.[friendUid];
             const messageTimestamp = msg.at;
 
-            // Check if the friend has read this message
+            // Only show a read receipt if the friend has actually read the message.
             if (friendLastRead && messageTimestamp && messageTimestamp.toDate() <= friendLastRead.toDate()) {
-                receiptSpan.classList.add('read');
+                const receiptSpan = document.createElement("span");
+                receiptSpan.className = "read-receipt read";
                 receiptSpan.textContent = '✓✓';
-            } else {
-                receiptSpan.textContent = '✓';
+                bubble.appendChild(receiptSpan);
             }
-            bubble.appendChild(receiptSpan);
         }
 
         return bubble;
@@ -171,6 +257,15 @@
         const messagesRef = db().collection("chats").doc(chatId).collection("messages").orderBy("at", "desc").limit(50);
 
         unsubscribe = messagesRef.onSnapshot(snapshot => {
+            // Play sound for new incoming messages after the chat has loaded
+            if (isBooted) {
+                snapshot.docChanges().forEach(change => {
+                    if (change.type === 'added' && change.doc.data().from === friendUid) {
+                        playSound('sound effect folder/chat-received.mp3');
+                    }
+                });
+            }
+
             els.messagesContainer.innerHTML = ''; // Clear old messages
 
             if (snapshot.empty) {
@@ -181,7 +276,7 @@
             let lastDateStr = null;
             // Reverse the docs to process from oldest to newest for date grouping
             snapshot.docs.reverse().forEach(doc => {
-                const msg = doc.data();
+                const msg = { id: doc.id, ...doc.data() };
                 const msgDate = msg.at?.toDate();
 
                 // Check if we need to add a date separator
@@ -200,8 +295,11 @@
                 els.messagesContainer.appendChild(bubble);
             });
 
-            // Scroll to the bottom to show the newest messages
-            els.messagesContainer.scrollTop = els.messagesContainer.scrollHeight;
+            // Scroll to the bottom. Using a small timeout ensures that the browser
+            // has finished rendering the new messages before we try to scroll.
+            setTimeout(() => {
+                els.messagesContainer.scrollTop = els.messagesContainer.scrollHeight;
+            }, 0);
 
             // Find the latest message to mark as read up to this point
             // The latest message is the first one in the original (un-reversed) snapshot
@@ -213,6 +311,137 @@
             els.messagesContainer.innerHTML = '<div class="chat-loading" style="color:red;">Could not load messages.</div>';
         });
     }
+
+    // --- Reaction Logic ---
+    const EMOJI_OPTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+
+    function showEmojiPicker(bubbleElement, messageId) {
+        if (!els.emojiPicker) return;
+
+        activeReactionPicker.messageId = messageId;
+        activeReactionPicker.bubbleElement = bubbleElement;
+
+        const rect = bubbleElement.getBoundingClientRect();
+        els.emojiPicker.style.display = 'flex';
+        // Position picker above the bubble
+        els.emojiPicker.style.top = `${window.scrollY + rect.top - 45}px`;
+        els.emojiPicker.style.left = `${window.scrollX + rect.left}px`;
+    }
+
+    function hideEmojiPicker() {
+        if (els.emojiPicker) {
+            els.emojiPicker.style.display = 'none';
+        }
+        activeReactionPicker.messageId = null;
+        activeReactionPicker.bubbleElement = null;
+    }
+
+    async function toggleReaction(messageId, emoji) {
+        if (!chatId || !me) return;
+        const msgRef = db().collection("chats").doc(chatId).collection("messages").doc(messageId);
+
+        hideEmojiPicker(); // Hide picker immediately on interaction
+
+        try {
+            await db().runTransaction(async (transaction) => {
+                const doc = await transaction.get(msgRef);
+                if (!doc.exists) return;
+
+                const reactions = doc.data().reactions || {};
+                const uids = reactions[emoji] || [];
+
+                if (uids.includes(me.uid)) { // User is removing their reaction
+                    reactions[emoji] = uids.filter(uid => uid !== me.uid);
+                    if (reactions[emoji].length === 0) delete reactions[emoji];
+                } else { // User is adding a reaction
+                    reactions[emoji] = [...uids, me.uid];
+                }
+                transaction.update(msgRef, { reactions });
+            });
+        } catch (error) {
+            console.error("Failed to toggle reaction:", error);
+        }
+    }
+    // --- End Reaction Logic ---
+
+    // --- Delete Message Logic ---
+    async function deleteMessage(messageId) {
+        if (!confirm("Delete this message? This cannot be undone.")) {
+            return;
+        }
+
+        try {
+            await db().collection("chats").doc(chatId).collection("messages").doc(messageId).delete();
+            // The onSnapshot listener will handle the UI update automatically.
+        } catch (error) {
+            console.error("Failed to delete message:", error);
+            alert("Could not delete message. You may need to update your security rules to allow deleting messages.");
+        }
+    }
+    // --- End Delete Message Logic ---
+
+    // --- Image Sending Logic ---
+    function handleImageUpload(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        e.target.value = ''; // Reset to allow selecting same file again
+
+        // You could add a visual "processing..." indicator here
+        processAndSendImage(file);
+    }
+
+    async function processAndSendImage(file) {
+        const MAX_SIZE_MB = 5;
+        if (file.size > MAX_SIZE_MB * 1024 * 1024) {
+            return alert(`Image is too large. Please select a file smaller than ${MAX_SIZE_MB}MB.`);
+        }
+        try {
+            // Resize to a max of 1280px and compress to fit under Firestore's ~1MB limit
+            const resizedDataUrl = await resizeImage(file, 1280, 1024 * 1024 * 0.9);
+            await executeSend({ imageUrl: resizedDataUrl }, "📷 Image");
+        } catch (error) {
+            console.error("Image processing failed:", error);
+            alert(error.message || "Could not process image. It might be too large or in an unsupported format.");
+        }
+    }
+
+    function resizeImage(file, maxDimension, targetByteSize) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    let { width, height } = img;
+                    if (width > maxDimension || height > maxDimension) {
+                        if (width > height) {
+                            height = Math.round(height * (maxDimension / width));
+                            width = maxDimension;
+                        } else {
+                            width = Math.round(width * (maxDimension / height));
+                            height = maxDimension;
+                        }
+                    }
+                    const canvas = document.createElement('canvas');
+                    canvas.width = width;
+                    canvas.height = height;
+                    canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+                    let quality = 0.9;
+                    let dataUrl = canvas.toDataURL('image/jpeg', quality);
+                    while (dataUrl.length > targetByteSize && quality > 0.3) {
+                        quality -= 0.1;
+                        dataUrl = canvas.toDataURL('image/jpeg', quality);
+                    }
+                    if (dataUrl.length > targetByteSize) return reject(new Error("Image is too large to send, even after compression."));
+                    resolve(dataUrl);
+                };
+                img.onerror = () => reject(new Error("Could not load image file."));
+                img.src = event.target.result;
+            };
+            reader.onerror = () => reject(new Error("Could not read file."));
+            reader.readAsDataURL(file);
+        });
+    }
+    // --- End Image Sending Logic ---
 
     // --- Typing Indicator Logic ---
     async function updateMyTypingStatus(isTyping) {
@@ -291,13 +520,26 @@
     }
 
     // Handle sending a message
-    async function sendMessage(e) {
+    async function sendTextMessage(e) {
         e.preventDefault();
-        // Final guard: if the form is disabled, do nothing.
-        if (els.sendBtn.disabled) return;
-
         const text = els.chatInput.value.trim();
         if (!text) return;
+
+        els.chatInput.value = '';
+
+        const serverTimestamp = firebase.firestore.FieldValue.serverTimestamp();
+
+        const messagePayload = {
+            text: text,
+        };
+
+        await executeSend(messagePayload, text);
+    }
+
+    async function executeSend(payload, lastMessageText) {
+        // Final guard: if the form is disabled, do nothing.
+        if (els.sendBtn.disabled) return;
+        els.sendBtn.disabled = true;
 
         // --- Clear typing indicator on send ---
         if (typingTimeout) {
@@ -306,17 +548,8 @@
             updateMyTypingStatus(false);
         }
 
-        els.chatInput.value = '';
-        els.sendBtn.disabled = true;
-
         const serverTimestamp = firebase.firestore.FieldValue.serverTimestamp();
-
-        const messagePayload = {
-            from: me.uid,
-            text: text,
-            at: serverTimestamp,
-        };
-
+        const messagePayload = { from: me.uid, at: serverTimestamp, ...payload };
         // Add reply context if it exists
         if (replyContext) {
             messagePayload.replyTo = replyContext;
@@ -339,7 +572,7 @@
             batch.set(chatRef, {
                 participants: { [me.uid]: true, [friendUid]: true },
                 lastMessage: {
-                    text: text,
+                    text: lastMessageText,
                     at: serverTimestamp,
                     from: me.uid,
                 },
@@ -353,7 +586,7 @@
         } catch (error) {
             console.error("Error sending message:", error);
             alert("Message could not be sent.");
-            els.chatInput.value = text; // Restore text on failure
+            if (payload.text) els.chatInput.value = payload.text; // Restore text on failure
         } finally {
             clearReplyContext(); // Clear reply context whether it succeeds or fails
             els.sendBtn.disabled = false;
@@ -424,16 +657,19 @@
         const friendLastReadDate = friendLastRead.toDate();
 
         els.messagesContainer.querySelectorAll('.message-bubble.sent').forEach(bubble => {
-            const receipt = bubble.querySelector('.read-receipt');
-            if (!receipt || receipt.classList.contains('read')) return; // Already marked as read
+            // If a receipt already exists, we don't need to do anything.
+            if (bubble.querySelector('.read-receipt')) return;
 
             const timestamp = bubble.dataset.timestamp;
             if (!timestamp) return;
 
             const messageDate = new Date(parseInt(timestamp, 10));
+            // If the message is now read, create and append the receipt.
             if (messageDate <= friendLastReadDate) {
-                receipt.classList.add('read');
-                receipt.textContent = '✓✓';
+                const receiptSpan = document.createElement("span");
+                receiptSpan.className = "read-receipt read";
+                receiptSpan.textContent = '✓✓';
+                bubble.appendChild(receiptSpan);
             }
         });
     }
@@ -465,6 +701,7 @@
             #chatForm {
                 display: flex;
                 gap: 8px;
+                align-items: center;
                 padding: 8px 12px;
                 background: var(--surface);
                 border-top: 1px solid var(--border);
@@ -520,6 +757,66 @@
             els.replyBannerCancel.addEventListener('click', clearReplyContext);
         }
 
+        // 4. Create image upload elements
+        if (!document.getElementById('imageUploadBtn')) {
+            const uploadBtn = document.createElement('button');
+            uploadBtn.id = 'imageUploadBtn';
+            uploadBtn.className = 'btn-icon';
+            uploadBtn.type = 'button';
+            uploadBtn.innerHTML = '<i class="fa-solid fa-paperclip"></i>';
+            uploadBtn.title = 'Send image';
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.id = 'imageFileInput';
+            fileInput.accept = 'image/*';
+            fileInput.style.display = 'none';
+            chatForm.prepend(uploadBtn, fileInput);
+            uploadBtn.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', handleImageUpload);
+            els.imageUploadBtn = uploadBtn;
+            els.imageFileInput = fileInput;
+        }
+
+        // 5. Create and inject the image lightbox
+        if (!document.getElementById('imageLightbox')) {
+            const lightbox = document.createElement('div');
+            lightbox.id = 'imageLightbox';
+            lightbox.innerHTML = '<img>';
+            document.body.appendChild(lightbox);
+            els.lightbox = lightbox;
+            els.lightboxImg = lightbox.querySelector('img');
+
+            lightbox.addEventListener('click', () => {
+                lightbox.style.display = 'none';
+            });
+        }
+
+        // --- Create and inject Emoji Picker ---
+        if (!els.emojiPicker) {
+            const picker = document.createElement('div');
+            picker.id = 'emojiPicker';
+            picker.innerHTML = EMOJI_OPTIONS.map(emoji =>
+                `<span class="emoji-option" data-emoji="${emoji}">${emoji}</span>`
+            ).join('');
+            document.body.appendChild(picker);
+            els.emojiPicker = picker;
+
+            picker.addEventListener('click', (e) => {
+                const option = e.target.closest('.emoji-option');
+                if (option && activeReactionPicker.messageId) {
+                    toggleReaction(activeReactionPicker.messageId, option.dataset.emoji);
+                }
+            });
+
+            // Hide picker when clicking outside
+            document.addEventListener('click', (e) => {
+                if (els.emojiPicker.style.display === 'flex' && !e.target.closest('.btn-add-react') && !e.target.closest('#emojiPicker')) {
+                    hideEmojiPicker();
+                }
+            }, true); // Use capture phase to catch click before it bubbles
+        }
+
+
         // Append navbar first, then the chat form, to ensure the chat form is at the very bottom.
         if (navbar) body.appendChild(navbar);
         if (chatForm) body.appendChild(chatForm);
@@ -532,8 +829,8 @@
         // Attach the submit handler IMMEDIATELY.
         // This prevents the page from reloading, which is the core issue.
         if (els.chatForm) {
-            els.chatForm.removeEventListener('submit', sendMessage); // Clean up previous just in case
-            els.chatForm.addEventListener('submit', sendMessage);
+            els.chatForm.removeEventListener('submit', sendTextMessage); // Clean up previous just in case
+            els.chatForm.addEventListener('submit', sendTextMessage);
         } else {
             console.error("Critical Error: Chat form not found in HTML. Cannot send messages.");
             return;

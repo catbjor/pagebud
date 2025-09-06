@@ -259,6 +259,9 @@
 
     await ref.set(payload, { merge: true });
 
+    // Log the appropriate activity based on what changed.
+    await window.PBActivity?.handleBookUpdate?.(id, payload, ctx.data);
+
     // If the book was marked as finished, check for challenge progress.
     if (payload.status === 'finished') {
       window.PBChallenges?.updateChallengeProgress?.(u.uid, { id, ...payload });
@@ -369,6 +372,41 @@
 
     const saveBtn = $("#saveBtn") || $('[data-role="save-book"]') || $('[data-action="save"]');
     let extractedCoverBlob = null;
+
+    // --- "I'm Finished" Button ---
+    const finishedBtn = document.createElement('button');
+    finishedBtn.type = 'button';
+    finishedBtn.id = 'imFinishedBtn';
+    finishedBtn.className = 'btn'; // Use a generic class and style it in CSS
+    finishedBtn.innerHTML = '<i class="fa-solid fa-flag-checkered"></i> I\'m Finished!';
+
+    // Place it next to the save button if it exists
+    if (saveBtn) {
+      const saveBtnContainer = saveBtn.closest('.form-row') || saveBtn.parentElement;
+      saveBtnContainer.style.display = 'flex';
+      saveBtnContainer.style.gap = '8px';
+      saveBtn.after(finishedBtn);
+    }
+
+    finishedBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+
+      // 1. Set status to "Finished"
+      const statusContainer = $('#statusChips');
+      const finishedChip = $$('.category', statusContainer).find(c => chipVal(c) === 'finished');
+      if (finishedChip && !finishedChip.classList.contains('active')) {
+        finishedChip.click(); // This triggers the wireChipGroup logic
+      }
+
+      // 2. Set finished date to today if it's empty
+      const finishedDateInput = $('#finished');
+      if (finishedDateInput && !finishedDateInput.value) {
+        finishedDateInput.valueAsDate = new Date();
+      }
+
+      // 3. Trigger the main save action
+      saveBtn.click();
+    });
 
     // Book file UI (existing)
     const pickBtn = $("#btnPickFile");

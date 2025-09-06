@@ -30,11 +30,6 @@
   <div class="app-container">
     <header class="header">
       <h1>Stats</h1>
-      <div class="header-actions">
-        <button class="back-fab" id="btnQuickReset" title="Reset caches">
-          <i class="fa-solid fa-rotate"></i>
-        </button>
-      </div>
     </header>
 
     <!-- Calendar + streak -->
@@ -118,10 +113,6 @@
     <!-- Charts (placeholder-beholdere; styres senere av egne scripts hvis ønsket) -->
     <section class="charts-container">
       <div class="chart-card">
-        <h3>Genres</h3>
-        <div style="height:240px"><canvas id="genresChart"></canvas></div>
-      </div>
-      <div class="chart-card">
         <h3>Moods</h3>
         <div style="height:240px"><canvas id="moodsChart"></canvas></div>
       </div>
@@ -136,8 +127,16 @@
         <div style="height:240px"><canvas id="readingTrendsChart"></canvas></div>
       </div>
       <div class="chart-card">
+        <h3>Top Authors</h3>
+        <div style="height:240px"><canvas id="topAuthorsChart"></canvas></div>
+      </div>
+      <div class="chart-card">
         <h3>Languages</h3>
         <div style="height:240px"><canvas id="languagesChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Formats</h3>
+        <div style="height:240px"><canvas id="formatsChart"></canvas></div>
       </div>
     </section>
 
@@ -181,16 +180,15 @@
     </div>
   </div>
 
+  <!-- Back to Top Button -->
+  <button id="backToTopBtn" class="btn-icon" title="Back to top">
+    <i class="fa-solid fa-arrow-up"></i>
+  </button>
+
   <!-- Scripts -->
   <script src="reset-utils.js"></script>
   <script src="stats.js"></script>
   <script>
-    // Quick reset button (samme som du hadde)
-    document.getElementById("btnQuickReset")?.addEventListener("click", async () => {
-      if (!confirm("Reset caches (keep login)?")) return;
-      try { await pbResetCaches?.({ full: false }); location.reload(); } catch { }
-    });
-
     // Ikke redirect ved sign-out; stats.js håndterer auth-ready
     try { requireAuth?.(() => { }); } catch { }
   </script>

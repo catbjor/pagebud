@@ -249,6 +249,67 @@ input[type="text"] {
   transition: opacity .15s;
 }
 
+/* --- Back to Top Button --- */
+#backToTopBtn {
+  position: fixed;
+  bottom: calc(var(--bottom-nav-h) + 20px);
+  right: 20px;
+  z-index: 1050;
+  background: var(--primary);
+  color: var(--btn-text);
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  opacity: 0;
+  transform: translateY(20px);
+  pointer-events: none;
+  transition: opacity 0.3s, transform 0.3s;
+}
+
+#backToTopBtn.show {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+/* --- Currently Reading Section (Homepage) --- */
+.currently-reading-section {
+  padding: 16px;
+  max-width: var(--content-max);
+  margin: 0 auto;
+}
+
+.currently-reading-section h2 {
+  margin-bottom: 0;
+}
+
+.horizontal-scroll {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(150px, 1fr);
+  gap: 12px;
+  overflow-x: auto;
+  padding: 12px 0;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+.horizontal-scroll>* {
+  scroll-snap-align: start;
+}
+
+/* Hide scrollbar for a cleaner look */
+.horizontal-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.horizontal-scroll {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+
 .theme-preview.active {
   border-color: var(--primary);
   box-shadow: 0 0 0 2px color-mix(in oklab, var(--primary) 25%, transparent);
@@ -486,14 +547,17 @@ input[type="text"] {
 
 /* ---------- Book card ---------- */
 .book-card {
-  display: grid;
-  grid-template-columns: 1fr;
+  display: flex;
+  flex-direction: column;
   gap: 10px;
   padding: 12px;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 12px;
-  position: relative
+  position: relative;
+  text-decoration: none;
+  /* For when it's a link */
+  color: inherit;
 }
 
 .thumb-wrap {
@@ -562,6 +626,23 @@ input[type="text"] {
   gap: 8px;
   flex-wrap: wrap;
   margin-top: 6px
+}
+
+.book-card .progress-bar {
+  width: 100%;
+  height: 8px;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: auto;
+  /* Pushes it to the bottom */
+}
+
+.book-card .progress-fill {
+  height: 100%;
+  background-color: var(--primary);
+  transition: width 0.5s ease-in-out;
 }
 
 /* Rated badge (top-left of cover) */
@@ -765,7 +846,8 @@ input[type="text"] {
 .stats-grid {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
+  /* Two columns side-by-side */
   padding: 0 16px;
   margin-bottom: 12px
 }
@@ -848,13 +930,19 @@ input[type="text"] {
 .top-item {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
   padding: 8px 0;
-  border-bottom: 1px solid var(--border)
+  text-decoration: none;
+  color: inherit;
 }
 
-.top-item:last-child {
-  border-bottom: none
+.top-list>li {
+  border-bottom: 1px solid var(--border);
+}
+
+.top-list>li:last-child {
+  border-bottom: none;
 }
 
 .top-item-name {
@@ -939,6 +1027,35 @@ input[type="text"] {
   background: var(--surface);
   color: var(--text);
   border: 1px solid var(--border)
+}
+
+.calendar-day.reading-span-day {
+  background: var(--primary);
+  color: var(--btn-text);
+  font-weight: 700;
+}
+
+/* When a day is both a span and a finished day, make the dot contrast */
+.calendar-day.reading-span-day .finished-book-dot {
+  background-color: var(--btn-text);
+  border-color: var(--btn-text);
+}
+
+.calendar-day {
+  position: relative;
+  /* For positioning the dot */
+}
+
+.finished-book-dot {
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 6px;
+  height: 6px;
+  background-color: var(--btn-text);
+  border: 1px solid var(--primary);
+  border-radius: 50%;
 }
 
 .calendar-day.other-month {
@@ -1592,10 +1709,40 @@ input[type="file"]::file-selector-button:hover {
   border-bottom: 1px solid var(--border);
   text-decoration: none;
   color: var(--text);
+  padding: 12px 0;
 }
 
 .feed-preview-item:last-child {
   border-bottom: none;
+}
+
+.feed-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.feed-line-1 {
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.feed-book-snippet {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  background: var(--surface);
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  margin-bottom: 6px;
+}
+
+.feed-book-cover {
+  width: 36px;
+  height: 54px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex-shrink: 0;
 }
 
 .feed-preview-item .avatar {
@@ -1606,8 +1753,23 @@ input[type="file"]::file-selector-button:hover {
   background: var(--surface);
 }
 
-.feed-preview-item .line-1 {
-  font-weight: 500;
+.feed-book-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.feed-book-author {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.feed-timestamp {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 4px;
 }
 
 /* --- Social Feed Interactive Elements --- */
@@ -1960,5 +2122,105 @@ input[type="file"]::file-selector-button:hover {
   color: #111827;
   border-color: #f59e0b;
 }
+
+#imFinishedBtn {
+  background-color: #1cc88a;
+  /* A nice green for "finished" */
+  border-color: #1cc88a;
+  color: #fff;
+}
+
+/* --- Reading Goal / Stats Section --- */
+.reading-goal-section {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 20px;
+  align-items: center;
+  background: var(--surface);
+  padding: 16px;
+  border-radius: 12px;
+  margin: 12px 0 0;
+  width: 100%;
+  max-width: 450px;
+}
+
+.goal-progress-ring {
+  width: 80px;
+  height: 80px;
+  position: relative;
+}
+
+.goal-progress-ring svg {
+  transform: rotate(-90deg);
+}
+
+.goal-progress-ring circle {
+  transition: stroke-dashoffset 0.8s ease-out;
+}
+
+.goal-progress-ring .ring-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.goal-progress-ring .ring-value {
+  font-size: 1.4rem;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.goal-progress-ring .ring-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.goal-stat-item .stat-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
+.goal-stat-item .stat-label {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+/* --- Progress Update Modal --- */
+.progress-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  z-index: 3000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.progress-modal-backdrop.show {
+  display: flex;
+  opacity: 1;
+}
+
+.progress-modal-sheet {
+  background: var(--card);
+  border-radius: 14px;
+  padding: 20px;
+  width: 100%;
+  max-width: 380px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  transform: scale(0.95);
+  transition: transform 0.2s ease;
+}
+
+.progress-modal-backdrop.show .progress-modal-sheet {
+  transform: scale(1);
 }
 }

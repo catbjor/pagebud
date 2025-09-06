@@ -4,6 +4,16 @@
   const $ = (s, r = document) => r.querySelector(s);
   const userCache = new Map();
 
+  const phCover =
+    "data:image/svg+xml;utf8," +
+    encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600">
+         <rect width="100%" height="100%" rx="12" fill="#e5e7eb"/>
+         <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle"
+               font-size="22" fill="#9aa3af" font-family="system-ui,-apple-system,Segoe UI,Roboto">No cover</text>
+       </svg>`
+    );
+
   function toWhen(e) {
     if (e.createdAt?.toDate) return e.createdAt.toDate();
     if (e.createdAt?.seconds) return new Date(e.createdAt.seconds * 1000);
@@ -54,18 +64,19 @@
   }
 
   function line(it) {
-    const t = it.type || it.action;
-    if (t === "progress_updated" && it.meta?.kind === "pdf" && it.meta.page) return `Reading… page ${it.meta.page}`;
-    if (t === "progress_updated" && it.meta?.kind === "epub" && (it.meta.percent || it.meta.percent === 0)) return `Reading… ${it.meta.percent}%`;
-    if (t === "file_attached") return `Attached a ${it.meta?.kind || "file"}`;
-    if (t === "book_saved") return `saved a book: <b>${it.meta?.title || ''}</b>`;
-    if (t === "book_finished") return `finished a book: <b>${it.meta?.title || ''}</b>`;
-    if (t === "book_rated") return `rated <b>${it.meta?.title || ''}</b> ${it.meta?.rating}★`;
+    const t = it.action || it.type;
+    if (t === "book_saved") return `added a new book:`;
+    if (t === "book_finished") return `finished reading:`;
+    if (t === "book_rated") return `rated a book:`;
+    if (t === "note_added") return `wrote a note on:`;
     if (t === "profile_updated") {
       if (it.meta?.updated === 'photo') return `updated their profile picture`;
       return `updated their profile`;
     }
-    return t || "updated";
+    // Fallback for older activity types
+    if (t === "progress_updated") return `is reading:`;
+    if (t === "file_attached") return `attached a file to:`;
+    return "updated:";
   }
 
   async function render(items) {
@@ -80,14 +91,25 @@
     for (const it of items) {
       const user = await getUserInfo(it.owner);
       const when = toWhen(it);
-      const time = when ? when.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : "";
+      const time = when ? when.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : "";
+      const isBookActivity = it.action?.startsWith('book_') || it.action === 'note_added';
+
       html += `
             <a href="profile.html?uid=${it.owner}" class="feed-preview-item">
                 <img src="${user.photoURL || 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'}" alt="" class="avatar">
-                <div class="text-content">
-                    <div class="line-1"><b>${user.displayName || 'A user'}</b> ${line(it)}</div>
-                    <div class="muted small">${time}</div>
-                </div>
+                <div class="feed-content">
+                    <div class="feed-line-1"><b>${user.displayName || 'A user'}</b> ${line(it)}</div>
+                    ${isBookActivity && it.meta?.title ? `
+                        <div class="feed-book-snippet">
+                            <img src="${it.meta.coverUrl || phCover}" class="feed-book-cover" alt="Cover for ${it.meta.title}">
+                            <div>
+                                <div class="feed-book-title">${it.meta.title}</div>
+                                <div class="feed-book-author">${it.meta.author || ''}</div>
+                            </div>
+                        </div>
+                    ` : ''}
+                    <div class="muted small feed-timestamp">${time}</div>
+                </div> 
             </a>
         `;
     }

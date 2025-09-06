@@ -114,24 +114,6 @@
     return `${userName} updated ${title}`;
   }
 
-  async function addReaction(ownerUid, itemId, emoji) {
-    const me = auth().currentUser;
-    if (!me) return;
-    const itemRef = db().collection("users").doc(ownerUid).collection("activity").doc(itemId);
-    try {
-      // Use dot notation for nested fields in an update
-      const fieldPath = `reactions.${emoji}`;
-      await itemRef.update({
-        [fieldPath]: firebase.firestore.FieldValue.increment(1)
-      });
-    } catch (e) {
-      // If the update fails (e.g., field doesn't exist), set it instead.
-      await itemRef.set({ reactions: { [emoji]: 1 } }, { merge: true });
-    }
-  }
-
-  const randomId = () => Math.random().toString(36).slice(2, 10);
-
   async function itemHTML(it) {
     const me = auth().currentUser;
     const user = await getUserInfo(it.owner);
@@ -139,10 +121,6 @@
     const whenTxt = when ? when.toLocaleString() : "";
     const likeN = Number(it.likeCount || 0);
     const comN = Number(it.commentCount || 0);
-    const reactions = it.reactions || {};
-    const reactionHTML = Object.entries(reactions)
-      .sort((a, b) => b[1] - a[1]) // Sort by count
-      .map(([emoji, count]) => `<span class="react-chip">${emoji} ${count}</span>`).join('');
 
     // Check if the current user has liked this item
     let isLiked = false;
@@ -170,10 +148,6 @@
       actionButton = `<button class="btn btn-secondary btn-add-to-tbr" data-book='${esc(bookData)}'><i class="fa-solid fa-plus"></i> Add to TBR</button>`;
     }
 
-    const quickReacts = ['❤️', '🎉', '🤯'];
-    const quickReactHTML = quickReacts.map(emoji =>
-      `<button class="btn btn-secondary btn-quick-react" data-emoji="${emoji}">${emoji}</button>`
-    ).join('');
     return `
       <div class="feed-item" data-owner="${it.owner}" data-id="${it.id}"
            style="display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--border)">
@@ -181,9 +155,8 @@
         <div style="flex:1;min-width:0">
           <div style="font-weight:500;margin:2px 0">${lineFor(it, user)}</div>
           <div class="muted" style="font-size:.85rem; margin-top: 4px;"><i class="fa-solid ${iconFor(it.type || it.action)}"></i> ${whenTxt}</div>
-          ${reactionHTML ? `<div class="reacts-display">${reactionHTML}</div>` : ''}
           <div class="row" style="display:flex;gap:8px;align-items:center;margin-top:8px">
-            ${quickReactHTML}
+            <button class="btn btn-secondary btn-like ${isLiked ? 'active' : ''}"><i class="fa-solid fa-heart"></i> <span class="like-count">${likeN}</span></button>
             <button class="btn btn-secondary btn-comment"><i class="fa-solid fa-comment"></i> ${comN}</button>
             ${actionButton}
           </div>
@@ -196,23 +169,6 @@
           </div>
         </div>
       </div>`;
-  }
-
-  async function saveBookToTBR(bookData) {
-    const user = auth().currentUser;
-    if (!user) throw new Error("Not signed in");
-    const payload = {
-      id: `feed_${randomId()}`,
-      title: bookData.title,
-      author: bookData.author,
-      coverUrl: bookData.coverUrl || '',
-      workKey: bookData.workKey || null,
-      status: 'tbr',
-      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-    };
-    const col = db().collection("users").doc(user.uid).collection("books");
-    await col.doc(payload.id).set(payload);
   }
 
   async function loadAndRenderComments(rootEl) {
@@ -251,10 +207,41 @@
     }
   }
 
+  async function saveBookToTBR(bookData) {
+    const user = auth().currentUser;
+    if (!user) throw new Error("Not signed in");
+    const payload = {
+      id: `feed_${Math.random().toString(36).slice(2, 10)}`,
+      title: bookData.title,
+      author: bookData.author,
+      coverUrl: bookData.coverUrl || '',
+      workKey: bookData.workKey || null,
+      status: 'tbr',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    };
+    const col = db().collection("users").doc(user.uid).collection("books");
+    await col.doc(payload.id).set(payload);
+  }
+
   function bindActions(container) {
     container.addEventListener("click", async (e) => {
       const root = e.target.closest(".feed-item"); if (!root) return;
       const owner = root.dataset.owner, id = root.dataset.id;
+
+      if (e.target.closest(".btn-like")) {
+        const btn = e.target.closest(".btn-like");
+        btn.disabled = true;
+        try {
+          const isNowLiked = await window.PBActivity?.like(owner, id);
+          const countEl = btn.querySelector('.like-count');
+          const currentCount = Number(countEl.textContent);
+          countEl.textContent = isNowLiked ? currentCount + 1 : currentCount - 1;
+          btn.classList.toggle('active', isNowLiked);
+        } finally {
+          btn.disabled = false;
+        }
+      }
 
       if (e.target.closest(".btn-comment")) {
         const commentsSection = root.querySelector(".comments-section");
@@ -292,11 +279,6 @@
           alert("Could not add book.");
           btn.disabled = false;
         }
-      }
-      if (e.target.closest(".btn-quick-react")) {
-        const btn = e.target.closest(".btn-quick-react");
-        await addReaction(owner, id, btn.dataset.emoji);
-        btn.style.borderColor = 'var(--primary)'; // Visual feedback
       }
     });
   }
