@@ -1,4 +1,5 @@
-// profile-page.js — shelf picker + per-card "Add to Shelf", photo save (no Storage)
+// profile-page.js — shelves manager + per-card "Add to Shelf", photo save (no Storage)
+// with Edit Profile as a mobile bottom sheet
 (function () {
     "use strict";
 
@@ -10,7 +11,8 @@
         encodeURIComponent(
             `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600"><rect width="100%" height="100%" rx="12" fill="#e5e7eb"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-size="22" fill="#9aa3af" font-family="system-ui,-apple-system,Segoe UI,Roboto">No cover</text></svg>`
         );
-    const esc = (s) => String(s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+    const esc = (s) =>
+        String(s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
 
     function auth() {
         if (window.fb?.auth) return window.fb.auth;
@@ -62,13 +64,15 @@
     function starsRow(val) {
         const full = Math.floor(Number(val) || 0);
         let out = "";
-        for (let i = 1; i <= 6; i++) out += `<span class="${i <= full ? "card-star--on" : "card-star"}"></span>`;
+        for (let i = 1; i <= 6; i++)
+            out += `<span class="${i <= full ? "card-star--on" : "card-star"}"></span>`;
         return out;
     }
     function chilisRow(val) {
         const full = Math.floor(Number(val) || 0);
         let out = "";
-        for (let i = 1; i <= 5; i++) out += `<span class="${i <= full ? "card-chili--on" : "card-chili"}"></span>`;
+        for (let i = 1; i <= 5; i++)
+            out += `<span class="${i <= full ? "card-chili--on" : "card-chili"}"></span>`;
         return out;
     }
     function createCardElement(doc, isMyProfile) {
@@ -85,41 +89,59 @@
         const author = d.author || "";
 
         const thumb = card.querySelector(".thumb");
-        thumb.src = cover;
-        thumb.alt = `Cover for ${title}`;
+        if (thumb) {
+            thumb.src = cover;
+            thumb.alt = `Cover for ${title}`;
+            thumb.onerror = () => {
+                thumb.onerror = null;
+                thumb.src = phCover;
+            };
+        }
 
-        card.querySelector(".title").textContent = title;
-        card.querySelector(".author").textContent = author;
+        const ttl = card.querySelector(".title");
+        const aut = card.querySelector(".author");
+        if (ttl) ttl.textContent = title;
+        if (aut) aut.textContent = author;
 
         const rating = Number(d.rating || 0);
         if (rating > 0) {
             const badge = card.querySelector(".rated-badge");
-            const label = Number.isInteger(rating) ? String(rating) : String(Math.round(rating * 10) / 10);
-            badge.title = `Rated ${label}`;
-            badge.querySelector(".val").textContent = label;
-            badge.style.display = "";
+            if (badge) {
+                const label = Number.isInteger(rating)
+                    ? String(rating)
+                    : String(Math.round(rating * 10) / 10);
+                badge.title = `Rated ${label}`;
+                badge.querySelector(".val").textContent = label;
+                badge.style.display = "";
+            }
         }
 
         const heartBtn = card.querySelector(".heart-btn");
-        heartBtn.classList.toggle("active", !!d.favorite);
-        heartBtn.dataset.id = id;
+        if (heartBtn) {
+            heartBtn.classList.toggle("active", !!d.favorite);
+            heartBtn.dataset.id = id;
+        }
 
-        card.querySelector(".rating-stars").innerHTML = starsRow(rating);
-        card.querySelector(".spice-chilis").innerHTML = chilisRow(Number(d.spice || 0));
+        const stars = card.querySelector(".rating-stars");
+        const chilis = card.querySelector(".spice-chilis");
+        if (stars) stars.innerHTML = starsRow(rating);
+        if (chilis) chilis.innerHTML = chilisRow(Number(d.spice || 0));
 
         const editBtn = card.querySelector('[data-action="open"]');
         const readBtn = card.querySelector('[data-action="read"]');
-        const addBtn = card.querySelector('[data-action="addtoshelf"]');
+        const addBtn = card.querySelector('[data-action="addtoshelf"]'); // optional
 
         if (isMyProfile) {
-            editBtn.dataset.id = id;
-            addBtn.dataset.id = id;
-            addBtn.style.display = "";
+            if (editBtn) editBtn.dataset.id = id;
+            if (addBtn) {
+                addBtn.dataset.id = id;
+                addBtn.style.display = "";
+            }
         } else {
-            editBtn.style.display = "none";
-            addBtn.style.display = "none";
+            if (editBtn) editBtn.style.display = "none";
+            if (addBtn) addBtn.style.display = "none";
         }
-        if (d.hasFile) {
+        if (d.hasFile && readBtn) {
             readBtn.dataset.id = id;
             readBtn.style.display = "";
         }
@@ -152,7 +174,7 @@
         const btnMoreOptions = $("#btnMoreOptions");
         const btnSaveChanges = $("#btnSaveChanges");
 
-        // Add "Save Photo" button dynamically
+        // Add "Save Photo" button dynamically (so HTML doesn’t need to change)
         let btnSavePhoto = $("#btnSavePhoto");
         if (!btnSavePhoto) {
             btnSavePhoto = document.createElement("button");
@@ -173,32 +195,41 @@
         try {
             const userDoc = await db().collection("users").doc(profileUid).get();
             if (!userDoc.exists) {
-                nameEl.textContent = "User not found";
+                if (nameEl) nameEl.textContent = "User not found";
                 return;
             }
             profileData = userDoc.data() || {};
             profileData.uid = profileUid;
 
+            // username (non-fatal)
             try {
-                const uSnap = await db().collection("usernames").where("uid", "==", profileUid).limit(1).get();
+                const uSnap = await db()
+                    .collection("usernames")
+                    .where("uid", "==", profileUid)
+                    .limit(1)
+                    .get();
                 if (!uSnap.empty) profileData.username = uSnap.docs[0].id;
             } catch (e) {
                 console.warn("Username lookup skipped:", e);
             }
 
-            nameEl.textContent = profileData.displayName || "No name";
-            usernameEl.textContent = profileData.username ? `@${profileData.username}` : "";
-            photoEl.src =
-                profileData.photoURL ||
-                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
-            bioEl.textContent =
-                profileData.bio ||
-                (isMyProfile
-                    ? "You haven't written a bio yet. Click 'Edit Profile' to add one."
-                    : "This user hasn't written a bio yet.");
+            // populate UI
+            if (nameEl) nameEl.textContent = profileData.displayName || "No name";
+            if (usernameEl) usernameEl.textContent = profileData.username ? `@${profileData.username}` : "";
+            if (photoEl)
+                photoEl.src =
+                    profileData.photoURL ||
+                    "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+            if (bioEl)
+                bioEl.textContent =
+                    profileData.bio ||
+                    (isMyProfile
+                        ? "You haven't written a bio yet. Click 'Edit Profile' to add one."
+                        : "This user hasn't written a bio yet.");
             renderQuirks(profileData.quirks || []);
-            if (isMyProfile) headerTitle.textContent = "My Profile";
+            if (isMyProfile && headerTitle) headerTitle.textContent = "My Profile";
 
+            // sections (fire and forget; each has its own try/catch)
             const streak = await calculateStreak(profileUid);
             await calculateAndShowAchievements(profileUid, streak);
             await loadAndDisplayBadges(profileUid);
@@ -215,11 +246,15 @@
                 await loadNotesAndQuotes(me.uid);
             } else {
                 await checkFriendshipAndShowActions(me.uid, profileUid);
-                await calculateAndShowCompatibility(me, profileData);
+                if (typeof calculateAndShowCompatibility === "function") {
+                    try {
+                        await calculateAndShowCompatibility(me, profileData);
+                    } catch { }
+                }
             }
         } catch (error) {
             console.error("Failed to load profile:", error);
-            nameEl.textContent = "Error loading profile";
+            if (nameEl) nameEl.textContent = "Error loading profile";
             return;
         }
 
@@ -227,26 +262,84 @@
         let pendingPhotoDataURL = null;
 
         if (isMyProfile) {
-            btnEditProfile.style.display = "inline-flex";
-            btnCreateShelf.style.display = "inline-flex";
-            btnChangePhoto.style.display = "grid";
+            if (btnEditProfile) btnEditProfile.style.display = "inline-flex";
+            if (btnCreateShelf) btnCreateShelf.style.display = "inline-flex";
+            if (btnChangePhoto) btnChangePhoto.style.display = "grid";
 
-            editName.value = profileData.displayName || "";
+            if (editName) editName.value = profileData.displayName || "";
             wireUpQuirksEditor(profileData.quirks || []);
-            editBio.value = profileData.bio || "";
+            if (editBio) editBio.value = profileData.bio || "";
 
-            btnEditProfile.addEventListener("click", () => {
-                const cur = editProfileSection.style.display;
-                editProfileSection.style.display = cur === "none" || !cur ? "block" : "none";
+            // ======== Edit Profile as a mobile bottom sheet ========
+            const editSection = editProfileSection;
+
+            // create a backdrop once (for mobile sheet)
+            let editBackdrop = $("#editBackdrop");
+            if (!editBackdrop) {
+                editBackdrop = document.createElement("div");
+                editBackdrop.id = "editBackdrop";
+                editBackdrop.className = "sheet-backdrop";
+                document.body.appendChild(editBackdrop);
+            }
+
+            // add a close (×) button to the section if it doesn't exist
+            let editCloseBtn = $("#editCloseBtn");
+            if (!editCloseBtn && editSection) {
+                editCloseBtn = document.createElement("button");
+                editCloseBtn.id = "editCloseBtn";
+                editCloseBtn.className = "btn btn-icon sheet-close";
+                editCloseBtn.innerHTML = `<i class="fa fa-times"></i>`;
+                editSection.prepend(editCloseBtn);
+            }
+
+            const isPhone = () => window.matchMedia("(max-width: 768px)").matches;
+
+            function openEdit() {
+                if (!editSection) return;
+
+                if (isPhone()) {
+                    document.body.classList.add("no-scroll");
+                    editBackdrop.classList.add("show");
+                    editSection.classList.add("sheet-open");
+                    setTimeout(() => editSection.querySelector("input,textarea,select,button")?.focus(), 120);
+                } else {
+                    editSection.style.display = "block";
+                    editSection.scrollIntoView({ behavior: "smooth", block: "start" });
+                }
+            }
+
+            function closeEdit() {
+                if (!editSection) return;
+
+                if (isPhone()) {
+                    document.body.classList.remove("no-scroll");
+                    editBackdrop.classList.remove("show");
+                    editSection.classList.remove("sheet-open");
+                } else {
+                    editSection.style.display = "none";
+                }
+            }
+
+            btnEditProfile?.addEventListener("click", () => {
+                if (!isPhone()) {
+                    const visible = editSection && editSection.style.display === "block";
+                    if (visible) closeEdit();
+                    else openEdit();
+                } else {
+                    openEdit();
+                }
             });
+            editBackdrop.addEventListener("click", closeEdit);
+            editCloseBtn?.addEventListener("click", closeEdit);
+            // ======== end bottom sheet wiring ========
 
-            btnChangePhoto.addEventListener("click", () => photoInput.click());
-            photoInput.addEventListener("change", async () => {
+            btnChangePhoto?.addEventListener("click", () => photoInput?.click());
+            photoInput?.addEventListener("change", async () => {
                 const file = photoInput.files?.[0];
                 if (!file) return;
                 try {
                     pendingPhotoDataURL = await fileToCompressedDataURL(file, 360, 360, 0.85);
-                    photoEl.src = pendingPhotoDataURL;
+                    if (photoEl) photoEl.src = pendingPhotoDataURL;
                     btnSavePhoto.style.display = "";
                 } catch (e) {
                     console.error(e);
@@ -283,45 +376,59 @@
                 }
             });
 
-            btnSaveChanges.addEventListener("click", saveChanges);
-            btnCreateShelf.addEventListener("click", createNewShelf);
+            btnSaveChanges?.addEventListener("click", saveChanges);
+            btnCreateShelf?.addEventListener("click", createNewShelf);
+
+            async function saveChanges() {
+                const newName = (editName?.value || "").trim();
+                const newQuirks = getSelectedQuirks();
+                const newBio = (editBio?.value || "").trim();
+
+                if (btnSaveChanges) {
+                    btnSaveChanges.disabled = true;
+                    btnSaveChanges.textContent = "Saving...";
+                }
+
+                try {
+                    const updates = {
+                        displayName: newName,
+                        quirks: newQuirks,
+                        bio: newBio,
+                        displayName_lower: (newName || "").toLowerCase(),
+                    };
+                    await db().collection("users").doc(me.uid).set(updates, { merge: true });
+
+                    if (nameEl) nameEl.textContent = newName || "No name";
+                    renderQuirks(newQuirks);
+                    if (bioEl)
+                        bioEl.textContent =
+                            newBio || "You haven't written a bio yet. Click 'Edit Profile' to add one.";
+                    alert("Profile saved!");
+
+                    // close the sheet on mobile after save
+                    if (window.matchMedia("(max-width: 768px)").matches) {
+                        setTimeout(() => {
+                            document.body.classList.remove("no-scroll");
+                            $("#editBackdrop")?.classList.remove("show");
+                            editProfileSection?.classList.remove("sheet-open");
+                        }, 150);
+                    }
+                } catch (error) {
+                    console.error("Failed to save profile:", error);
+                    alert("Could not save. Please try again.");
+                } finally {
+                    if (btnSaveChanges) {
+                        btnSaveChanges.disabled = false;
+                        btnSaveChanges.textContent = "Save Changes";
+                    }
+                }
+            }
         } else {
-            otherUserActions.style.display = "flex";
-            btnMoreOptions.addEventListener("click", () =>
+            if (otherUserActions) otherUserActions.style.display = "flex";
+            btnMoreOptions?.addEventListener("click", () =>
                 showMoreOptions(profileData.uid, profileData.displayName || "this user")
             );
-            btnMessage.addEventListener("click", () => (location.href = `chat.html?buddy=${profileData.uid}`));
-        }
-
-        // ---------- save profile fields ----------
-        async function saveChanges() {
-            const newName = (editName.value || "").trim();
-            const newQuirks = getSelectedQuirks();
-            const newBio = (editBio.value || "").trim();
-
-            btnSaveChanges.disabled = true;
-            btnSaveChanges.textContent = "Saving...";
-
-            try {
-                const updates = {
-                    displayName: newName,
-                    quirks: newQuirks,
-                    bio: newBio,
-                    displayName_lower: (newName || "").toLowerCase(),
-                };
-                await db().collection("users").doc(me.uid).set(updates, { merge: true });
-
-                nameEl.textContent = newName || "No name";
-                renderQuirks(newQuirks);
-                bioEl.textContent = newBio || "You haven't written a bio yet. Click 'Edit Profile' to add one.";
-                alert("Profile saved!");
-            } catch (error) {
-                console.error("Failed to save profile:", error);
-                alert("Could not save. Please try again.");
-            } finally {
-                btnSaveChanges.disabled = false;
-                btnSaveChanges.textContent = "Save Changes";
-            }
+            btnMessage?.addEventListener("click", () => (location.href = `chat.html?buddy=${profileData.uid}`));
         }
 
         // ---------- shelves (create + render custom) ----------
@@ -329,16 +436,28 @@
             const shelfName = prompt("Name your new shelf:", "");
             if (!shelfName || !shelfName.trim()) return;
             try {
-                await db().collection("users").doc(me.uid).collection("shelves").add({
-                    name: shelfName.trim(),
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    bookIds: [],
-                });
+                await db()
+                    .collection("users")
+                    .doc(me.uid)
+                    .collection("shelves")
+                    .add({
+                        name: shelfName.trim(),
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        bookIds: [],
+                    });
                 await loadAndRenderCustomShelves(me.uid, true);
             } catch (error) {
                 console.error("Failed to create shelf:", error);
                 alert("Could not create the shelf. Please try again.");
             }
+        }
+
+        function renderSkeletons(host, count = 3) {
+            const tpl = $("#skeleton-card-template");
+            if (!tpl || !host) return;
+            const frag = document.createDocumentFragment();
+            for (let i = 0; i < count; i++) frag.appendChild(tpl.content.cloneNode(true));
+            host.appendChild(frag);
         }
 
         async function loadAndRenderCustomShelves(uid, isMy) {
@@ -351,8 +470,10 @@
                     .collection("users")
                     .doc(uid)
                     .collection("shelves")
+                    .orderBy("order", "asc")
                     .orderBy("createdAt", "desc")
                     .get();
+
                 if (snap.empty) return;
 
                 for (const shelfDoc of snap.docs) {
@@ -367,17 +488,26 @@
 
                     const head = document.createElement("div");
                     head.className = "card-head";
-                    head.innerHTML = `<h3>${esc(name)}</h3>`;
+                    head.innerHTML = `<h3><span class="shelf-handle" style="display:none; cursor:grab; margin-right:8px;">☰</span>${esc(
+                        name
+                    )}</h3>`;
 
                     if (isMy) {
                         const actions = document.createElement("div");
                         actions.className = "shelf-actions";
                         actions.innerHTML = `
-              <button class="btn btn-secondary small" data-rename="${shelfId}"><i class="fa fa-pen"></i> Rename</button>
-              <button class="btn btn-secondary small" data-manage="${shelfId}"><i class="fa fa-plus"></i> Add/Remove Books</button>
-              <button class="btn btn-icon" title="Delete shelf" data-delete="${shelfId}"><i class="fa fa-trash"></i></button>
+              <button class="btn btn-icon" title="Rename shelf" data-rename="${esc(
+                            shelfId
+                        )}"><i class="fa fa-pen"></i></button>
+              <button class="btn btn-icon" title="Manage books in this shelf" data-manage="${esc(
+                            shelfId
+                        )}"><i class="fa-solid fa-list-check"></i></button>
+              <button class="btn btn-icon" title="Delete shelf" data-delete="${esc(
+                            shelfId
+                        )}"><i class="fa fa-trash"></i></button>
             `;
                         head.appendChild(actions);
+                        head.querySelector(".shelf-handle").style.display = "inline-block";
                     }
 
                     const grid = document.createElement("div");
@@ -387,6 +517,7 @@
                     container.appendChild(sec);
 
                     if (bookIds.length) {
+                        renderSkeletons(grid, Math.min(bookIds.length, 5));
                         const refs = bookIds.map((id) =>
                             db().collection("users").doc(uid).collection("books").doc(id).get()
                         );
@@ -397,6 +528,7 @@
                             const card = createCardElement(bs, isMy);
                             if (card) frag.appendChild(card);
                         });
+                        grid.innerHTML = "";
                         grid.appendChild(frag);
                         wireShelfGridActions(grid, isMy, "customShelf");
                     } else {
@@ -404,6 +536,31 @@
                     }
                 }
 
+                // Drag-and-drop reordering (optional)
+                if (isMy && typeof Sortable !== "undefined") {
+                    Sortable.create(container, {
+                        animation: 150,
+                        handle: ".shelf-handle",
+                        onEnd: async () => {
+                            const shelfElements = $$("[data-shelf-id]", container);
+                            const batch = db().batch();
+                            shelfElements.forEach((el, index) => {
+                                const id = el.dataset.shelfId;
+                                if (id) {
+                                    const ref = db().collection("users").doc(uid).collection("shelves").doc(id);
+                                    batch.update(ref, { order: index });
+                                }
+                            });
+                            try {
+                                await batch.commit();
+                            } catch (e) {
+                                console.error("Shelf reorder failed", e);
+                            }
+                        },
+                    });
+                }
+
+                // delegated actions
                 container.onclick = async (e) => {
                     const renameBtn = e.target.closest("[data-rename]");
                     const delBtn = e.target.closest("[data-delete]");
@@ -413,10 +570,12 @@
                         const id = renameBtn.getAttribute("data-rename");
                         const newName = prompt("New shelf name:");
                         if (!newName || !newName.trim()) return;
-                        await db().collection("users").doc(uid).collection("shelves").doc(id).set(
-                            { name: newName.trim() },
-                            { merge: true }
-                        );
+                        await db()
+                            .collection("users")
+                            .doc(uid)
+                            .collection("shelves")
+                            .doc(id)
+                            .set({ name: newName.trim() }, { merge: true });
                         await loadAndRenderCustomShelves(uid, isMy);
                     }
                     if (delBtn) {
@@ -438,7 +597,7 @@
             }
         }
 
-        // ---------- Shelf Picker (manage one shelf’s books) ----------
+        // ---------- Shelf Picker (manage one shelf’s books at once) ----------
         async function openShelfPicker(uid, shelfId, shelfName = "Shelf") {
             const modal = $("#shelfPickerModal");
             const nameEl = $("#spShelfName");
@@ -450,128 +609,116 @@
 
             if (!modal) return;
 
-            // Open modal & basic bindings FIRST so you can cancel even if loading fails
             nameEl.textContent = shelfName;
             listEl.innerHTML = `<div class="muted">Loading your books…</div>`;
             countEl.textContent = "0";
-            modal.style.display = "flex";
+            modal.classList.add("show");
 
-            const close = () => (modal.style.display = "none");
-            btnCancel.onclick = close;
-            // Close on backdrop click (outside sheet)
-            modal.onclick = (e) => {
-                if (e.target === modal) close();
-            };
-            // Close on Esc
-            const escHandler = (e) => {
-                if (e.key === "Escape") close();
-            };
-            document.addEventListener("keydown", escHandler, { once: true });
+            const shelfRef = db().collection("users").doc(uid).collection("shelves").doc(shelfId);
+            const shelfSnap = await shelfRef.get();
+            const selected = new Set(
+                shelfSnap.exists && Array.isArray(shelfSnap.data().bookIds)
+                    ? shelfSnap.data().bookIds
+                    : []
+            );
 
+            let booksSnap;
             try {
-                const shelfRef = db().collection("users").doc(uid).collection("shelves").doc(shelfId);
-                const shelfSnap = await shelfRef.get();
-                const selected = new Set(
-                    shelfSnap.exists && Array.isArray(shelfSnap.data().bookIds) ? shelfSnap.data().bookIds : []
-                );
-
-                // Try orderBy(createdAt) first; fall back to plain get() if it errors
-                let booksSnap;
-                try {
-                    booksSnap = await db()
-                        .collection("users")
-                        .doc(uid)
-                        .collection("books")
-                        .orderBy("createdAt", "desc")
-                        .limit(300)
-                        .get();
-                } catch (err) {
-                    console.warn("orderBy(createdAt) failed — falling back to unordered get()", err);
-                    booksSnap = await db().collection("users").doc(uid).collection("books").get();
-                }
-
-                const books = booksSnap.docs.map((d) => {
-                    const b = d.data() || {};
-                    return {
-                        id: d.id,
-                        title: b.title || "Untitled",
-                        author: b.author || "",
-                        cover: b.coverUrl || b.coverDataUrl || "",
-                        search: ((b.title || "") + " " + (b.author || "")).toLowerCase(),
-                    };
-                });
-
-                function render(items) {
-                    if (!items.length) {
-                        listEl.innerHTML = `<div class="muted">No books found.</div>`;
-                        countEl.textContent = String(selected.size);
-                        return;
-                    }
-                    listEl.innerHTML = items
-                        .map(
-                            (b) => `
-              <div class="shelf-picker-item ${selected.has(b.id) ? "selected" : ""}"
-                   data-id="${esc(b.id)}" data-search="${esc(b.search)}"
-                   title="${esc(b.title)} — ${esc(b.author)}">
-                <img class="cover" src="${esc(b.cover)}" onerror="this.src='';this.style.background='#eee'">
-                <div class="col">
-                  <div class="t">${esc(b.title)}</div>
-                  <div class="a">${esc(b.author)}</div>
-                </div>
-                <div class="check" aria-hidden="true"></div>
-              </div>`
-                        )
-                        .join("");
-                    countEl.textContent = String(selected.size);
-                }
-                render(books);
-
-                listEl.onclick = (e) => {
-                    const item = e.target.closest(".shelf-picker-item");
-                    if (!item) return;
-                    const id = item.getAttribute("data-id");
-                    if (selected.has(id)) {
-                        selected.delete(id);
-                        item.classList.remove("selected");
-                    } else {
-                        selected.add(id);
-                        item.classList.add("selected");
-                    }
-                    countEl.textContent = String(selected.size);
-                };
-
-                searchEl.oninput = (e) => {
-                    const q = (e.target.value || "").toLowerCase().trim();
-                    if (!q) return render(books);
-                    render(books.filter((b) => b.search.includes(q)));
-                };
-
-                btnSave.onclick = async () => {
-                    btnSave.disabled = true;
-                    btnSave.textContent = "Saving…";
-                    try {
-                        await shelfRef.set(
-                            {
-                                name: shelfName,
-                                bookIds: Array.from(selected),
-                                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                            },
-                            { merge: true }
-                        );
-                        close();
-                    } catch (e) {
-                        console.warn(e);
-                        alert("Could not save shelf.");
-                    } finally {
-                        btnSave.disabled = false;
-                        btnSave.textContent = "Save to Shelf";
-                    }
-                };
-            } catch (e) {
-                console.error("Shelf picker failed:", e);
-                $("#spList").innerHTML =
-                    `<div class="muted">Could not load your books. Try again.</div>`;
+                booksSnap = await db()
+                    .collection("users")
+                    .doc(uid)
+                    .collection("books")
+                    .orderBy("createdAt", "desc")
+                    .limit(300)
+                    .get();
+            } catch {
+                booksSnap = await db().collection("users").doc(uid).collection("books").limit(300).get();
             }
+
+            const books = booksSnap.docs.map((d) => {
+                const b = d.data() || {};
+                return {
+                    id: d.id,
+                    title: b.title || "Untitled",
+                    author: b.author || "",
+                    cover: b.coverUrl || b.coverDataUrl || "",
+                    search: ((b.title || "") + " " + (b.author || "")).toLowerCase(),
+                };
+            });
+
+            function render(items) {
+                if (!items.length) {
+                    listEl.innerHTML = `<div class="muted">No books found.</div>`;
+                    return;
+                }
+                listEl.innerHTML = items
+                    .map(
+                        (b) => `
+          <div class="shelf-picker-item ${selected.has(b.id) ? "selected" : ""}" data-id="${esc(
+                            b.id
+                        )}" data-search="${esc(b.search)}" title="${esc(b.title)} — ${esc(b.author)}">
+            <img class="cover" src="${esc(
+                            b.cover
+                        )}" onerror="this.src='';this.style.background='#eee'">
+            <div class="col">
+              <div class="t">${esc(b.title)}</div>
+              <div class="a">${esc(b.author)}</div>
+            </div>
+            <div class="check" aria-hidden="true"></div>
+          </div>`
+                    )
+                    .join("");
+                countEl.textContent = String(selected.size);
+            }
+            render(books);
+
+            listEl.onclick = (e) => {
+                const item = e.target.closest(".shelf-picker-item");
+                if (!item) return;
+                const id = item.getAttribute("data-id");
+                if (selected.has(id)) {
+                    selected.delete(id);
+                    item.classList.remove("selected");
+                } else {
+                    selected.add(id);
+                    item.classList.add("selected");
+                }
+                countEl.textContent = String(selected.size);
+            };
+
+            searchEl.oninput = (e) => {
+                const q = (e.target.value || "").toLowerCase().trim();
+                if (!q) return render(books);
+                render(books.filter((b) => b.search.includes(q)));
+            };
+
+            const closeModal = () => modal.classList.remove("show");
+            btnCancel.onclick = closeModal;
+            modal.addEventListener("click", (e) => {
+                if (e.target === modal) closeModal();
+            });
+
+            btnSave.onclick = async () => {
+                btnSave.disabled = true;
+                btnSave.textContent = "Saving…";
+                try {
+                    await shelfRef.set(
+                        {
+                            name: shelfName,
+                            bookIds: Array.from(selected),
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        },
+                        { merge: true }
+                    );
+                    closeModal();
+                } catch (e) {
+                    console.warn(e);
+                    alert("Could not save shelf.");
+                } finally {
+                    btnSave.disabled = false;
+                    btnSave.textContent = "Save to Shelf";
+                }
+            };
         }
 
         // ---------- Quick chooser: add a single book to shelves ----------
@@ -585,24 +732,16 @@
             const btnSave = $("#scSave");
 
             if (!modal) return;
-
-            const close = () => (modal.style.display = "none");
             titleEl.textContent = `“${bookTitle}”`;
             newNameInput.value = "";
-            modal.style.display = "flex";
-            modal.onclick = (e) => { if (e.target === modal) close(); };
-            const escHandler = (e) => { if (e.key === "Escape") close(); };
-            document.addEventListener("keydown", escHandler, { once: true });
-            btnCancel.onclick = close;
 
-            // load shelves (fallback if order fails)
-            let shelvesSnap;
-            try {
-                shelvesSnap = await db().collection("users").doc(uid).collection("shelves")
-                    .orderBy("createdAt", "desc").get();
-            } catch {
-                shelvesSnap = await db().collection("users").doc(uid).collection("shelves").get();
-            }
+            // load shelves
+            const shelvesSnap = await db()
+                .collection("users")
+                .doc(uid)
+                .collection("shelves")
+                .orderBy("createdAt", "desc")
+                .get();
             const shelves = shelvesSnap.docs.map((d) => ({ id: d.id, ...(d.data() || {}) }));
             const membership = new Set(
                 shelves.filter((s) => Array.isArray(s.bookIds) && s.bookIds.includes(bookId)).map((s) => s.id)
@@ -616,17 +755,18 @@
                 listEl.innerHTML = shelves
                     .map(
                         (s) => `
-            <div class="shelf-chooser-item" data-id="${esc(s.id)}">
-              <label>
-                <input type="checkbox" ${membership.has(s.id) ? "checked" : ""}>
-                ${esc(s.name || "Untitled Shelf")}
-              </label>
-              <span class="count">${Array.isArray(s.bookIds) ? s.bookIds.length : 0}</span>
-            </div>`
+          <div class="shelf-chooser-item" data-id="${esc(s.id)}">
+            <label>
+              <input type="checkbox" ${membership.has(s.id) ? "checked" : ""}>
+              ${esc(s.name || "Untitled Shelf")}
+            </label>
+            <span class="count">${Array.isArray(s.bookIds) ? s.bookIds.length : 0}</span>
+          </div>`
                     )
                     .join("");
             }
             render();
+            modal.classList.add("show");
 
             btnCreate.onclick = async () => {
                 const name = newNameInput.value.trim();
@@ -642,7 +782,7 @@
                             bookIds: [],
                         });
                     shelves.unshift({ id: ref.id, name, bookIds: [] });
-                    membership.add(ref.id); // pre-select new shelf
+                    membership.add(ref.id); // pre-select
                     newNameInput.value = "";
                     render();
                 } catch (e) {
@@ -651,10 +791,17 @@
                 }
             };
 
+            const closeModal = () => modal.classList.remove("show");
+            btnCancel.onclick = closeModal;
+            modal.addEventListener("click", (e) => {
+                if (e.target === modal) closeModal();
+            });
+
             btnSave.onclick = async () => {
                 btnSave.disabled = true;
                 btnSave.textContent = "Saving…";
                 try {
+                    // read current checkbox state
                     const updates = [];
                     $$(".shelf-chooser-item", listEl).forEach((row) => {
                         const id = row.getAttribute("data-id");
@@ -682,7 +829,7 @@
                         }
                     });
                     await Promise.all(updates);
-                    close();
+                    closeModal();
                 } catch (e) {
                     console.warn(e);
                     alert("Could not update shelves.");
@@ -707,16 +854,16 @@
                     const noteHtml = quote.note ? `<div class="note-body">${quote.note}</div>` : "";
                     const quoteData = encodeURIComponent(JSON.stringify(quote));
                     return `
-            <div class="quote-item" data-search-text="${(quote.text + " " + (quote.note || "")).toLowerCase()}">
-              <blockquote class="quote-text">“${quote.text}”</blockquote>
-              ${noteHtml}
-              <div class="quote-meta">
-                <span>From <strong>${quote.bookTitle || "a book"}</strong></span>
-                <button class="btn btn-secondary small" data-action="share-quote" data-quote='${quoteData}'>
-                  <i class="fa-solid fa-share-nodes"></i> Share
-                </button>
-              </div>
-            </div>`;
+          <div class="quote-item" data-search-text="${(quote.text + " " + (quote.note || "")).toLowerCase()}">
+            <blockquote class="quote-text">“${quote.text}”</blockquote>
+            ${noteHtml}
+            <div class="quote-meta">
+              <span>From <strong>${quote.bookTitle || "a book"}</strong></span>
+              <button class="btn btn-secondary small" data-action="share-quote" data-quote='${quoteData}'>
+                <i class="fa-solid fa-share-nodes"></i> Share
+              </button>
+            </div>
+          </div>`;
                 })
                 .join("");
         }
@@ -801,10 +948,7 @@
                     bookIds.map((id) => db().collection("users").doc(uid).collection("books").doc(id).get())
                 );
                 const coverMap = new Map(bookSnaps.map((s) => [s.id, (s.data() || {}).coverUrl]));
-                allQuotes = snap.docs.map((doc) => ({
-                    ...doc.data(),
-                    bookCoverUrl: coverMap.get(doc.data().bookId),
-                }));
+                allQuotes = snap.docs.map((doc) => ({ ...doc.data(), bookCoverUrl: coverMap.get(doc.data().bookId) }));
                 renderNotes(allQuotes);
                 section.style.display = "block";
             } catch (e) {
@@ -820,13 +964,22 @@
             const wrap = $("#quoteCardCanvasWrap");
             const dl = $("#downloadQuoteCardBtn");
             wrap.innerHTML = `<p class="muted">Generating card...</p>`;
-            modal.style.display = "flex";
+            modal.classList.add("show");
             const canvas = await generateQuoteCard(quote);
             wrap.innerHTML = "";
             wrap.appendChild(canvas);
             dl.href = canvas.toDataURL("image/png");
+            $("#closeQuoteCardBtn")?.addEventListener("click", () => modal.classList.remove("show"), {
+                once: true,
+            });
+            modal.addEventListener(
+                "click",
+                (evt) => {
+                    if (evt.target === modal) modal.classList.remove("show");
+                },
+                { once: true }
+            );
         });
-        $("#closeQuoteCardBtn")?.addEventListener("click", () => ($("#quoteCardModal").style.display = "none"));
         $("#notesSearchInput")?.addEventListener("input", (e) => {
             const q = (e.target.value || "").toLowerCase().trim();
             if (!q) return renderNotes(allQuotes);
@@ -844,9 +997,10 @@
         function renderQuirks(quirks) {
             const host = $("#quirksContainer");
             if (!host) return;
-            host.innerHTML = Array.isArray(quirks) && quirks.length
-                ? quirks.map((q) => `<span class="quirk-chip">${q}</span>`).join("")
-                : "";
+            host.innerHTML =
+                Array.isArray(quirks) && quirks.length
+                    ? quirks.map((q) => `<span class="quirk-chip">${q}</span>`).join("")
+                    : "";
         }
         function wireUpQuirksEditor(selectedQuirks) {
             const quirksList =
@@ -915,8 +1069,7 @@
                         favBtn.classList.toggle("active", next);
                         if (shelfId === "favoritesShelf" && !next) {
                             card.remove();
-                            if (!grid.children.length)
-                                grid.closest(".profile-shelf").style.display = "none";
+                            if (!grid.children.length) grid.closest(".profile-shelf").style.display = "none";
                         }
                     } catch (err) {
                         console.warn("Favorite toggle failed:", err);
@@ -946,7 +1099,8 @@
                 grid.innerHTML = "";
                 grid.appendChild(frag);
                 shelf.style.display = "block";
-                shelf.querySelector(".see-all-btn")?.style && (shelf.querySelector(".see-all-btn").style.display = isMyProfile ? "" : "none");
+                const seeAll = shelf.querySelector(".see-all-btn");
+                if (isMyProfile && seeAll) seeAll.style.display = "";
                 wireShelfGridActions(grid, isMyProfile, "currentlyReadingShelf");
             } catch (e) {
                 console.warn("Currently Reading load failed:", e);
@@ -973,7 +1127,8 @@
                 grid.innerHTML = "";
                 grid.appendChild(frag);
                 shelf.style.display = "block";
-                shelf.querySelector(".see-all-btn")?.style && (shelf.querySelector(".see-all-btn").style.display = isMyProfile ? "" : "none");
+                const seeAll = shelf.querySelector(".see-all-btn");
+                if (isMyProfile && seeAll) seeAll.style.display = "";
                 wireShelfGridActions(grid, isMyProfile, "favoritesShelf");
             } catch (e) {
                 console.warn("Favorites load failed:", e);
@@ -984,14 +1139,42 @@
             const grid = shelf?.querySelector(".shelf-grid");
             if (!shelf || !grid) return;
             try {
-                const snap = await db()
-                    .collection("users")
-                    .doc(uid)
-                    .collection("books")
-                    .where("status", "==", "finished")
-                    .orderBy("finished", "desc")
-                    .limit(10)
-                    .get();
+                // Try the nice query (needs composite index if you see a console link)
+                let snap;
+                try {
+                    snap = await db()
+                        .collection("users")
+                        .doc(uid)
+                        .collection("books")
+                        .where("status", "==", "finished")
+                        .orderBy("finished", "desc")
+                        .limit(10)
+                        .get();
+                } catch (err) {
+                    // Fallback that never crashes: filter client-side
+                    if (err && err.code === "failed-precondition") {
+                        const raw = await db()
+                            .collection("users")
+                            .doc(uid)
+                            .collection("books")
+                            .where("status", "==", "finished")
+                            .limit(50)
+                            .get();
+                        const docs = raw.docs
+                            .map((d) => ({ id: d.id, ...d.data() }))
+                            .sort(
+                                (a, b) =>
+                                    new Date(b.finished || b.updatedAt?.toDate?.() || 0) -
+                                    new Date(a.finished || a.updatedAt?.toDate?.() || 0)
+                            )
+                            .slice(0, 10)
+                            .map((d) => ({ data: () => d, id: d.id }));
+                        snap = { empty: docs.length === 0, forEach: (fn) => docs.forEach((x) => fn(x)) };
+                    } else {
+                        throw err;
+                    }
+                }
+
                 if (snap.empty) return;
                 const frag = document.createDocumentFragment();
                 snap.forEach((doc) => {
@@ -1001,7 +1184,8 @@
                 grid.innerHTML = "";
                 grid.appendChild(frag);
                 shelf.style.display = "block";
-                shelf.querySelector(".see-all-btn")?.style && (shelf.querySelector(".see-all-btn").style.display = isMyProfile ? "" : "none");
+                const seeAll = shelf.querySelector(".see-all-btn");
+                if (isMyProfile && seeAll) seeAll.style.display = "";
                 wireShelfGridActions(grid, isMyProfile, "finishedShelf");
             } catch (e) {
                 console.warn("Finished load failed:", e);
@@ -1028,7 +1212,8 @@
                 grid.innerHTML = "";
                 grid.appendChild(frag);
                 shelf.style.display = "block";
-                shelf.querySelector(".see-all-btn")?.style && (shelf.querySelector(".see-all-btn").style.display = isMyProfile ? "" : "none");
+                const seeAll = shelf.querySelector(".see-all-btn");
+                if (isMyProfile && seeAll) seeAll.style.display = "";
                 wireShelfGridActions(grid, isMyProfile, "wishlistShelf");
             } catch (e) {
                 console.warn("Wishlist load failed:", e);
@@ -1111,7 +1296,6 @@
                     .where("completedAt", "!=", null)
                     .orderBy("completedAt", "desc")
                     .get();
-
                 if (snap.empty) return;
 
                 const iconMap = {
@@ -1208,8 +1392,10 @@
                     },
                     { merge: true }
                 );
-                btnAddFriend.textContent = "Request Sent ✓";
-                btnAddFriend.disabled = true;
+                if (btnAddFriend) {
+                    btnAddFriend.textContent = "Request Sent ✓";
+                    btnAddFriend.disabled = true;
+                }
             } catch (error) {
                 console.error("Friend request failed:", error);
                 alert("Could not send friend request.");
@@ -1231,28 +1417,45 @@
             }
         }
         async function checkFriendshipAndShowActions(myUid, theirUid) {
-            const friendDoc = await db().collection("users").doc(myUid).collection("friends").doc(theirUid).get();
+            const friendDoc = await db()
+                .collection("users")
+                .doc(myUid)
+                .collection("friends")
+                .doc(theirUid)
+                .get();
             const isFriend = friendDoc.exists && friendDoc.data().status === "accepted";
-
             if (isFriend) {
-                btnAddFriend.textContent = "Friends ✓";
-                btnAddFriend.disabled = true;
+                if (btnAddFriend) {
+                    btnAddFriend.textContent = "Friends ✓";
+                    btnAddFriend.disabled = true;
+                }
             } else {
                 const reqId = [myUid, theirUid].sort().join("__");
                 const reqDoc = await db().collection("friend_requests").doc(reqId).get();
                 if (reqDoc.exists && reqDoc.data().status === "pending") {
-                    btnAddFriend.textContent = "Request Pending...";
-                    btnAddFriend.disabled = true;
+                    if (btnAddFriend) {
+                        btnAddFriend.textContent = "Request Pending...";
+                        btnAddFriend.disabled = true;
+                    }
                 } else {
-                    btnAddFriend.textContent = "Add Friend";
-                    btnAddFriend.onclick = () => addFriend(myUid, theirUid);
+                    if (btnAddFriend) {
+                        btnAddFriend.textContent = "Add Friend";
+                        btnAddFriend.onclick = () => addFriend(myUid, theirUid);
+                    }
                 }
             }
         }
     } // end init
 
-    // boot
-    if (window.onAuthReady && typeof window.onAuthReady.then === "function") {
+    // ------------------ boot ------------------
+    // Prefer your existing requireAuth helper if present
+    if (typeof window.requireAuth === "function") {
+        window.requireAuth(() => {
+            const u = auth().currentUser;
+            if (u) init(u);
+            else location.href = "auth.html";
+        });
+    } else if (window.onAuthReady && typeof window.onAuthReady.then === "function") {
         window.onAuthReady.then((user) => {
             if (user) init(user);
             else location.href = "auth.html";

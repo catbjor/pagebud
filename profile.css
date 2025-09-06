@@ -130,6 +130,12 @@
     gap: 8px;
 }
 
+.shelf-actions .btn-icon {
+    width: 36px;
+    height: 36px;
+    font-size: 15px;
+}
+
 .shelf-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -356,4 +362,554 @@
     border: solid var(--btn-text);
     border-width: 0 2px 2px 0;
     transform: rotate(45deg);
+}
+
+/* --- Reading Goal / Stats Section --- */
+.reading-goal-section {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 20px;
+    align-items: center;
+    background: var(--surface);
+    padding: 16px;
+    border-radius: 12px;
+    margin: 24px 0;
+    width: 100%;
+    max-width: 450px;
+}
+
+.goal-progress-ring {
+    width: 80px;
+    height: 80px;
+    position: relative;
+}
+
+.goal-progress-ring svg {
+    transform: rotate(-90deg);
+}
+
+.goal-progress-ring circle {
+    transition: stroke-dashoffset 0.8s ease-out;
+}
+
+.goal-progress-ring .ring-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+.goal-progress-ring .ring-value {
+    font-size: 1.4rem;
+    font-weight: 900;
+    line-height: 1.1;
+}
+
+.goal-progress-ring .ring-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--muted);
+}
+
+.goal-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    text-align: left;
+}
+
+.goal-stat-item .stat-value {
+    font-size: 1.5rem;
+    font-weight: 800;
+}
+
+.goal-stat-item .stat-label {
+    font-size: 0.85rem;
+    color: var(--muted);
+}
+
+/* --- Skeleton Loader for Book Cards --- */
+.skeleton-card {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 12px;
+    position: relative;
+    overflow: hidden;
+}
+
+.skeleton-thumb {
+    width: 100%;
+    aspect-ratio: 2 / 3;
+    border-radius: 10px;
+    background: var(--surface);
+    margin-bottom: 10px;
+}
+
+.skeleton-line {
+    height: 1em;
+    border-radius: 4px;
+    background: var(--surface);
+}
+
+.skeleton-line.w-80 {
+    width: 80%;
+}
+
+.skeleton-line.w-50 {
+    width: 50%;
+    margin-top: 8px;
+}
+
+.skeleton-card::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    transform: translateX(-100%);
+    background-image: linear-gradient(90deg,
+            rgba(255, 255, 255, 0) 0,
+            rgba(255, 255, 255, 0.3) 20%,
+            rgba(255, 255, 255, 0.5) 60%,
+            rgba(255, 255, 255, 0));
+    animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+/* --- Recent Activity List --- */
+.activity-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    font-size: 0.9rem;
+}
+
+.activity-item:not(:last-child) {
+    border-bottom: 1px solid var(--border);
+}
+
+.activity-icon {
+    color: var(--muted);
+}
+
+/* =========================
+   Responsive shelves layout
+   ========================= */
+:root {
+    --gap: 16px;
+    --gap-sm: 12px;
+    --btn-h: 44px;
+    --btn-sm-h: 44px;
+    /* keep small buttons same height for consistency */
+    --btn-radius: 14px;
+    --btn-font: 0.95rem;
+    --btn-pad-x: 16px;
+}
+
+/* Consistent buttons */
+.btn,
+.btn.small,
+.btn-secondary,
+.btn-primary {
+    min-height: var(--btn-h);
+    padding-inline: var(--btn-pad-x);
+    border-radius: var(--btn-radius);
+    font-size: var(--btn-font);
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .5rem;
+}
+
+.btn.small {
+    min-height: var(--btn-sm-h);
+}
+
+.btn-icon {
+    width: var(--btn-h);
+    min-width: var(--btn-h);
+    height: var(--btn-h);
+    border-radius: 50%;
+    display: inline-grid;
+    place-items: center;
+}
+
+/* The list of your custom shelves */
+#customShelvesContainer {
+    display: grid;
+    gap: var(--gap);
+}
+
+/* Two shelves per row on phones */
+@media (max-width: 599px) {
+    #customShelvesContainer {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+/* Scale up on tablets / desktop */
+@media (min-width:600px) and (max-width:1023px) {
+    #customShelvesContainer {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (min-width:1024px) {
+    #customShelvesContainer {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}
+
+/* Each shelf card */
+.profile-shelf.card {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 14px;
+}
+
+/* Shelf header: title + actions stay tidy */
+.profile-shelf .card-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.profile-shelf .card-head h3 {
+    margin: 0;
+    font-size: 1.05rem;
+    line-height: 1.2;
+    flex: 1;
+}
+
+.profile-shelf .shelf-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: nowrap;
+}
+
+/* Grid of books inside a shelf */
+.profile-shelf .shelf-grid {
+    display: grid;
+    gap: var(--gap-sm);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    /* two book cards per row on phones */
+}
+
+/* More columns as screens get wider */
+@media (min-width:640px) {
+    .profile-shelf .shelf-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (min-width:1024px) {
+    .profile-shelf .shelf-grid {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+}
+
+/* Book card normalization */
+.book-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    height: 100%;
+}
+
+.book-card .thumb {
+    width: 100%;
+    aspect-ratio: 2 / 3;
+    /* keeps covers consistent */
+    object-fit: cover;
+    border-radius: 12px;
+    background: #1112;
+    /* subtle placeholder bg if image missing */
+}
+
+.book-card .title {
+    font-size: .98rem;
+    font-weight: 600;
+}
+
+.book-card .author {
+    opacity: .8;
+    font-size: .9rem;
+}
+
+/* Keep action buttons uniform on cards */
+.book-card .btn {
+    width: 100%;
+}
+
+.book-card .btn-icon {
+    align-self: flex-end;
+}
+
+/* Tighten spacing in tiny screens so two-shelf grid breathes */
+@media (max-width:380px) {
+    :root {
+        --gap: 12px;
+        --gap-sm: 10px;
+    }
+
+    .profile-shelf .card-head h3 {
+        font-size: 1rem;
+    }
+}
+
+/* Optional: make modals’ buttons match too */
+.modal .btn,
+.modal .btn.small {
+    min-height: var(--btn-h);
+    font-size: var(--btn-font);
+    border-radius: var(--btn-radius);
+}
+
+/* =========================
+   Edit Profile: mobile sheet
+   ========================= */
+.sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .45);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s ease;
+    z-index: 59;
+}
+
+.sheet-backdrop.show {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+@media (max-width: 768px) {
+    body.no-scroll {
+        overflow: hidden;
+    }
+
+    /* Turn the existing section into a bottom sheet */
+    #editProfileSection {
+        /* visible on mobile (we use transform to hide/show) */
+        display: block !important;
+
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 60;
+
+        background: var(--surface, #111);
+        border-radius: 18px 18px 0 0;
+        box-shadow: 0 -10px 30px rgba(0, 0, 0, .35);
+
+        transform: translateY(105%);
+        transition: transform .25s ease;
+
+        /* Keep the panel within the screen and scroll inside it */
+        max-height: calc(90vh - env(safe-area-inset-bottom, 0px));
+        overflow: auto;
+
+        padding: 16px;
+        padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    }
+
+    #editProfileSection.sheet-open {
+        transform: translateY(0);
+    }
+
+    /* Close button */
+    #editCloseBtn.sheet-close {
+        position: sticky;
+        top: -8px;
+        margin-left: auto;
+        display: inline-grid;
+        place-items: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, .06);
+        backdrop-filter: blur(6px);
+        z-index: 1;
+    }
+
+    /* Make inputs full width and comfy on mobile */
+    #editProfileSection input[type="text"],
+    #editProfileSection input[type="number"],
+    #editProfileSection textarea {
+        width: 100%;
+    }
+
+    /* Keep the save button sticky at the bottom of the sheet if you like */
+    #editProfileSection .save-row {
+        position: sticky;
+        bottom: 0;
+        background: linear-gradient(to top, var(--surface, #111) 70%, transparent);
+        padding-top: 12px;
+        margin-top: 12px;
+    }
+}
+
+/* ==== Responsive shelf layout (two-up on phones) ==== */
+#customShelvesContainer {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 1100px) {
+    #customShelvesContainer {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 640px) {
+    #customShelvesContainer {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    /* exactly two per row */
+}
+
+/* Shelf card polish */
+.profile-shelf.card {
+    margin: 0;
+}
+
+.profile-shelf .card-head {
+    padding: 8px 6px;
+}
+
+.profile-shelf .shelf-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+/* ==== Consistent button sizing across the page ==== */
+:root {
+    --btn-min-h: 44px;
+    /* tap target size */
+    --btn-radius: 14px;
+    --btn-pad-x: 14px;
+    --btn-font: 500 14px/1.1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+
+.btn,
+.btn-primary,
+.btn-secondary {
+    min-height: var(--btn-min-h);
+    padding: 10px var(--btn-pad-x);
+    border-radius: var(--btn-radius);
+    font: var(--btn-font);
+}
+
+.btn.small {
+    min-height: 36px;
+    padding: 8px 12px;
+    border-radius: 10px;
+}
+
+.btn.large {
+    min-height: 52px;
+    padding: 12px 18px;
+    border-radius: 16px;
+}
+
+/* Icon buttons are square and consistent */
+.btn-icon {
+    width: var(--btn-min-h);
+    min-width: var(--btn-min-h);
+    height: var(--btn-min-h);
+    display: inline-grid;
+    place-items: center;
+    padding: 0;
+    border-radius: 999px;
+}
+
+/* Book-card action buttons stay uniform too */
+.book-card .btn,
+.book-card .btn-primary,
+.book-card .btn-secondary {
+    width: 100%;
+}
+
+/* ==== Edit Profile panel: mobile friendly, never overflows ==== */
+#editProfileSection {
+    width: min(100%, 680px);
+    margin: 16px auto 0;
+    box-sizing: border-box;
+    padding: 16px;
+    overflow: hidden;
+    /* prevent horizontal scroll bleed */
+}
+
+#editProfileSection .form-grid,
+#editProfileSection .form-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+}
+
+#editProfileSection input[type="text"],
+#editProfileSection input[type="number"],
+#editProfileSection textarea {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Quirks wrap nicely on small screens */
+#editProfileSection .quirks-row,
+#editProfileSection #editQuirks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+#editProfileSection #editQuirks .category {
+    flex: 1 1 calc(50% - 8px);
+    text-align: center;
+    padding: 10px 12px;
+    border-radius: 12px;
+}
+
+@media (min-width: 640px) {
+    #editProfileSection #editQuirks .category {
+        flex: 0 0 auto;
+        /* back to chips when there’s room */
+    }
+}
+
+/* Make the whole profile card breathe a bit on phones */
+@media (max-width: 640px) {
+    .profile-card {
+        padding: 16px;
+    }
+}
+
+/* Shelf book grid already responsive, but tighten on very small screens */
+@media (max-width: 480px) {
+    .shelf-grid {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    }
+}
+
+/* Prevent any unexpected horizontal scroll site-wide on mobile */
+html,
+body {
+    max-width: 100%;
+    overflow-x: hidden;
 }

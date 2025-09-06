@@ -73,6 +73,33 @@
                     <div class="score-breakdown"></div>
                 </div>
 
+                <!-- Reading Goal / Stats -->
+                <div id="readingGoalSection" class="reading-goal-section" style="display:none;">
+                    <div class="goal-progress-ring">
+                        <svg width="80" height="80" viewBox="0 0 100 100">
+                            <circle cx="50" cy="50" r="45" fill="none" stroke="var(--border)" stroke-width="10">
+                            </circle>
+                            <circle id="goalProgressRing" cx="50" cy="50" r="45" fill="none" stroke="var(--primary)"
+                                stroke-width="10" stroke-linecap="round" stroke-dasharray="283" stroke-dashoffset="283">
+                            </circle>
+                        </svg>
+                        <div class="ring-center">
+                            <div id="goalProgressValue" class="ring-value">0%</div>
+                            <div class="ring-label">Goal</div>
+                        </div>
+                    </div>
+                    <div class="goal-stats">
+                        <div class="goal-stat-item">
+                            <div id="statsBooksRead" class="stat-value">0</div>
+                            <div class="stat-label">Books this year</div>
+                        </div>
+                        <div class="goal-stat-item">
+                            <div id="statsPagesRead" class="stat-value">0</div>
+                            <div class="stat-label">Pages this year</div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Custom Shelves go here -->
                 <div id="customShelvesContainer"></div>
 
@@ -121,6 +148,10 @@
                         <input type="text" id="editName" placeholder="Your name" />
                     </div>
                     <div class="form-row">
+                        <label for="editReadingGoal">Yearly Reading Goal (Books)</label>
+                        <input type="number" id="editReadingGoal" placeholder="e.g., 50" min="0" />
+                    </div>
+                    <div class="form-row">
                         <label for="editQuirks">Reading Quirks</label>
                         <div class="categories picker-grid" id="editQuirks"></div>
                     </div>
@@ -146,6 +177,14 @@
                     </div>
                     <div id="badgesGrid" class="badges-grid"></div>
                 </section>
+
+                <!-- Recent Activity -->
+                <section id="recentActivitySection" class="profile-shelf card" style="display:none;">
+                    <div class="card-head">
+                        <h3>Recent Activity</h3>
+                    </div>
+                    <div id="recentActivityList"></div>
+                </section>
             </div>
         </main>
 
@@ -159,8 +198,8 @@
         </section>
 
         <!-- Quote card modal -->
-        <div id="quoteCardModal" class="modal-backdrop" style="align-items:center; justify-content:center;">
-            <div class="modal-sheet" style="max-width:min(90vw,450px); bottom:auto;">
+        <div id="quoteCardModal" class="modal-backdrop">
+            <div class="modal-sheet" style="max-width: 450px;">
                 <h3>Your Quote Card</h3>
                 <div id="quoteCardCanvasWrap"
                     style="margin:16px 0; background:var(--surface); padding:10px; border-radius:8px;">
@@ -177,8 +216,8 @@
     </div>
 
     <!-- Shelf Picker (manage a shelf's contents) -->
-    <div id="shelfPickerModal" class="modal-backdrop" style="align-items:center; justify-content:center; display:none;">
-        <div class="modal-sheet" style="max-width:min(92vw,900px); bottom:auto;">
+    <div id="shelfPickerModal" class="modal-backdrop">
+        <div class="modal-sheet" style="max-width: 900px;">
             <div class="row" style="align-items:center; justify-content:space-between; gap:10px;">
                 <h3 style="margin:0">Add books to: <span id="spShelfName"></span></h3>
                 <input id="spSearch" type="search" placeholder="Search your library..." style="max-width:280px">
@@ -198,9 +237,8 @@
     </div>
 
     <!-- Shelf Chooser (add one book to multiple shelves) -->
-    <div id="shelfChooserModal" class="modal-backdrop"
-        style="align-items:center; justify-content:center; display:none;">
-        <div class="modal-sheet" style="max-width:min(92vw,520px); bottom:auto;">
+    <div id="shelfChooserModal" class="modal-backdrop">
+        <div class="modal-sheet" style="max-width: 520px;">
             <h3 style="margin:0 0 6px;">Add to shelves: <span id="scBookTitle"></span></h3>
             <div id="scList" class="shelf-chooser-list" aria-live="polite"></div>
             <div class="row" style="gap:8px; margin-top:10px;">
@@ -234,20 +272,31 @@
                 <div class="card-row spice-chilis" aria-label="spice"></div>
             </div>
             <div class="actions">
-                <button class="btn btn-secondary" data-action="addtoshelf">
-                    <i class="fa fa-plus"></i> Add to Shelf
-                </button>
-                <button class="btn btn-secondary" data-action="open">
+                <button class="btn btn-secondary small" data-action="open">
                     <i class="fa fa-pen"></i> Edit
                 </button>
-                <button class="btn" data-action="read" style="display:none;">
+                <button class="btn small" data-action="read" style="display:none;">
                     <i class="fa fa-book-open"></i> Read
+                </button>
+                <button class="btn btn-icon" title="Add to a shelf" data-action="addtoshelf" style="display: none;">
+                    <i class="fa-solid fa-folder-plus"></i>
                 </button>
             </div>
         </article>
     </template>
 
+    <!-- Skeleton loader for book cards -->
+    <template id="skeleton-card-template">
+        <div class="skeleton-card">
+            <div class="skeleton-thumb"></div>
+            <div class="skeleton-line w-80"></div>
+            <div class="skeleton-line w-50"></div>
+        </div>
+    </template>
+
     <script src="nav.js" defer></script>
+    <!-- Library for drag-and-drop shelves -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="profile-page.js" defer></script>
 </body>
 
