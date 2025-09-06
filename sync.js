@@ -51,22 +51,30 @@
     }
 
     // Merge rule: remote is truth if updated later, otherwise keep local
+    // **Correction**: The remote list is the source of truth for *existence*.
+    // A book present locally but not remotely has been deleted and should be removed.
     function mergeBooks(local, remote) {
-        const map = new Map();
-        local.forEach(b => map.set(b.id, b));
+        const localMap = new Map();
+        local.forEach(b => localMap.set(b.id, b));
+
+        const mergedMap = new Map();
         remote.forEach(rb => {
-            const lb = map.get(rb.id);
-            if (!lb) { map.set(rb.id, rb); return; }
-            const lTime = Date.parse(lb.lastUpdated || lb.updatedAt || 0) || 0;
-            const rTime = Date.parse(rb.lastUpdated || rb.updatedAt || 0) || 0;
-            map.set(rb.id, (rTime >= lTime) ? rb : lb);
+            const lb = localMap.get(rb.id);
+            if (!lb) {
+                mergedMap.set(rb.id, rb); // New remote book, add it.
+            } else {
+                const lTime = Date.parse(lb.lastUpdated || lb.updatedAt || 0) || 0;
+                const rTime = Date.parse(rb.lastUpdated || rb.updatedAt || 0) || 0;
+                mergedMap.set(rb.id, (rTime >= lTime) ? rb : lb); // Keep the newest version.
+            }
         });
-        return Array.from(map.values());
+        return Array.from(mergedMap.values());
     }
 
     // ------------- Core API -------------
     const PBSync = {
         _unsubBooks: null,
+        _pendingDeletes: new Set(),
         _bootstrapped: false,
         getLocalBooks,
         setLocalBooks,
@@ -86,10 +94,21 @@
                 // Initial remote pull + ongoing updates
                 const col = userBooksCol().orderBy("updatedAt", "desc");
                 this._unsubBooks = col.onSnapshot((snap) => {
+                    // If the snapshot has pending writes, it's likely because we just
+                    // performed a local action (like a delete). The snapshot might
+                    // contain stale data from the cache. By ignoring this snapshot,
+                    // we prevent a race condition where a deleted book is re-added.
+                    // A second guard checks against a set of recently deleted IDs.
+                    if (snap.metadata.hasPendingWrites) {
+                        return;
+                    }
+
                     const remoteBooks = [];
                     snap.forEach(doc => remoteBooks.push({ id: doc.id, ...doc.data() }));
                     const merged = mergeBooks(getLocalBooks(), remoteBooks);
-                    setLocalBooks(merged);
+                    // Final guard: filter out any books that are pending deletion.
+                    const finalBooks = merged.filter(b => !this._pendingDeletes.has(b.id));
+                    setLocalBooks(finalBooks);
                 }, (err) => {
                     console.warn("[PBSync] onSnapshot error:", err);
                 });
@@ -167,6 +186,7 @@
          */
         async deleteBook(bookId) {
             if (!bookId) return;
+            this._pendingDeletes.add(bookId);
 
             // Remove from local (optimistic)
             const all = getLocalBooks();
@@ -183,6 +203,9 @@
                     // Note: local is already deleted. We could try to re-add it,
                     // but for now we'll accept the inconsistency and let the next
                     // sync potentially fix it.
+                } finally {
+                    // Clean up the pending set after a delay to allow snapshots to settle.
+                    setTimeout(() => this._pendingDeletes.delete(bookId), 7000);
                 }
             }
         },
@@ -210,9 +233,12 @@
     if (window.fb?.auth) {
         fb.auth.onAuthStateChanged((u) => {
             if (u) {
-                // User in: begin listening and do a gentle initial push
+                // User is signed in.
+                // The most reliable way to sync is to pull the server's state,
+                // which is the single source of truth. `subscribe` does this.
+                // We will NOT push local changes on login, as the local cache
+                // could be stale and cause "undeletion" of books.
                 PBSync.subscribe();
-                PBSync.pushAll().catch(() => { });
             } else {
                 // User out: keep local data; no remote listener
                 if (PBSync._unsubBooks) { PBSync._unsubBooks(); PBSync._unsubBooks = null; }

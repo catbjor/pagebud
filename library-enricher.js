@@ -59,7 +59,9 @@
 
         let books = [];
         try {
-            const snap = await db.collection("users").doc(user.uid).collection("books").limit(500).get();
+            // Force a server read to bypass the local cache, which can be stale after
+            // deletions and cause this script to inadvertently "undelete" books.
+            const snap = await db.collection("users").doc(user.uid).collection("books").limit(500).get({ source: 'server' });
             snap.forEach(d => {
                 const x = d.data() || {};
                 x.__id = d.id;

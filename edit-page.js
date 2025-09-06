@@ -342,7 +342,29 @@
     const delBtn = $("#deleteBtn");
     const cancelBtn = $("#cancelBtn");
 
-    delBtn?.addEventListener("click", () => window.PB_Delete?.deleteBook?.(ctx.data.id, ctx.data.title));
+    if (delBtn) {
+      delBtn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        const bookId = ctx?.data?.id;
+        const bookTitle = ctx?.data?.title || "this book";
+        if (!bookId) return;
+
+        if (confirm(`Are you sure you want to delete "${bookTitle}"? This cannot be undone.`)) {
+          try {
+            if (window.PBSync?.deleteBook) {
+              await window.PBSync.deleteBook(bookId);
+              alert("Book deleted successfully.");
+              window.location.href = 'index.html';
+            } else {
+              alert("Deletion service is not available.");
+            }
+          } catch (error) {
+            console.error("Failed to delete book:", error);
+            alert("There was an error deleting the book. Please try again.");
+          }
+        }
+      });
+    }
     cancelBtn?.addEventListener("click", () => history.back());
 
     const saveBtn = $("#saveBtn") || $('[data-role="save-book"]') || $('[data-action="save"]');

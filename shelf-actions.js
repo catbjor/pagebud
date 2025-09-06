@@ -12,7 +12,7 @@
         if (!modal || !listEl) return;
 
         listEl.innerHTML = `<p class="muted">Loading shelves...</p>`;
-        modal.style.display = 'flex';
+        modal.classList.add('show');
 
         db().collection("users").doc(user.uid).collection("shelves").orderBy("name", "asc").get()
             .then(snap => {
@@ -108,11 +108,11 @@
                 const selectedBookIds = window.PB_MultiSelect?.getSelectedIds?.();
                 await addBooksToShelf(shelfId, selectedBookIds);
                 window.PB_MultiSelect?.clearSelection?.();
-                modal.style.display = 'none';
+                modal.classList.remove('show');
             }
 
             if (e.target.id === 'closeShelfModalBtn' || e.target === modal) {
-                modal.style.display = 'none';
+                modal.classList.remove('show');
             }
         });
     }

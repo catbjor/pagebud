@@ -393,15 +393,22 @@
                 }
 
                 const fileMeta = await saveFn({ file: f, uid: user.uid, bookId: createdBookId, coverBlob: coverBlob2 });
-                await ref.set({
+                const fileUpdatePayload = {
                     hasFile: true,
                     fileName: fileMeta?.name || f.name,
                     fileSize: fileMeta?.size || f.size || null,
                     fileType: fileMeta?.type || f.type || null,
-                    storagePath: fileMeta?.path || null,
-                    downloadURL: fileMeta?.url || null,
+                    filePath: fileMeta?.filePath || null, // Correct field for local files
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                }, { merge: true });
+                };
+
+                // If the file metadata extraction returned a cover, ensure it's saved.
+                // This is the key fix to make sure the extracted cover is persisted.
+                if (fileMeta?.coverDataUrl) {
+                    fileUpdatePayload.coverDataUrl = fileMeta.coverDataUrl;
+                }
+
+                await ref.set(fileUpdatePayload, { merge: true });
             }
 
             showToast("Saved ✓");
