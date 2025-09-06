@@ -64,9 +64,11 @@
                 return; // Exit early
             }
 
-            // The query is ordered by time descending. We must reverse the docs array
-            // to append them in the correct chronological order for display.
-            snapshot.docs.reverse().forEach(doc => {
+            // The CSS uses `flex-direction: column-reverse`, so we don't reverse the snapshot.
+            // The query is already `orderBy("at", "desc")`, so newest messages come first.
+            // Appending them directly places the newest message at the bottom visually,
+            // and the browser handles keeping the view scrolled to the bottom.
+            snapshot.docs.forEach(doc => {
                 const msg = doc.data();
                 const isSent = msg.from === me.uid;
                 const bubble = createMessageBubble(msg, isSent);
@@ -118,21 +120,28 @@
         const messagesRef = chatRef.collection("messages");
 
         try {
-            // Add the new message
-            await messagesRef.add(messagePayload);
+            // Use a batched write to perform both operations atomically.
+            const batch = db().batch();
 
-            // Update the lastMessage and read status on the parent chat doc
-            await chatRef.set({
+            // 1. Add the new message to the subcollection.
+            const newMsgRef = messagesRef.doc();
+            batch.set(newMsgRef, messagePayload);
+
+            // 2. Upsert the parent chat document.
+            // Using set({ merge: true }) makes this robust. It will create the chat
+            // document if it doesn't exist, or update it if it does.
+            batch.set(chatRef, {
+                participants: { [me.uid]: true, [friendUid]: true },
                 lastMessage: {
                     text: text,
                     at: firebase.firestore.FieldValue.serverTimestamp(),
                     from: me.uid,
                 },
-                // Mark as unread for the other participant
-                [`read.${friendUid}`]: false,
-                [`read.${me.uid}`]: true,
+                // Overwriting the read map is correct here, as it pertains to the new lastMessage.
+                read: { [friendUid]: false, [me.uid]: true },
             }, { merge: true });
 
+            await batch.commit();
         } catch (error) {
             console.error("Error sending message:", error);
             alert("Message could not be sent.");
@@ -145,31 +154,81 @@
 
     // Ensure a chat document exists between two users
     async function ensureChatExists() {
-        const chatRef = db().collection("chats").doc(chatId);
-        const chatSnap = await chatRef.get();
-
-        if (!chatSnap.exists) {
-            try {
-                await chatRef.set({
-                    participants: {
-                        [me.uid]: true,
-                        [friendUid]: true
-                    },
-                    read: {
-                        [me.uid]: true,
-                        [friendUid]: true,
-                    },
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                }, { merge: true });
-            } catch (error) {
-                console.error("Failed to create chat document:", error);
-                throw new Error("Could not initialize chat.");
-            }
+        try {
+            const chatRef = db().collection("chats").doc(chatId);
+            // This is an "upsert". It creates the document with the participants
+            // if it doesn't exist, or merges the participants field if it does.
+            // This avoids a separate `get()` call which can fail on new chats due to security rules.
+            await chatRef.set({
+                participants: {
+                    [me.uid]: true,
+                    [friendUid]: true
+                }
+            }, { merge: true });
+        } catch (error) {
+            console.error("Failed to create/ensure chat document:", error);
+            // This is not a critical failure. If it fails (e.g. security rules),
+            // we might still be able to read an existing chat. The robust sendMessage
+            // function can create the chat doc later if needed.
         }
+    }
+
+    // Apply styles and re-order elements for the sticky footer layout
+    function setupChatLayout() {
+        // 1. Inject CSS for flexbox layout
+        const style = document.createElement('style');
+        style.id = 'chat-layout-styles';
+        style.textContent = `
+            html, body {
+                height: 100%;
+                margin: 0;
+                overflow: hidden; /* Prevent scrolling on the body */
+            }
+            body {
+                display: flex;
+                flex-direction: column;
+            }
+            #chatMessages {
+                flex-grow: 1; /* Allow message area to fill space */
+                overflow-y: auto; /* Enable scrolling within the message area */
+                padding: 1rem;
+            }
+            #chatForm, nav {
+                flex-shrink: 0; /* Prevent form and nav from shrinking */
+            }
+            /* Style the form itself for a better chat bar layout */
+            #chatForm {
+                display: flex;
+                gap: 8px;
+                padding: 8px 12px;
+                background: var(--surface);
+                border-top: 1px solid var(--border);
+            }
+            #chatInput {
+                flex-grow: 1;
+                border-radius: 20px; /* Rounded corners for the input */
+                border: 1px solid var(--border);
+            }
+        `;
+        if (!document.getElementById('chat-layout-styles')) {
+            document.head.appendChild(style);
+        }
+
+        // 2. Re-order elements to ensure form and nav are at the bottom.
+        // This moves them to the end of the <body>, and the flexbox CSS handles the rest.
+        const body = document.body;
+        const chatForm = document.getElementById('chatForm');
+        const navbar = document.querySelector('nav'); // Assuming the main navbar is a <nav> tag.
+
+        // Append navbar first, then the chat form, to ensure the chat form is at the very bottom.
+        if (navbar) body.appendChild(navbar);
+        if (chatForm) body.appendChild(chatForm);
     }
 
     // Main boot function
     async function boot() {
+        setupChatLayout();
+
         // Attach the submit handler IMMEDIATELY.
         // This prevents the page from reloading, which is the core issue.
         if (els.chatForm) {

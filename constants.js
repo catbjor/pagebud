@@ -39,7 +39,9 @@
         "Reads the last page first", "Dog-ears pages", "Reads multiple books at once",
         "Only reads at night", "Never cracks the spine", "Listens to audiobooks at 2x speed",
         "Has a dedicated reading nook", "Matches bookmarks to book covers",
-        "Cries over fictional characters", "Buys more books than they can read"
+        "Cries over fictional characters", "Buys more books than they can read",
+        "Sniffs new books", "Color-codes their bookshelf", "Creates playlists for books",
+        "Reads spoilers on purpose", "Has a 'currently reading' pile of shame"
     ];
 
     // Statuses for books (multi-select)

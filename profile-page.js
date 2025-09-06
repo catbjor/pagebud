@@ -164,6 +164,8 @@
         const profileUid = urlParams.get("uid") || me.uid;
         const isMyProfile = profileUid === me.uid;
 
+        wireCustomShelvesActions(profileUid, isMyProfile);
+
         // DOM
         const photoEl = $("#profilePhoto");
         const nameEl = $("#profileName");
@@ -523,24 +525,25 @@
                     const name = shelf.name || "Untitled Shelf";
                     const bookCount = Array.isArray(shelf.bookIds) ? shelf.bookIds.length : 0;
 
-                    const shelfLink = document.createElement("a");
-                    shelfLink.href = `index.html?shelf=${shelfId}`;
-                    shelfLink.className = "profile-shelf-box";
-                    shelfLink.dataset.shelfId = shelfId; // For SortableJS
+                    const shelfBox = document.createElement("div");
+                    shelfBox.className = "profile-shelf-box-expandable";
+                    shelfBox.dataset.shelfId = shelfId;
 
-                    shelfLink.innerHTML = `
-                        <span class="see-all-label">See All <i class="fa-solid fa-arrow-right fa-xs"></i></span>
-                        <h3>${esc(name)}</h3>
-                        <div class="book-count">(${bookCount} book${bookCount !== 1 ? 's' : ''})</div>
+                    shelfBox.innerHTML = `
+                        <div class="shelf-box-header">
+                            <div class="shelf-box-title">
+                                <h3>${esc(name)}</h3>
+                                <div class="book-count">(${bookCount} book${bookCount !== 1 ? 's' : ''})</div>
+                            </div>
+                            <button class="btn btn-secondary see-all-btn" data-action="see-all">See All</button>
+                        </div>
+                        <div class="shelf-expanded-content" style="display: none;"></div>
+                        ${isMy ? `<span class="shelf-handle" title="Drag to reorder">☰</span>` : ''}
                     `;
-
-                    if (isMy) {
-                        shelfLink.innerHTML += `<span class="shelf-handle" title="Drag to reorder">☰</span>`;
-                    }
-                    container.appendChild(shelfLink);
+                    container.appendChild(shelfBox);
                 });
 
-                // Drag-and-drop reordering (optional)
+                // Drag-and-drop reordering
                 if (isMy && typeof Sortable !== "undefined") {
                     Sortable.create(container, {
                         animation: 150,
@@ -566,6 +569,70 @@
             } catch (e) {
                 console.warn("Custom shelves failed:", e);
             }
+        }
+
+        function wireCustomShelvesActions(uid, isMy) {
+            const container = $("#customShelvesContainer");
+            if (!container) return;
+
+            container.addEventListener('click', async (e) => {
+                const seeAllBtn = e.target.closest('[data-action="see-all"]');
+                if (seeAllBtn) {
+                    const shelfBox = seeAllBtn.closest('.profile-shelf-box-expandable');
+                    if (!shelfBox) return;
+
+                    const contentDiv = shelfBox.querySelector('.shelf-expanded-content');
+                    const shelfId = shelfBox.dataset.shelfId;
+                    const isExpanded = contentDiv.style.display !== 'none';
+
+                    if (isExpanded) {
+                        contentDiv.style.display = 'none';
+                        seeAllBtn.textContent = 'See All';
+                    } else {
+                        seeAllBtn.textContent = 'Loading...';
+                        seeAllBtn.disabled = true;
+                        await renderExpandedShelfContent(contentDiv, shelfId, uid, isMy);
+                        contentDiv.style.display = 'block';
+                        seeAllBtn.textContent = 'Close';
+                        seeAllBtn.disabled = false;
+                    }
+                    return;
+                }
+
+                // Handle management actions inside the expanded view
+                const shelfBox = e.target.closest('.profile-shelf-box-expandable');
+                if (!shelfBox || !isMy) return;
+
+                const shelfId = shelfBox.dataset.shelfId;
+
+                const renameBtn = e.target.closest("[data-rename]");
+                if (renameBtn) {
+                    const currentName = shelfBox.querySelector('.shelf-box-title h3')?.textContent || "Shelf";
+                    const newName = prompt("New shelf name:", currentName);
+                    if (newName && newName.trim()) {
+                        await db().collection("users").doc(uid).collection("shelves").doc(shelfId).set({ name: newName.trim() }, { merge: true });
+                        await loadAndRenderCustomShelves(uid, isMy); // Reload all to reflect name change
+                    }
+                    return;
+                }
+
+                const delBtn = e.target.closest("[data-delete]");
+                if (delBtn) {
+                    if (confirm("Delete this shelf? This does NOT delete your books.")) {
+                        await db().collection("users").doc(uid).collection("shelves").doc(shelfId).delete();
+                        await loadAndRenderCustomShelves(uid, isMy); // Reload all
+                    }
+                    return;
+                }
+
+                const manageBtn = e.target.closest("[data-manage]");
+                if (manageBtn) {
+                    const currentName = shelfBox.querySelector('.shelf-box-title h3')?.textContent || "Shelf";
+                    await openShelfPicker(uid, shelfId, currentName);
+                    // Reload to update book count after managing
+                    await loadAndRenderCustomShelves(uid, isMy);
+                }
+            });
         }
 
         // ---------- Shelf Picker (manage one shelf’s books at once) ----------
@@ -811,6 +878,64 @@
             };
         }
 
+        async function renderExpandedShelfContent(container, shelfId, uid, isMy) {
+            try {
+                const shelfDoc = await db().collection("users").doc(uid).collection("shelves").doc(shelfId).get();
+                if (!shelfDoc.exists) {
+                    container.innerHTML = '<p class="muted">Shelf not found.</p>';
+                    return;
+                }
+
+                const shelf = shelfDoc.data();
+                const bookIds = shelf.bookIds || [];
+
+                // Add management header
+                let managementHtml = '';
+                if (isMy) {
+                    managementHtml = `
+                        <div class="shelf-expanded-header">
+                            <h4>Manage Shelf</h4>
+                            <div class="shelf-actions">
+                                <button class="btn btn-icon" title="Rename shelf" data-rename="${esc(shelfId)}"><i class="fa fa-pen"></i></button>
+                                <button class="btn btn-icon" title="Manage books in this shelf" data-manage="${esc(shelfId)}"><i class="fa-solid fa-list-check"></i></button>
+                                <button class="btn btn-icon" title="Delete shelf" data-delete="${esc(shelfId)}"><i class="fa fa-trash"></i></button>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                const gridDiv = document.createElement('div');
+                gridDiv.className = 'shelf-grid'; // Reuse existing grid style
+
+                container.innerHTML = managementHtml;
+                container.appendChild(gridDiv);
+
+                if (bookIds.length === 0) {
+                    gridDiv.innerHTML = '<p class="muted" style="grid-column: 1 / -1;">This shelf is empty.</p>';
+                    return;
+                }
+
+                const bookPromises = bookIds.map(id => db().collection("users").doc(uid).collection("books").doc(id).get());
+                const bookSnaps = await Promise.all(bookPromises);
+
+                const frag = document.createDocumentFragment();
+                bookSnaps.forEach(doc => {
+                    if (doc.exists) {
+                        const card = createCardElement(doc, isMy, { showActions: true });
+                        if (card) frag.appendChild(card);
+                    }
+                });
+
+                gridDiv.innerHTML = '';
+                gridDiv.appendChild(frag);
+                wireShelfGridActions(gridDiv, isMy, shelfId);
+
+            } catch (error) {
+                console.error("Failed to render expanded shelf:", error);
+                container.innerHTML = '<p class="muted" style="color:red;">Could not load shelf content.</p>';
+            }
+        }
+
         // ---------- notes & quotes ----------
         let allQuotes = [];
         function renderNotes(quotes) {
@@ -974,22 +1099,17 @@
                     : "";
         }
         function wireUpQuirksEditor(selectedQuirks) {
-            const quirksList =
-                (window.PB_CONST && window.PB_CONST.QUIRKS) || [
-                    "Annotator",
-                    "DNF is okay",
-                    "TBR mountain climber",
-                    "Buddy reader",
-                    "Audiobook lover",
-                    "Re-reader",
-                ];
+            // Use the single, definitive list of quirks from constants.js
+            const quirksList = window.PB_CONST?.QUIRKS || [];
             const host = $("#editQuirks");
             if (!host) return;
             const setSel = new Set(selectedQuirks || []);
+
             host.innerHTML = quirksList
                 .map(
                     (q) =>
-                        `<span class="category ${setSel.has(q) ? "active" : ""}" data-value="${q}">${q}</span>`
+                        `<span class="category ${setSel.has(q) ? "active" : ""}" data-value="${esc(q)}"
+              role="button" tabindex="0">${esc(q)}</span>`
                 )
                 .join("");
             host.addEventListener("click", (e) => {
@@ -1228,6 +1348,13 @@
                     desc: "Finish a 500+ page book",
                     icon: "fa-person-running",
                     unlocked: books.some((b) => b.status === "finished" && b.pageCount >= 500),
+                },
+                {
+                    id: "tome-toppler",
+                    title: "Tome Toppler",
+                    desc: "Finish a book over 1000 pages",
+                    icon: "fa-mountain",
+                    unlocked: books.some((b) => b.status === "finished" && b.pageCount >= 1000),
                 },
                 {
                     id: "critic",
