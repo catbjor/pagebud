@@ -269,7 +269,9 @@
       if (e.target.closest(".btn-add-to-tbr")) {
         const btn = e.target.closest(".btn-add-to-tbr");
         const bookData = JSON.parse(btn.dataset.book);
+        const originalHTML = btn.innerHTML;
         btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Adding...';
         try {
           await saveBookToTBR(bookData);
           btn.textContent = 'Added ✓';
@@ -277,6 +279,7 @@
         } catch (err) {
           console.error("Failed to add book from feed:", err);
           alert("Could not add book.");
+          btn.innerHTML = originalHTML;
           btn.disabled = false;
         }
       }

@@ -108,10 +108,11 @@
 
 .quirk-chip {
     display: inline-block;
-    padding: 12px 12px;
-    border-radius: 20px;
-    background: var(--surface);
-    border: 1px solid var(--border);
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: var(--primary);
+    color: var(--btn-text);
+    border: 1px solid var(--primary);
     font-weight: 600;
     font-size: .85rem;
 }
@@ -691,7 +692,8 @@
     opacity: 0;
     pointer-events: none;
     transition: opacity .2s ease;
-    z-index: 59;
+    z-index: 2500;
+    /* Higher than bottom nav (2000) */
 }
 
 .sheet-backdrop.show {
@@ -713,7 +715,8 @@
         left: 0;
         right: 0;
         bottom: 0;
-        z-index: 60;
+        z-index: 2501;
+        /* Higher than bottom nav (2000) */
 
         background: var(--surface, #111);
         border-radius: 18px 18px 0 0;
@@ -764,27 +767,6 @@
         padding-top: 12px;
         margin-top: 12px;
     }
-}
-
-/* ==== Responsive shelf layout (two-up on phones) ==== */
-#customShelvesContainer {
-    display: grid;
-    gap: 16px;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-@media (max-width: 1100px) {
-    #customShelvesContainer {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-}
-
-@media (max-width: 640px) {
-    #customShelvesContainer {
-        grid-template-columns: 1fr 1fr;
-    }
-
-    /* exactly two per row */
 }
 
 .profile-shelf .card-head {
@@ -964,7 +946,8 @@ body {
     text-align: center;
     justify-content: space-between;
     min-height: 150px;
-    position: relative; /* For the drag handle */
+    position: relative;
+    /* For the drag handle */
 }
 
 .profile-shelf-box-expandable .shelf-box-title {
@@ -1015,14 +998,18 @@ body {
 /* --- Reading Mood Ring --- */
 .mood-ring {
     position: absolute;
-    inset: -6px; /* Makes it slightly larger than the photo */
+    inset: -6px;
+    /* Makes it slightly larger than the photo */
     border-radius: 50%;
-    z-index: -1; /* Behind the photo */
-    background: conic-gradient(from 90deg, #4e73df, #1cc88a, #f6c23e, #e74a3b, #4e73df); /* Placeholder gradient */
+    z-index: -1;
+    /* Behind the photo */
+    background: conic-gradient(from 90deg, #4e73df, #1cc88a, #f6c23e, #e74a3b, #4e73df);
+    /* Placeholder gradient */
     animation: spin 10s linear infinite;
     opacity: 0;
     transition: opacity 0.5s ease-in-out;
-    filter: blur(4px); /* Soft glow effect */
+    filter: blur(4px);
+    /* Soft glow effect */
 }
 
 .mood-ring.visible {
@@ -1030,7 +1017,9 @@ body {
 }
 
 @keyframes spin {
-    to { transform: rotate(450deg); }
+    to {
+        transform: rotate(450deg);
+    }
 }
 
 /* --- Stats Snapshot on Profile --- */

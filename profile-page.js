@@ -91,8 +91,10 @@
 
         const thumb = card.querySelector(".thumb");
         if (thumb) {
-            thumb.src = cover;
+            thumb.src = phCover; // Always start with the placeholder
+            thumb.dataset.src = cover; // Store the real image URL
             thumb.alt = `Cover for ${title}`;
+            thumb.classList.add('lazy-load'); // Mark for the observer
             thumb.onerror = () => {
                 thumb.onerror = null;
                 thumb.src = phCover;
@@ -205,6 +207,30 @@
         const shelfToManage = urlParams.get("manageShelf");
         const profileUid = urlParams.get("uid") || me.uid;
         const isMyProfile = profileUid === me.uid;
+
+        // --------- Lazy Loading for Images ---------
+        let lazyImageObserver;
+        if ("IntersectionObserver" in window) {
+            lazyImageObserver = new IntersectionObserver((entries, observer) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const lazyImage = entry.target;
+                        lazyImage.src = lazyImage.dataset.src;
+                        // Add a load event listener to fade in the image
+                        lazyImage.addEventListener('load', () => {
+                            lazyImage.classList.remove('lazy-load');
+                        }, { once: true });
+                        observer.unobserve(lazyImage);
+                    }
+                });
+            }, { rootMargin: "200px" }); // Start loading when 200px away
+        }
+
+        function observeLazyImages(container) {
+            if (!lazyImageObserver || !container) return;
+            const lazyImages = container.querySelectorAll('img.lazy-load');
+            lazyImages.forEach(img => lazyImageObserver.observe(img));
+        }
 
         wireCustomShelvesActions(profileUid, isMyProfile);
 
@@ -993,6 +1019,7 @@
 
                 gridDiv.innerHTML = '';
                 gridDiv.appendChild(frag);
+                observeLazyImages(gridDiv);
                 wireShelfGridActions(gridDiv, isMy, shelfId);
 
                 // Add Sortable.js logic for reordering
@@ -1363,6 +1390,7 @@
                 });
                 grid.innerHTML = "";
                 grid.appendChild(frag);
+                observeLazyImages(grid);
                 shelf.style.display = "block";
                 const seeAll = shelf.querySelector(".see-all-btn");
                 if (isMyProfile && seeAll) seeAll.style.display = "";
@@ -1391,6 +1419,7 @@
                 });
                 grid.innerHTML = "";
                 grid.appendChild(frag);
+                observeLazyImages(grid);
                 shelf.style.display = "block";
                 const seeAll = shelf.querySelector(".see-all-btn");
                 if (isMyProfile && seeAll) seeAll.style.display = "";
@@ -1448,6 +1477,7 @@
                 });
                 grid.innerHTML = "";
                 grid.appendChild(frag);
+                observeLazyImages(grid);
                 shelf.style.display = "block";
                 const seeAll = shelf.querySelector(".see-all-btn");
                 if (isMyProfile && seeAll) seeAll.style.display = "";
@@ -1476,6 +1506,7 @@
                 });
                 grid.innerHTML = "";
                 grid.appendChild(frag);
+                observeLazyImages(grid);
                 shelf.style.display = "block";
                 const seeAll = shelf.querySelector(".see-all-btn");
                 if (isMyProfile && seeAll) seeAll.style.display = "";

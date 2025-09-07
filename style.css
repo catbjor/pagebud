@@ -574,7 +574,15 @@ input[type="text"] {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  display: block
+  display: block;
+  /* Add transition for lazy loading */
+  opacity: 1;
+  transition: opacity 0.4s ease-in-out;
+}
+
+/* Style for images that are being lazy-loaded */
+.thumb.lazy-load {
+  opacity: 0;
 }
 
 .heart-btn {
@@ -610,12 +618,12 @@ input[type="text"] {
   color: #d12a2a
 }
 
-.title {
+.book-card .title {
   font-weight: 900;
   line-height: 1.25
 }
 
-.author {
+.book-card .author {
   color: var(--muted);
   font-size: .92rem;
   margin-bottom: 6px
@@ -646,7 +654,7 @@ input[type="text"] {
 }
 
 /* Rated badge (top-left of cover) */
-.rated-badge {
+.book-card .rated-badge {
   position: absolute;
   top: 8px;
   left: 8px;
@@ -665,13 +673,13 @@ input[type="text"] {
   /* stays above the cover but below the heart on the right */
 }
 
-.rated-badge .star {
+.book-card .rated-badge .star {
   width: 14px;
   height: 14px;
   display: block;
 }
 
-.rated-badge .val {
+.book-card .rated-badge .val {
   translate: 0 0;
   /* keeps text crisp */
 }
@@ -687,14 +695,14 @@ input[type="text"] {
 }
 
 /* ---------- Card stars & chilis (static display) ---------- */
-.card-ratings {
+.book-card .card-ratings {
   display: flex;
   flex-direction: column;
   gap: 6px;
   margin-top: 4px
 }
 
-.card-row {
+.book-card .card-row {
   display: inline-flex;
   gap: var(--icon-gap);
   align-items: center
@@ -732,42 +740,6 @@ input[type="text"] {
 .form-row>label {
   font-weight: 800;
   font-size: 1rem
-}
-
-/* ---------- Bottom nav ---------- */
-.bottom-nav {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: var(--bottom-nav-h);
-  backdrop-filter: blur(8px);
-  background: color-mix(in oklab, var(--card) 85%, transparent);
-  border-top: 1px solid var(--border);
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  align-items: center;
-  z-index: 2000;
-}
-
-.nav-item {
-  display: grid;
-  place-items: center;
-  gap: 4px;
-  height: 100%;
-  color: var(--muted);
-  font-size: 12px;
-  user-select: none
-}
-
-.nav-item i {
-  font-size: 18px;
-  line-height: 1
-}
-
-.nav-item.active {
-  color: var(--primary);
-  font-weight: 800
 }
 
 .app-container {
@@ -1371,56 +1343,64 @@ input[type="file"]::file-selector-button:hover {
   z-index: 2;
 }
 
-/* --- Bottom nav: force one row, equal widths, no wrap --- */
+/* --- Modern Bottom Navigation Bar --- */
 .bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--bottom-nav-h);
+  background: color-mix(in oklab, var(--card) 85%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-top: 1px solid var(--border);
+  z-index: 2000;
   display: flex;
-  flex-wrap: nowrap;
-  /* never wrap to a 2nd line */
-  justify-content: space-between;
-  align-items: stretch;
-  gap: 0;
-  /* maximize available width */
-  padding: 6px 8px;
+  justify-content: space-around;
+  align-items: center;
+  padding: 4px 8px env(safe-area-inset-bottom, 4px);
 }
 
 .bottom-nav .nav-item {
-  flex: 1 1 20%;
-  /* 5 items -> 20% each */
-  min-width: 0;
-  /* allow shrinking */
   display: flex;
   flex-direction: column;
   align-items: center;
-  white-space: nowrap;
-  /* keep label on one line */
-  overflow: hidden;
-  text-overflow: ellipsis;
+  justify-content: center;
+  gap: 4px;
+  flex: 1;
+  height: 100%;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 12px;
+  user-select: none;
+  position: relative;
+  transition: color 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
 }
 
-/* Slightly smaller labels/icons on narrow phones */
-@media (max-width: 390px) {
-  .bottom-nav .nav-item {
-    font-size: 12px;
-  }
-
-  .bottom-nav .nav-item i {
-    font-size: 18px;
-    margin-bottom: 2px;
-  }
+.bottom-nav .nav-item i {
+  font-size: 20px;
+  line-height: 1;
+  padding: 4px 16px;
+  border-radius: 999px;
+  transition: background-color 0.2s ease;
 }
 
-/* Ultra-narrow fallback (e.g., 320px): show icons only */
-@media (max-width: 330px) {
-  .bottom-nav .nav-item {
-    font-size: 0;
-  }
+.bottom-nav .nav-item span {
+  font-weight: 500;
+  transition: font-weight 0.2s ease;
+}
 
-  /* hides label text */
-  .bottom-nav .nav-item i {
-    font-size: 20px;
-  }
+.bottom-nav .nav-item.active {
+  color: var(--primary);
+}
 
-  /* keep icons readable */
+.bottom-nav .nav-item.active i {
+  background-color: color-mix(in oklab, var(--primary) 15%, transparent);
+}
+
+.bottom-nav .nav-item.active span {
+  font-weight: 700;
 }
 
 /* TIMER: make the circle clickable even when the drawer is open */

@@ -49,6 +49,8 @@ section.card[data-rail] {
     scrollbar-gutter: stable;
     align-items: stretch;
     /* same height */
+    padding-bottom: 12px;
+    /* Space for scrollbar */
 }
 
 .rail-list.dragging {
@@ -74,110 +76,72 @@ section.card[data-rail] {
     border-radius: 999px;
 }
 
-/* --- Book Tile in Rail (stabil, brei, “one card per book”) --- */
+/* --- Compact Vertical Book Tile in Rail --- */
 .rail-list .tile {
-    /* VIKTIG: ikkje la korta krympe */
     flex: 0 0 auto;
-    /* <- hindrar at kort blir smale */
-    width: min(92vw, 520px);
-    /* responsiv breidde, maks ~520px */
-    min-height: 180px;
-    box-sizing: border-box;
-
-    padding: 12px;
+    width: 140px;
+    /* Smaller, fixed width */
+    padding: 8px;
     border: 1px solid var(--border);
     border-radius: 12px;
     background: var(--surface);
     position: relative;
     z-index: 0;
-
-    display: grid;
-    grid-template-columns: 120px 1fr;
-    grid-template-rows: auto auto 1fr auto;
-    /* tittel, forfattar/meta, chips/space, actions */
-    column-gap: 14px;
-    row-gap: 8px;
-
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
     scroll-snap-align: start;
     overflow: hidden;
-    /* klipp alt som stikk ut */
 }
 
-/* Cover venstre */
 .tile .cover {
-    grid-column: 1 / 2;
-    grid-row: 1 / 5;
-    width: 120px;
-    height: 170px;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 2 / 3;
     object-fit: cover;
     border-radius: 8px;
     border: 1px solid var(--border);
     background: #eee;
 }
 
-/* Tekstfelt høgre — sørg for at tekst kan brytast */
-.tile .t,
-.tile .a,
-.tile .meta,
-.tile .chips,
-.tile .actions {
-    min-width: 0;
-    /* gjer truncation mogleg */
-}
-
 .tile .t {
-    grid-column: 2 / 3;
-    grid-row: 1;
-    font-weight: 800;
+    font-weight: 700;
+    font-size: 0.9rem;
     line-height: 1.25;
     overflow: hidden;
     display: -webkit-box;
     -webkit-line-clamp: 2;
-    /* maks 2 linjer */
     -webkit-box-orient: vertical;
 }
 
 .tile .a {
-    grid-column: 2 / 3;
-    grid-row: 2;
     color: var(--muted);
-    font-size: .95rem;
+    font-size: .85rem;
     line-height: 1.2;
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
-    padding-right: 8px;
-    /* luft før meta til høgre */
 }
 
-/* Meta (rating + år) — ligg på same “rad” som forfattar, til høgre */
 .tile .meta {
-    grid-column: 2 / 3;
-    grid-row: 2;
-    justify-self: end;
-    align-self: start;
-    font-size: .9rem;
+    font-size: .8rem;
     color: var(--muted);
     white-space: nowrap;
 }
 
-/* Chips under meta */
 .tile .chips {
-    grid-column: 2 / 3;
-    grid-row: 3;
-    display: flex;
-    flex-wrap: wrap;
-    gap: Zpx;
-    align-content: start;
+    display: none;
+    /* Hide chips as requested */
 }
 
-/* Actions nederst til høgre */
 .tile .actions {
-    grid-column: 2 / 3;
-    grid-row: 4;
+    margin-top: auto;
+    /* Push to bottom */
     display: flex;
-    justify-content: flex-end;
-    align-items: flex-end;
+}
+
+.tile .actions .btn {
+    width: 100%;
 }
 
 .tile .inlib,
