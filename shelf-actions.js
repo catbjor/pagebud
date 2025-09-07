@@ -241,5 +241,6 @@
 
     // Expose functions for other scripts if needed
     window.PB_ShelfActions = {
-        addBooksToShelf e
-    }) ();
+        addBooksToShelf: addBooksToShelf
+    };
+})();
