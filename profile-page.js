@@ -204,9 +204,19 @@
     // ------------------ init ------------------
     async function init(me) {
         const urlParams = new URLSearchParams(window.location.search);
-        const shelfToManage = urlParams.get("manageShelf");
-        const profileUid = urlParams.get("uid") || me.uid;
-        const isMyProfile = profileUid === me.uid;
+        const profileUid = urlParams.get("uid") || me?.uid;
+
+        const nameEl = $("#profileName"); // Get this early for error reporting
+
+        // Add a guard to prevent the page from getting stuck if no user is found.
+        if (!profileUid) {
+            if (nameEl) nameEl.textContent = "Profile not found.";
+            // You can optionally clear the page to make the error more obvious.
+            document.body.innerHTML = '<div class="container card muted" style="margin-top:24px;">Could not determine which profile to load. Please go back and try again.</div>';
+            return;
+        }
+
+        const isMyProfile = profileUid === me?.uid;
 
         // --------- Lazy Loading for Images ---------
         let lazyImageObserver;
@@ -236,7 +246,6 @@
 
         // DOM
         const photoEl = $("#profilePhoto");
-        const nameEl = $("#profileName");
         const usernameEl = $("#profileUsername");
         const bioEl = $("#profileBio");
         const btnEditProfile = $("#btnEditProfile");
@@ -317,7 +326,7 @@
             const streak = await calculateStreak(profileUid);
             await renderMoodRing(profileUid);
             await calculateAndShowAchievements(profileUid, streak);
-            await renderStatsSnapshot(profileUid, streak);
+            await renderStatsSnapshot(profileUid, streak, profileData.yearlyGoal);
             await displayYearlyGoalProgress(profileUid, isMyProfile);
             await loadAndDisplayBadges(profileUid);
             await loadGuestbook(profileUid, isMyProfile, me);
@@ -1572,7 +1581,7 @@
         }
 
         // ---------- Stats Snapshot & Goal Tracker ----------
-        async function renderStatsSnapshot(uid, streak) {
+        async function renderStatsSnapshot(uid, streak, yearlyGoal = 0) {
             const container = $("#statsSnapshot");
             if (!container) return;
 
@@ -1594,7 +1603,7 @@
                 const ratedBooks = finishedBooks.filter(b => (b.rating || 0) > 0);
                 const avgRating = ratedBooks.length > 0 ? (ratedBooks.reduce((sum, b) => sum + Number(b.rating), 0) / ratedBooks.length).toFixed(1) : "0.0";
 
-                $("#snapshotBooks").textContent = booksRead;
+                $("#snapshotBooks").textContent = yearlyGoal > 0 ? `${booksRead} / ${yearlyGoal}` : booksRead;
                 $("#snapshotStreak").textContent = streak;
                 $("#snapshotAvgRating").textContent = avgRating;
                 container.style.display = 'grid';
@@ -1646,7 +1655,9 @@
                     ring.style.strokeDashoffset = circumference - (progressPercent / 100) * circumference;
                 }
                 if (ringValue) ringValue.textContent = `${Math.round(progressPercent)}%`;
-                if (booksReadEl) booksReadEl.textContent = booksReadThisYear;
+                if (booksReadEl) {
+                    booksReadEl.textContent = yearlyGoal > 0 ? `${booksReadThisYear} / ${yearlyGoal}` : booksReadThisYear;
+                }
 
                 section.style.display = 'grid';
             } catch (error) {

@@ -6,7 +6,7 @@
     library: { href: "index.html", icon: "fa-book", label: "Library" },
     stats: { href: "stats.html", icon: "fa-chart-line", label: "Stats" },
     discover: { href: "discover.html", icon: "fa-compass", label: "Discover" },
-    profile: { href: "profile.html", icon: "fa-user", label: "Profile" },
+    friends: { href: "friends.html", icon: "fa-users", label: "Friends" },
     settings: { href: "settings.html", icon: "fa-cog", label: "Settings" }
   };
 
@@ -47,7 +47,7 @@
     nav.appendChild(item("library"));
     nav.appendChild(item("stats"));
     nav.appendChild(item("discover"));
-    nav.appendChild(item("profile"));
+    nav.appendChild(item("friends"));
     nav.appendChild(item("settings"));
 
     (document.querySelector(".app-container") || document.body).appendChild(nav);
