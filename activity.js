@@ -115,10 +115,11 @@
                 await this.finished({
                     bookId: bookId,
                     title: newData.title,
-                    author: newData.author,
-                    coverUrl: newData.coverUrl,
-                    workKey: newData.workKey,
-                    subjects: newData.subjects
+                    author: newData.author || oldData?.author,
+                    coverUrl: newData.coverUrl || oldData?.coverUrl,
+                    // Ensure workKey and subjects are passed through from either new or old data
+                    workKey: newData.workKey || oldData?.workKey,
+                    subjects: newData.subjects || newData.genres || oldData?.subjects || oldData?.genres
                 });
             }
 

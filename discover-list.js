@@ -98,19 +98,23 @@
         if (!user) throw new Error("Not signed in");
 
         const payload = {
-            id: book.id || randomId(),
+            id: book.workKey || book.id || randomId(),
             title: book.title || "Untitled",
             author: book.author || "",
             coverUrl: book.cover || "",
             status: "tbr",
             statuses: ["tbr"],
             rating: 0,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
             workKey: book.workKey || null,
             subjects: take(book.subjects || [], 6)
         };
-        await window.fb.db.collection("users").doc(user.uid).collection("books").doc(payload.id).set(payload);
+
+        if (!window.PBSync) throw new Error("Sync service not available.");
+
+        const savedBook = await window.PBSync.saveBook(payload);
+        if (window.PBActivity) {
+            await window.PBActivity.handleBookUpdate(savedBook.id, savedBook, null);
+        }
     }
 
     function card(b) {

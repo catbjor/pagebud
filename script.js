@@ -47,15 +47,15 @@ function chilisRow(val) {
   return out;
 }
 
-function createCardElement(doc) {
+function createCardElement(book) {
   const cardTemplate = document.getElementById('book-card-template');
   if (!cardTemplate) {
     throw new Error("Missing #book-card-template in HTML");
   }
 
   const card = cardTemplate.content.cloneNode(true).firstElementChild;
-  const d = doc.data() || {};
-  const id = doc.id;
+  const d = book || {};
+  const id = d.id;
 
   const rating = Number(d.rating || 0);
   const statusList = (Array.isArray(d.statuses) && d.statuses.length > 0)
@@ -116,48 +116,35 @@ function applyVisibility(card) {
   card.style.display = hide ? "none" : "";
 }
 
-async function loadAndRenderLibrary(user) {
+function renderLibrary() {
   const grid = $("#books-grid");
   const empty = $("#empty-state");
-  if (!db || !user || !grid) return;
+  if (!grid) return;
 
   // Add a loading state for better UX
   grid.innerHTML = '<div style="grid-column: 1 / -1;"><div class="loader"></div></div>';
   if (empty) empty.style.display = "none";
 
   try {
-    const urlParams = new URLSearchParams(window.location.search);
-    const shelfId = urlParams.get('shelf');
-    let docs = [];
+    // Get books from the sync service, which manages the local cache.
+    const books = window.PBSync.getLocalBooks();
 
-    if (shelfId) {
-      // Shelf view logic: fetch only books from the specified shelf.
-      const shelfDoc = await db.collection("users").doc(user.uid).collection("shelves").doc(shelfId).get();
-      if (shelfDoc.exists) {
-        const bookIds = shelfDoc.data().bookIds || [];
-        if (bookIds.length > 0) {
-          // Using Promise.all with individual gets is robust for any number of books.
-          const bookPromises = bookIds.map(id => db.collection("users").doc(user.uid).collection("books").doc(id).get());
-          const bookSnaps = await Promise.all(bookPromises);
-          docs = bookSnaps.filter(snap => snap.exists);
-        }
-      }
-    } else {
-      // Default library view: fetch all books.
-      const snap = await db.collection("users").doc(user.uid).collection("books").get({ source: 'server' });
-      docs = snap.docs;
-    }
-
-    const sortedDocs = docs.slice().sort((a, b) => {
-      const da = a.data(), dbb = b.data();
-      const ta = da.createdAt?.toMillis?.()
-        ?? (da.createdAt ? new Date(da.createdAt).getTime() : 0);
-      const tb = dbb.createdAt?.toMillis?.()
-        ?? (dbb.createdAt ? new Date(dbb.createdAt).getTime() : 0);
+    const sortedBooks = books.slice().sort((a, b) => {
+      // Sort by updatedAt to show the most recently touched books first.
+      const ta = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+      const tb = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
       return tb - ta;
     });
 
-    if (!sortedDocs.length) {
+    // Handle shelf filtering if a shelfId is present in the URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const shelfId = urlParams.get('shelf');
+    const shelf = window.PB_SHELVES?.find(s => s.id === shelfId);
+    const booksToRender = shelf
+      ? sortedBooks.filter(b => shelf.bookIds.includes(b.id))
+      : sortedBooks;
+
+    if (!booksToRender.length) {
       if (empty) empty.style.display = "grid";
       grid.innerHTML = "";
       return;
@@ -165,12 +152,12 @@ async function loadAndRenderLibrary(user) {
     if (empty) empty.style.display = "none";
 
     const fragment = document.createDocumentFragment();
-    sortedDocs.forEach(doc => {
+    booksToRender.forEach(book => {
       try {
-        const cardElement = createCardElement(doc);
+        const cardElement = createCardElement(book);
         fragment.appendChild(cardElement);
       } catch (error) {
-        console.error(`Failed to create card for book ${doc.id}:`, error);
+        console.error(`Failed to create card for book ${book.id}:`, error);
       }
     });
 
@@ -201,11 +188,7 @@ async function loadAndRenderLibrary(user) {
     `;
     // Add a listener to the new retry button
     const retryBtn = grid.querySelector('#retryLoadBtn');
-    if (retryBtn) {
-      retryBtn.addEventListener('click', () => {
-        loadAndRenderLibrary(user);
-      });
-    }
+    if (retryBtn) retryBtn.addEventListener('click', renderLibrary);
   }
 }
 
@@ -323,9 +306,12 @@ document.addEventListener("DOMContentLoaded", () => {
   if (typeof requireAuth === "function") {
     requireAuth(user => {
       CURRENT_USER = user;
-      loadAndRenderLibrary(user);
+      renderLibrary(); // Initial render from local cache
       initGridActions(user);
       window.startSocialFeedPreview?.(); // Initialize the friends feed preview
+
+      // Listen for changes from the sync service and re-render the library
+      document.addEventListener("pb:booksChanged", renderLibrary);
     });
   } else {
     const tryNow = setInterval(() => {

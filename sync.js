@@ -54,18 +54,27 @@
     // **Correction**: The remote list is the source of truth for *existence*.
     // A book present locally but not remotely has been deleted and should be removed.
     function mergeBooks(local, remote) {
-        const localMap = new Map();
-        local.forEach(b => localMap.set(b.id, b));
+        const remoteMap = new Map(remote.map(b => [b.id, b]));
+        const mergedMap = new Map(remoteMap); // Start with all remote books as the source of truth.
+        const now = Date.now();
 
-        const mergedMap = new Map();
-        remote.forEach(rb => {
-            const lb = localMap.get(rb.id);
-            if (!lb) {
-                mergedMap.set(rb.id, rb); // New remote book, add it.
+        local.forEach(lb => {
+            const rb = remoteMap.get(lb.id);
+            if (!rb) {
+                // This book is local-only. It might be a new book that hasn't
+                // appeared in the remote snapshot yet. We'll keep it for a short
+                // time to handle this race condition.
+                const lTime = Date.parse(lb.updatedAt || 0) || 0;
+                if (now - lTime < 10000) { // 10-second grace period
+                    mergedMap.set(lb.id, lb);
+                }
             } else {
-                const lTime = Date.parse(lb.lastUpdated || lb.updatedAt || 0) || 0;
-                const rTime = Date.parse(rb.lastUpdated || rb.updatedAt || 0) || 0;
-                mergedMap.set(rb.id, (rTime >= lTime) ? rb : lb); // Keep the newest version.
+                // The book exists in both. Keep the one with the later timestamp.
+                const lTime = Date.parse(lb.updatedAt || 0) || 0;
+                const rTime = Date.parse(rb.updatedAt?.toDate?.() || rb.updatedAt || 0) || 0;
+                if (lTime > rTime) {
+                    mergedMap.set(lb.id, lb);
+                }
             }
         });
         return Array.from(mergedMap.values());
@@ -104,7 +113,14 @@
                     }
 
                     const remoteBooks = [];
-                    snap.forEach(doc => remoteBooks.push({ id: doc.id, ...doc.data() }));
+                    snap.forEach(doc => {
+                        const data = doc.data();
+                        // Normalize Firestore timestamp to ISO string for consistency
+                        if (data.updatedAt?.toDate) {
+                            data.updatedAt = data.updatedAt.toDate().toISOString();
+                        }
+                        remoteBooks.push({ id: doc.id, ...data });
+                    });
                     const merged = mergeBooks(getLocalBooks(), remoteBooks);
                     // Final guard: filter out any books that are pending deletion.
                     const finalBooks = merged.filter(b => !this._pendingDeletes.has(b.id));
@@ -161,24 +177,25 @@
 
             // Ensure id
             const id = book.id || fb.db.collection("_").doc().id;
-            const updatedAt = nowISO();
-            const toSave = { ...book, id, updatedAt };
+            // For optimistic update, use a client-side timestamp.
+            const optimisticBook = { ...book, id, updatedAt: nowISO() };
 
             // Update local first (optimistic)
             const all = getLocalBooks();
             const idx = all.findIndex(b => b.id === id);
-            if (idx >= 0) all[idx] = toSave; else all.push(toSave);
+            if (idx >= 0) all[idx] = optimisticBook; else all.push(optimisticBook);
             setLocalBooks(all);
 
-            // Push remote if signed in
+            // For remote, use the server timestamp for consistency.
             if (u) {
                 try {
-                    await userBooksCol().doc(id).set(toSave, { merge: true });
+                    const remotePayload = { ...book, id, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+                    await userBooksCol().doc(id).set(remotePayload, { merge: true });
                 } catch (e) {
                     console.error("[PBSync] saveBook remote failed, keeping local:", e);
                 }
             }
-            return toSave;
+            return optimisticBook;
         },
 
         /**

@@ -78,26 +78,33 @@
     async function addToLibrary(normal) {
         var user = hasFB() && window.fb.auth ? window.fb.auth.currentUser : null;
         if (!user) throw new Error("Not signed in");
+
+        // The payload for a NEW book from discover.
         var payload = {
             id: normal.id || randomId(),
             title: normal.title || "Untitled",
             author: normal.author || "",
             coverUrl: normal.cover || "",
-            status: "tbr", // More consistent with other parts of the app
+            status: "tbr",
             statuses: ["tbr"],
             rating: 0,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            // Let PBSync handle timestamps
             workKey: normal.workKey || null,
             subjects: take(normal.subjects || [], 6)
         };
-        const bookRef = window.fb.db.collection("users").doc(user.uid).collection("books").doc(payload.id);
-        await bookRef.set(payload, { merge: true });
+
+        if (!window.PBSync || !window.PBActivity) throw new Error("Core library features are not available.");
+
+        // Save the book using the sync service for consistency and optimistic UI updates.
+        const savedBook = await window.PBSync.saveBook(payload);
+        // Log the activity so friends can see it.
+        await window.PBActivity.handleBookUpdate(savedBook.id, savedBook, null);
+        // Update the local session cache for the Discover page UI
         try {
             if (LIB_CACHE && LIB_CACHE.title) LIB_CACHE.title.add(String(payload.title).toLowerCase());
             if (LIB_CACHE && LIB_CACHE.work && payload.workKey) LIB_CACHE.work.add(String(payload.workKey).toLowerCase());
         } catch { }
-        return payload.id;
+        return savedBook.id;
     }
 
     // -------------------- data adapters (OL + GB) --------------------
@@ -389,6 +396,43 @@
         if (see) see.addEventListener("click", function () { openSeeAllFor(id); });
         return sec;
     }
+    function getEnhancedQuery(railId, originalQuery) {
+        const now = new Date().getFullYear();
+        // Prioritize books from the last 10 years to keep collections fresh
+        const recentYearFilter = `first_publish_year:[${now - 10} TO ${now}]`;
+
+        // Define specific authors and keywords to improve relevance for certain genres
+        const enhancements = {
+            'dark_romance': {
+                authors: ['"H.D. Carlton"', '"Penelope Douglas"', '"Ana Huang"', '"Rina Kent"', '"Danielle Lori"'],
+                keywords: ['mafia', 'stalker', 'bully romance', '"morally grey"'],
+                exclusions: ['-author:"Agatha Christie"', '-author:"Jane Austen"', '-subject:classic']
+            },
+            'romantasy': {
+                authors: ['"Sarah J. Maas"', '"Rebecca Yarros"', '"Jennifer L. Armentrout"', '"Carissa Broadbent"'],
+                keywords: ['fae', 'dragon', '"fantasy romance"'],
+                exclusions: []
+            },
+            'psych_thrillers': {
+                authors: ['"Gillian Flynn"', '"Paula Hawkins"', '"Alex Michaelides"', '"Shari Lapena"', '"Freida McFadden"'],
+                keywords: ['"unreliable narrator"', '"domestic thriller"', 'psychological'],
+                exclusions: []
+            },
+            'best_horror': {
+                authors: ['"Stephen King"', '"Shirley Jackson"', '"T. Kingfisher"', '"Grady Hendrix"', '"Silvia Moreno-Garcia"'],
+                keywords: ['horror', 'supernatural', 'gothic'],
+                exclusions: []
+            }
+        };
+
+        const enhancement = enhancements[railId];
+        if (!enhancement) return `${originalQuery} AND ${recentYearFilter}`;
+
+        const authorQuery = enhancement.authors.map(a => `author:${a}`).join(' OR ');
+        const keywordQuery = enhancement.keywords.map(k => `subject:${k}`).join(' OR ');
+        const exclusionQuery = enhancement.exclusions.join(' ');
+        return `((${authorQuery}) OR (${keywordQuery}) OR (${originalQuery})) AND ${recentYearFilter} ${exclusionQuery}`;
+    }
 
     function tileHTML(b, inLib) {
         var genres = (b.subjects || []).slice(0, 3);
@@ -478,7 +522,8 @@
         bindSectionClicks(sec);
         try {
             var rail = sec.querySelector(".rail-list"); if (rail) rail.innerHTML = railSkeleton(6);
-            var items = await fetchCombinedSearchResults(query, 20, 20);
+            var enhancedQuery = getEnhancedQuery(id, query);
+            var items = await fetchCombinedSearchResults(enhancedQuery, 20, 20);
             var rail = sec.querySelector(".rail-list"); if (!rail) return;
             var displayItems = libMap ? items.filter(function (b) { return !markInLib(b, libMap); }) : items;
             if (!displayItems.length) {
@@ -792,6 +837,22 @@
             if (id === "qBtn") doSearch();
             if (id === "discMenuBtn") ensureDrawer().classList.add("show");
         });
+
+        // --- Back to Top Button ---
+        var backToTopBtn = $('#backToTopBtn');
+        if (backToTopBtn) {
+            window.addEventListener('scroll', function () {
+                if (window.scrollY > 400) { // Show after scrolling down 400px
+                    backToTopBtn.classList.add('show');
+                } else {
+                    backToTopBtn.classList.remove('show');
+                }
+            }, { passive: true });
+
+            backToTopBtn.addEventListener('click', function () {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        }
     }
 
     async function buildHomeRails(user) {
@@ -828,16 +889,53 @@
         curatedHeader.textContent = 'Curated Collections';
         host.appendChild(curatedHeader);
 
-        // Dynamically add the Audiobooks rail to the list of collections
-        if (window.PB_RAILS && !window.PB_RAILS.audiobooks) {
-            window.PB_RAILS.audiobooks = { title: "Popular Audiobooks", tags: ["Listen"], query: 'subject:"audiobooks"' };
+        // Dynamically add new collections if they don't exist from rail-definitions.js
+        if (window.PB_RAILS) {
+            const newCollections = {
+                'audiobooks': { title: "Popular Audiobooks", tags: ["Listen"], query: 'subject:"audiobooks"' },
+                'splatterpunk': { title: "Splatterpunk & Extreme Horror", tags: ["Horror"], query: 'subject:"splatterpunk" OR subject:"extreme horror"' },
+                'thriller': { title: "Gripping Thrillers", tags: ["Suspense"], query: 'subject:"thriller"' },
+                'retellings': { title: "Modern Retellings", tags: ["Mythology", "Fantasy"], query: 'subject:"retellings" OR subject:"mythology retelling"' },
+                'historical': { title: "Historical Fiction", tags: ["History"], query: 'subject:"historical fiction"' },
+                'best_2020s': { title: "Best of the 2020s", tags: ["Decade"], query: `first_publish_year:[2020 TO ${nowYear}]` },
+                'bad_boy_hero': { title: "Bad Boy & Tortured Heroes", tags: ["Trope"], query: 'subject:"bad boy" OR subject:"tortured hero" OR subject:"morally grey character"' },
+                'best_horror': { title: "Best Horror Novels", tags: ["Horror"], query: 'subject:horror' },
+                'chick_lit': { title: "Chick Lit", tags: ["Contemporary"], query: 'subject:"chick lit"' },
+                'taboo_romance': { title: "Taboo Romance", tags: ["Spicy"], query: 'subject:"taboo romance" OR subject:"forbidden love"' },
+                'memoirs_by_women': { title: "Memoirs by Women", tags: ["Non-fiction"], query: 'subject:memoir subject:women' },
+                'weird_fiction': { title: "Weird Fiction", tags: ["Strange"], query: 'subject:"weird fiction"' },
+                'circus_books': { title: "Circus & Carnival Books", tags: ["Theme"], query: 'subject:circus OR subject:carnival' },
+                'modern_gothic': { title: "Modern Gothic", tags: ["Atmospheric"], query: 'subject:"gothic fiction"' },
+                'cozy_fantasy': { title: "Cozy Fantasy", tags: ["Feel-good"], query: 'subject:"cozy fantasy"' },
+                'found_family_trope': { title: "Found Family", tags: ["Trope"], query: 'subject:"found family"' },
+                'enemies_to_lovers': { title: "Enemies to Lovers", tags: ["Trope"], query: 'subject:"enemies to lovers"' },
+                'academic_thrillers': { title: "Dark Academia", tags: ["Campus"], query: 'subject:"dark academia"' },
+                'space_opera': { title: "Modern Space Opera", tags: ["Sci-Fi"], query: 'subject:"space opera"' },
+                'climate_fiction': { title: "Climate Fiction (Cli-Fi)", tags: ["Topical"], query: 'subject:"climate fiction"' },
+                'standalone_fantasy': { title: "Standalone Fantasy", tags: ["Fantasy"], query: 'subject:"standalone fantasy"' },
+                'locked_room_mystery': { title: "Locked-Room Mysteries", tags: ["Mystery"], query: 'subject:"locked-room mystery"' },
+                'portal_fantasy': { title: "Portal Fantasy", tags: ["Fantasy"], query: 'subject:"portal fantasy"' },
+                'vampire_renaissance': { title: "Vampire Renaissance", tags: ["Paranormal"], query: `subject:"vampires" AND first_publish_year:[2019 TO ${nowYear}]` },
+                'witchy_vibes': { title: "Witchy Vibes", tags: ["Magic"], query: 'subject:"witches" OR subject:"witchcraft"' },
+                'translated_fiction': { title: "Translated Fiction Gems", tags: ["World"], query: 'subject:"translated"' },
+                'indigenous_authors': { title: "Indigenous Voices", tags: ["Own Voices"], query: 'subject:"indigenous"' },
+                'pop_science': { title: "Pop Science & Big Ideas", tags: ["Non-fiction"], query: 'subject:"popular science"' },
+                'true_crime_deep_dives': { title: "True Crime Deep Dives", tags: ["Non-fiction"], query: 'subject:"true crime"' }
+            };
+            for (const [id, def] of Object.entries(newCollections)) {
+                if (!window.PB_RAILS[id]) window.PB_RAILS[id] = def;
+            }
         }
 
         // Set up the global order of rails to be loaded
         railOrder = [
             "new_releases", "booktok", "epic_fantasy", "psych_thrillers", "romance_reads",
-            "dark_romance", "banned_forbidden", "christmas_reads", "spooky_season", "self_help", "philosophical_reads",
-            "audiobooks" // Add our new rail to the end of the list
+            "dark_romance", "banned_forbidden", "splatterpunk", "thriller", "retellings", "historical",
+            "best_2020s", "bad_boy_hero", "best_horror", "chick_lit", "taboo_romance", "memoirs_by_women", "weird_fiction", "circus_books",
+            "modern_gothic", "cozy_fantasy", "found_family_trope", "enemies_to_lovers", "academic_thrillers", "space_opera",
+            "climate_fiction", "standalone_fantasy", "locked_room_mystery", "portal_fantasy", "vampire_renaissance",
+            "witchy_vibes", "translated_fiction", "indigenous_authors", "pop_science", "true_crime_deep_dives",
+            "christmas_reads", "spooky_season", "self_help", "philosophical_reads", "audiobooks"
         ].filter(function (id) { return window.PB_RAILS[id]; });
 
         if (!railOrder.length) {

@@ -2291,51 +2291,55 @@ input[type="file"]::file-selector-button:hover {
 
 /* --- Discover Page Format Toggle --- */
 .discover-format-toggle {
-    display: flex;
-    justify-content: center;
-    gap: 12px;
-    margin: 16px auto;
-    max-width: var(--content-max);
-    padding: 0 16px;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin: 16px auto;
+  max-width: var(--content-max);
+  padding: 0 16px;
 }
 
 .discover-format-toggle .btn {
-    background: var(--surface);
-    color: var(--text);
-    border-color: var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border);
 }
 
 .discover-format-toggle .btn.active {
-    background: var(--primary);
-    color: var(--btn-text);
-    border-color: var(--primary);
+  background: var(--primary);
+  color: var(--btn-text);
+  border-color: var(--primary);
 }
 
 /* --- Discover Page Toolbar Layout --- */
 .toolbar.discover-toolbar-layout {
-    flex-direction: row;
-    justify-content: center;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .discover-search-wrapper {
-    display: flex;
-    flex-grow: 1;
-    max-width: 500px;
+  display: flex;
+  flex-grow: 1;
+  max-width: 500px;
 }
 
 .discover-search-wrapper #q {
-    flex-grow: 1;
-    border-right: none;
-    border-top-right-radius: 0;
-    border-bottom-right-radius: 0;
+  flex-grow: 1;
+  border-right: none;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
 }
 
 .discover-search-wrapper #qBtn {
-    border-top-left-radius: 0;
-    border-bottom-left-radius: 0;
-    flex-shrink: 0;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  flex-shrink: 0;
 }
+
+#railSentinel {
+    /* Give the sentinel some height so the observer can reliably track it */
+    height: 100px;
 }
