@@ -1924,7 +1924,8 @@ input[type="file"]::file-selector-button:hover {
   display: none;
   align-items: center;
   justify-content: center;
-  z-index: 2000;
+  z-index: 2150;
+  /* Higher than multi-select bar (2100) */
   padding: 16px;
   -webkit-backdrop-filter: blur(4px);
   /* Safari */
@@ -2340,11 +2341,11 @@ input[type="file"]::file-selector-button:hover {
 }
 
 #railSentinel {
-    /* Give the sentinel some height so the observer can reliably track it */
-    height: 100px;
+  /* Give the sentinel some height so the observer can reliably track it */
+  height: 100px;
 }
 
 #railSentinel {
-    /* Give the sentinel some height so the observer can reliably track it */
-    height: 100px;
+  /* Give the sentinel some height so the observer can reliably track it */
+  height: 100px;
 }
