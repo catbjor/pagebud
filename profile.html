@@ -207,6 +207,28 @@
                     <div id="badgesGrid" class="badges-grid"></div>
                 </section>
 
+                <!-- Guestbook Section -->
+                <section id="guestbookSection" class="profile-shelf card" style="display:none;">
+                    <div class="card-head">
+                        <h3>Guestbook</h3>
+                    </div>
+                    <!-- Form to add a new entry (only visible on others' profiles) -->
+                    <form id="guestbookForm" class="guestbook-form" style="display:none;">
+                        <textarea id="guestbookInput" placeholder="Leave a note..." rows="3" required></textarea>
+                        <button type="submit" class="btn btn-primary">Post Note</button>
+                    </form>
+                    <!-- List of guestbook entries -->
+                    <div id="guestbookList" class="guestbook-list"></div>
+                </section>
+
+                <!-- Friend of a Friend Discovery -->
+                <section id="fofDiscoverySection" class="profile-shelf card" style="display:none;">
+                    <div class="card-head">
+                        <h3>Friends of <span id="fofFriendName"></span></h3>
+                    </div>
+                    <div id="fofGrid" class="fof-grid"></div>
+                </section>
+
                 <!-- Recent Activity -->
                 <section id="recentActivitySection" class="profile-shelf card" style="display:none;">
                     <div class="card-head">

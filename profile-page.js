@@ -186,6 +186,19 @@
         return card;
     }
 
+    function getShelfMood(shelf) {
+        const name = (shelf.name || "").toLowerCase();
+        const count = Array.isArray(shelf.bookIds) ? shelf.bookIds.length : 0;
+
+        if (name.includes("tbr") || name.includes("to be read")) {
+            if (count > 100) return '😩'; // Stressed
+            if (count > 50) return '😬';  // Nervous
+            if (count > 20) return '🙂';  // Neutral
+            return '😊'; // Happy
+        }
+        return ''; // No mood for other shelves for now
+    }
+
     // ------------------ init ------------------
     async function init(me) {
         const urlParams = new URLSearchParams(window.location.search);
@@ -281,6 +294,8 @@
             await renderStatsSnapshot(profileUid, streak);
             await displayYearlyGoalProgress(profileUid, isMyProfile);
             await loadAndDisplayBadges(profileUid);
+            await loadGuestbook(profileUid, isMyProfile, me);
+            wireGuestbookActions(profileUid, isMyProfile);
 
             await Promise.all([
                 loadCurrentlyReading(profileUid, isMyProfile),
@@ -299,6 +314,8 @@
                     console.warn("Failed to check friendship status:", e);
                 }
                 await calculateAndShowCompatibility(me, profileData);
+                await loadFriendOfFriendDiscovery(profileUid, me.uid, profileData.displayName);
+                wireGuestbookForm(profileUid, me);
             }
         } catch (error) {
             console.error("Failed to load profile:", error);
@@ -568,6 +585,7 @@
                     const shelf = shelfDoc.data() || {};
                     const shelfId = shelfDoc.id;
                     const name = shelf.name || "Untitled Shelf";
+                    const moodEmoji = getShelfMood(shelf);
                     const bookCount = Array.isArray(shelf.bookIds) ? shelf.bookIds.length : 0;
 
                     const shelfBox = document.createElement("div");
@@ -576,7 +594,7 @@
 
                     shelfBox.innerHTML = `
                         <div class="shelf-box-title">
-                            <h3>${esc(name)}</h3>
+                            <h3>${moodEmoji ? `<span class="shelf-mood-emoji" title="Shelf Mood">${moodEmoji}</span>` : ''}${esc(name)}</h3>
                             <div class="book-count">(${bookCount} book${bookCount !== 1 ? 's' : ''})</div>
                         </div>
                         <div class="shelf-expanded-content" style="display: none;"></div>
@@ -1675,6 +1693,231 @@
             } catch (error) {
                 console.warn("Could not calculate compatibility score:", error);
                 container.style.display = 'none';
+            }
+        }
+
+        function wireGuestbookActions(profileUid, isMy) {
+            const listEl = $("#guestbookList");
+            if (!listEl || listEl.dataset.wiredActions) return;
+            listEl.dataset.wiredActions = "true";
+
+            listEl.addEventListener('click', async (e) => {
+                const deleteBtn = e.target.closest('.guestbook-delete-btn');
+                if (!deleteBtn) return;
+
+                const entryEl = deleteBtn.closest('.guestbook-entry');
+                const entryId = entryEl?.dataset.entryId;
+                if (!entryId) return;
+
+                if (confirm("Are you sure you want to delete this guestbook entry?")) {
+                    deleteBtn.disabled = true;
+                    try {
+                        await db().collection("users").doc(profileUid).collection("guestbook").doc(entryId).delete();
+                        window.toast?.("Entry deleted.");
+                        if (entryEl) {
+                            entryEl.style.transition = 'opacity 0.3s, transform 0.3s';
+                            entryEl.style.opacity = '0';
+                            entryEl.style.transform = 'scale(0.95)';
+                            setTimeout(() => {
+                                entryEl.remove();
+                                if (listEl.children.length === 0) {
+                                    listEl.innerHTML = `<p class="muted">No guestbook entries yet.</p>`;
+                                }
+                            }, 300);
+                        }
+                    } catch (err) {
+                        console.error("Failed to delete guestbook entry:", err);
+                        alert("Could not delete entry.");
+                        deleteBtn.disabled = false;
+                    }
+                }
+            });
+        }
+
+        // ---------- Guestbook ----------
+        async function loadGuestbook(uid, isMy, me) {
+            const section = $("#guestbookSection");
+            const listEl = $("#guestbookList");
+            const form = $("#guestbookForm");
+            if (!section || !listEl || !form) return;
+
+            // Show form only on other people's profiles
+            if (!isMy) {
+                form.style.display = 'flex'; // Use flex for the form layout
+                const textarea = form.querySelector('textarea');
+                if (textarea) {
+                    const friendName = $("#profileName")?.textContent?.split(' ')[0] || 'them';
+                    textarea.placeholder = `Leave a note for ${friendName}...`;
+                }
+            }
+
+            try {
+                let snap;
+                try {
+                    // Ideal query
+                    snap = await db().collection("users").doc(uid).collection("guestbook")
+                        .orderBy("createdAt", "desc")
+                        .limit(10)
+                        .get();
+                } catch (err) {
+                    if (err?.code === "failed-precondition") {
+                        console.warn("Guestbook query failed, falling back to client-side sort. Create a Firestore index for performance.");
+                        const rawSnap = await db().collection("users").doc(uid).collection("guestbook").limit(20).get();
+                        const docs = rawSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+                            .sort((a, b) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0))
+                            .slice(0, 10)
+                            .map(d => ({ data: () => d, id: d.id, exists: true }));
+                        snap = { empty: docs.length === 0, docs: docs };
+                    } else {
+                        throw err;
+                    }
+                }
+
+                if (snap.empty) {
+                    listEl.innerHTML = `<p class="muted">No guestbook entries yet. ${!isMy ? 'Be the first!' : ''}</p>`;
+                    section.style.display = 'block'; // Show section even if empty
+                    return;
+                }
+
+                const meUid = me?.uid;
+                listEl.innerHTML = snap.docs.map((doc) => {
+                    const entry = doc.data();
+                    const entryId = doc.id;
+                    const date = entry.createdAt?.toDate ? entry.createdAt.toDate().toLocaleDateString() : '';
+                    // Show delete button if I own the profile OR I wrote the entry
+                    const canDelete = isMy || (meUid && entry.fromUid === meUid);
+                    const deleteBtnHtml = canDelete ? `<button class="guestbook-delete-btn" title="Delete entry">&times;</button>` : '';
+
+                    return `
+                        <div class="guestbook-entry" data-entry-id="${entryId}">
+                            <a href="profile.html?uid=${entry.fromUid}" class="guestbook-author">
+                                <img src="${entry.fromPhoto || 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'}" alt="">
+                                <span>${esc(entry.fromName || 'A user')}</span>
+                            </a>
+                            <div class="guestbook-content">
+                                ${deleteBtnHtml}
+                                <p>${esc(entry.text)}</p>
+                                <span class="guestbook-date">${date}</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                section.style.display = 'block';
+            } catch (error) {
+                console.error("Failed to load guestbook:", error);
+                listEl.innerHTML = `<p class="muted" style="color:red;">Could not load guestbook.</p>`;
+                section.style.display = 'block';
+            }
+        }
+
+        function wireGuestbookForm(profileUid, me) {
+            const form = $("#guestbookForm");
+            if (!form || form.dataset.wired) return; // Prevent multiple listeners
+            form.dataset.wired = "true";
+
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const textarea = form.querySelector('#guestbookInput');
+                const text = textarea.value.trim();
+                const user = auth().currentUser;
+
+                if (!text || !user) return;
+
+                const btn = form.querySelector('button[type="submit"]');
+                btn.disabled = true;
+                btn.textContent = 'Posting...';
+
+                try {
+                    await db().collection("users").doc(profileUid).collection("guestbook").add({
+                        fromUid: user.uid,
+                        fromName: user.displayName,
+                        fromPhoto: user.photoURL,
+                        text: text,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    textarea.value = '';
+                    window.toast?.('Note posted!');
+                    // Reload guestbook to show the new entry
+                    await loadGuestbook(profileUid, false, me);
+                } catch (err) {
+                    console.error("Failed to post guestbook entry:", err);
+                    alert("Could not post your note. Please try again.");
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = 'Post Note';
+                }
+            });
+        }
+
+        // ---------- Friend of a Friend Discovery ----------
+        async function loadFriendOfFriendDiscovery(friendUid, myUid, friendName) {
+            const section = $("#fofDiscoverySection");
+            const grid = $("#fofGrid");
+            const nameEl = $("#fofFriendName");
+            if (!section || !grid || !nameEl) return;
+
+            nameEl.textContent = friendName.split(' ')[0];
+
+            try {
+                // 1. Get the friend's list of friends
+                const friendsSnap = await db().collection("users").doc(friendUid).collection("friends")
+                    .where("status", "==", "accepted")
+                    .limit(10)
+                    .get();
+
+                if (friendsSnap.empty) {
+                    section.style.display = 'none';
+                    return;
+                }
+
+                // Filter out myself and the friend whose profile I'm on.
+                const fofUids = friendsSnap.docs
+                    .map(doc => doc.id)
+                    .filter(id => id !== myUid && id !== friendUid)
+                    .slice(0, 5); // Limit to 5 FoFs for the preview
+
+                if (fofUids.length === 0) {
+                    section.style.display = 'none';
+                    return;
+                }
+
+                // 2. Fetch details for each FoF
+                const fofPromises = fofUids.map(async (fofUid) => {
+                    const userDoc = await db().collection("users").doc(fofUid).get();
+                    if (!userDoc.exists) return null;
+
+                    const readingSnap = await db().collection("users").doc(fofUid).collection("books")
+                        .where("status", "==", "reading")
+                        .orderBy("updatedAt", "desc")
+                        .limit(1)
+                        .get();
+
+                    const currentlyReading = readingSnap.empty ? null : readingSnap.docs[0].data();
+                    return { user: userDoc.data(), uid: fofUid, reading: currentlyReading };
+                });
+
+                const fofDetails = (await Promise.all(fofPromises)).filter(Boolean);
+
+                if (fofDetails.length === 0) {
+                    section.style.display = 'none';
+                    return;
+                }
+
+                // 3. Render the grid
+                grid.innerHTML = fofDetails.map(fof => {
+                    const user = fof.user;
+                    const reading = fof.reading;
+                    const avatar = user.photoURL || 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+                    const name = user.displayName || 'A user';
+                    const readingHtml = reading ? `<div class="fof-reading-snippet"><img src="${esc(reading.coverUrl || reading.coverDataUrl || phCover)}" alt=""><span>Reading “${esc(reading.title)}”</span></div>` : '<div class="fof-reading-snippet">Not currently reading anything.</div>';
+                    return `<a href="profile.html?uid=${fof.uid}" class="fof-card"><img src="${esc(avatar)}" alt="${esc(name)}" class="fof-avatar"><div class="fof-info"><div class="fof-name">${esc(name)}</div>${readingHtml}</div></a>`;
+                }).join('');
+
+                section.style.display = 'block';
+            } catch (error) {
+                console.warn("Friend-of-a-friend discovery failed:", error);
+                section.style.display = 'none';
             }
         }
 

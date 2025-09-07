@@ -1088,49 +1088,6 @@ input[type="text"] {
   color: #fff
 }
 
-/* ==== Add/Edit: wrap chips i bokser (Genres / Moods / Tropes) ==== */
-#genresBox .categories,
-#moodsBox .categories,
-#tropesBox .categories {
-  display: grid !important;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 8px 10px;
-  padding: 8px 10px;
-  margin: 8px 0;
-  white-space: normal;
-  overflow: visible;
-  scroll-snap-type: none;
-}
-
-#genresBox .category,
-#moodsBox .category,
-#tropesBox .category {
-  justify-content: flex-start;
-  font-weight: 700;
-}
-
-@media (max-width: 680px) {
-
-  #genresBox .categories,
-  #moodsBox .categories,
-  #tropesBox .categories {
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  }
-}
-
-/* (fra forrige runde) Chips i Genres/Moods/Tropes ligger pent i grid (duplikat ok) */
-#genresBox .categories,
-#moodsBox .categories,
-#tropesBox .categories {
-  display: grid !important;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 8px 10px;
-  padding: 8px 10px;
-  margin: 8px 0;
-  white-space: normal;
-  overflow: visible;
-  scroll-snap-type: none;
-}
 
 @media (max-width: 680px) {
 
@@ -1290,30 +1247,6 @@ input[type="file"]::file-selector-button:hover {
   color: var(--muted);
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-#bookFile {
-  position: absolute !important;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  border: 0;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-}
-
-#coverFile {
-  position: absolute !important;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  border: 0;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
   white-space: nowrap;
 }
 
@@ -1774,19 +1707,21 @@ input[type="file"]::file-selector-button:hover {
 
 /* --- Homepage Feed Preview Actions --- */
 .feed-actions {
-    display: flex;
-    gap: 8px;
-    margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
 }
 
 .feed-actions .btn.small {
-    padding: 6px 10px;
-    font-size: 0.8rem;
-    min-height: 32px;
-    border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  min-height: 32px;
+  border-radius: 8px;
 }
 
-.feed-avatar-link { flex-shrink: 0; }
+.feed-avatar-link {
+  flex-shrink: 0;
+}
 
 /* --- Social Feed Interactive Elements --- */
 .btn-like.active {
@@ -1844,7 +1779,8 @@ input[type="file"]::file-selector-button:hover {
 
 .comment-input {
   flex: 1;
-  border-radius: 10px; /* Match button radius */
+  border-radius: 10px;
+  /* Match button radius */
   padding: 8px 12px;
 }
 

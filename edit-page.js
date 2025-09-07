@@ -71,6 +71,21 @@
     });
   }
 
+  function wireChipControls(form) {
+    const inpGenres = ensureHidden(form, "genres");
+    const inpMoods = ensureHidden(form, "moods");
+    const inpTropes = ensureHidden(form, "tropes");
+    const inpStatus = ensureHidden(form, "status");
+    const inpStatuses = ensureHidden(form, "statuses");
+    const inpFormat = ensureHidden(form, "format");
+
+    wireChipGroup($("#genres"), { multi: true, onChange: vals => inpGenres.value = JSON.stringify(vals) });
+    wireChipGroup($("#moods"), { multi: true, onChange: vals => inpMoods.value = JSON.stringify(vals) });
+    wireChipGroup($("#tropes"), { multi: true, onChange: vals => inpTropes.value = JSON.stringify(vals) });
+    wireChipGroup($("#statusChips"), { multi: true, onChange: vals => { inpStatuses.value = JSON.stringify(vals); inpStatus.value = vals[0] || ""; } });
+    wireChipGroup($("#formatChips"), { multi: false, onChange: val => inpFormat.value = val || "" });
+  }
+
   // read image file → data URL
   function readAsDataURL(file) {
     return new Promise((resolve, reject) => {
@@ -130,21 +145,8 @@
     inpSpice.value = d.spice || "0";
 
     // Reread value checkbox
-    $("#rereadValue") && ($("#rereadValue").checked = !!d.rereadValue);
-
-    // Cover preview (existing)
-    if ($("#coverPreview")) {
-      // CSS should handle hiding this if src is empty, and hiding placeholder if src is present
-      if (d.coverUrl) $("#coverPreview").src = d.coverUrl;
-      else if (d.coverDataUrl) $("#coverPreview").src = d.coverDataUrl;
-      else $("#coverPreview").removeAttribute("src");
-    }
-
-    // Show existing file name
-    if ($("#fileName")) {
-      const hasFile = d.fileName || d.storagePath || d.downloadURL;
-      $("#fileName").textContent = hasFile ? (d.fileName || "Existing file attached") : "";
-    }
+    const rereadValueEl = $("#rereadValue");
+    if (rereadValueEl) rereadValueEl.checked = !!d.rereadValue;
 
     // Hidden inputs for chips
     const inpGenres = ensureHidden(form, "genres");
@@ -161,47 +163,39 @@
     inpStatus.value = d.status || "";
     inpFormat.value = d.format || "";
 
-    // Get chip definitions
-    const { genres, moods, tropes, statuses, formats } = getLists();
+    // Cover preview (existing)
+    const coverPreviewEl = $("#coverPreview");
+    if (coverPreviewEl) {
+      coverPreviewEl.src = d.coverUrl || d.coverDataUrl || "";
+    }
 
-    // Populate chip containers if they are empty
-    populateChips($("#genresBox .categories"), genres);
-    populateChips($("#moodsBox .categories"), moods);
-    populateChips($("#tropesBox .categories"), tropes);
-    // Also populate status and format if they are empty
-    populateChips($("#statusChips"), statuses);
-    populateChips($("#formatChips"), formats);
+    // Show existing file name
+    const fileNameEl = $("#fileName");
+    if (fileNameEl) fileNameEl.textContent = d.fileName || "";
 
     // Activate chips visually
-    activateChips($("#genresBox .categories"), JSON.parse(inpGenres.value || "[]"));
-    activateChips($("#moodsBox  .categories"), JSON.parse(inpMoods.value || "[]"));
-    activateChips($("#tropesBox .categories"), JSON.parse(inpTropes.value || "[]"));
+    activateChips($("#genres"), JSON.parse(inpGenres.value || "[]"));
+    activateChips($("#moods"), JSON.parse(inpMoods.value || "[]"));
+    activateChips($("#tropes"), JSON.parse(inpTropes.value || "[]"));
     activateChips($("#statusChips"), JSON.parse(inpStatuses.value || "[]")); // multi
     activateChips($("#formatChips"), [inpFormat.value].filter(Boolean)); // single
-
-    // Keep hidden inputs in sync
-    wireChipGroup($("#genresBox .categories"), { multi: true, onChange: vals => inpGenres.value = JSON.stringify(vals) });
-    wireChipGroup($("#moodsBox  .categories"), { multi: true, onChange: vals => inpMoods.value = JSON.stringify(vals) });
-    wireChipGroup($("#tropesBox .categories"), { multi: true, onChange: vals => inpTropes.value = JSON.stringify(vals) });
-    wireChipGroup($("#statusChips"), {
-      multi: true,
-      onChange: vals => { inpStatuses.value = JSON.stringify(vals); inpStatus.value = vals[0] || ""; }
-    });
-    wireChipGroup($("#formatChips"), { multi: false, onChange: val => inpFormat.value = val || "" });
-
-    // Render existing quotes
     renderQuotes(d.quotes || []);
 
     return { ref, data: d, uid: u.uid };
   }
 
-  async function save(form, ctx, newCoverDataUrl, extractedCoverBlob) {
+  async function save(form, ctx, isEditing, newCoverDataUrl, extractedCoverBlob) {
     const u = auth().currentUser;
     if (!u) return alert("Not signed in.");
-    const id = new URLSearchParams(location.search).get("id") || form.dataset.id || "";
-    if (!id) return alert("Missing book id.");
 
+    // If we are adding a new book, generate a new ID. Otherwise, use the existing one.
+    const id = isEditing ? (ctx.ref.id) : db().collection("users").doc(u.uid).collection("books").doc().id;
     const ref = db().collection("users").doc(u.uid).collection("books").doc(id);
+
+    // For new books, we need to set the creation timestamp.
+    const creationTimestamp = isEditing
+      ? ctx.data.createdAt // Keep existing timestamp
+      : firebase.firestore.FieldValue.serverTimestamp(); // Set new timestamp
 
     const title = ($("#title")?.value || "").trim();
     const author = ($("#author")?.value || "").trim();
@@ -236,6 +230,7 @@
       writingNotes: $("#writingNotes")?.value || "",
       impactNotes: $("#impactNotes")?.value || "",
       statuses, status, format,
+      createdAt: creationTimestamp,
       quotes, // Save the quotes array
       ...(ratingVal !== "" ? { rating: Number(ratingVal) || 0 } : {}),
       ...(spiceVal !== "" ? { spice: Number(spiceVal) || 0 } : {}),
@@ -260,7 +255,7 @@
     await ref.set(payload, { merge: true });
 
     // Log the appropriate activity based on what changed.
-    await window.PBActivity?.handleBookUpdate?.(id, payload, ctx.data);
+    await window.PBActivity?.handleBookUpdate?.(id, payload, isEditing ? ctx.data : null);
 
     // If the book was marked as finished, check for challenge progress.
     if (payload.status === 'finished') {
@@ -337,12 +332,50 @@
     const form = $("#bookForm") || $("form");
     if (!form) return;
 
+    const urlParams = new URLSearchParams(location.search);
+    const bookId = urlParams.get("id");
+    const isEditing = !!bookId;
+
+    // --- Populate all chip containers once, for both modes ---
+    const { genres, moods, tropes, statuses, formats } = getLists();
+    populateChips($("#genres"), genres);
+    populateChips($("#moods"), moods);
+    populateChips($("#tropes"), tropes);
+    populateChips($("#statusChips"), statuses);
+    populateChips($("#formatChips"), formats);
+
+    // Wire up all chip controls for both Add and Edit modes
+    wireChipControls(form);
+
+    // Adjust UI for Add vs. Edit mode
+    const header = $("h1");
+    if (header) header.textContent = isEditing ? "Edit Book" : "Add Book";
+    const saveBtnText = $("#saveBtn");
+    if (saveBtnText) saveBtnText.textContent = isEditing ? "Save Changes" : "Save Book";
+    const delBtn = $("#deleteBtn");
+    if (delBtn) delBtn.style.display = isEditing ? "" : "none";
+
     let ctx = null;
-    try { ctx = await loadBook(form); }
-    catch (e) { console.warn("[edit] load failed:", e); alert(e.message || "Could not load book."); return; }
+    if (isEditing) {
+      try { ctx = await loadBook(form); }
+      catch (e) { console.warn("[edit] load failed:", e); alert(e.message || "Could not load book."); return; }
+    } else {
+      // This is the "Add Book" page. Set up a default context.
+      const u = auth().currentUser || await new Promise(res => { const off = auth().onAuthStateChanged(x => { off(); res(x); }); });
+      if (!u) { location.href = "auth.html"; return; }
+      ctx = { ref: null, data: { statuses: ['tbr'], status: 'tbr' }, uid: u.uid };
+
+      // Activate default status and initialize hidden inputs
+      activateChips($("#statusChips"), ['tbr']);
+      ensureHidden(form, "statuses").value = JSON.stringify(['tbr']);
+      ensureHidden(form, "status").value = 'tbr';
+      ensureHidden(form, "genres").value = "[]";
+      ensureHidden(form, "moods").value = "[]";
+      ensureHidden(form, "tropes").value = "[]";
+      ensureHidden(form, "format").value = "";
+    }
 
     // Wire header buttons
-    const delBtn = $("#deleteBtn");
     const cancelBtn = $("#cancelBtn");
 
     if (delBtn) {
@@ -373,15 +406,15 @@
     const saveBtn = $("#saveBtn") || $('[data-role="save-book"]') || $('[data-action="save"]');
     let extractedCoverBlob = null;
 
-    // --- "I'm Finished" Button ---
+    // --- "I'm Finished" Button (only for edit page) ---
     const finishedBtn = document.createElement('button');
     finishedBtn.type = 'button';
     finishedBtn.id = 'imFinishedBtn';
     finishedBtn.className = 'btn'; // Use a generic class and style it in CSS
     finishedBtn.innerHTML = '<i class="fa-solid fa-flag-checkered"></i> I\'m Finished!';
 
-    // Place it next to the save button if it exists
-    if (saveBtn) {
+    // Place it in the header only when editing
+    if (saveBtn && isEditing) {
       const saveBtnContainer = saveBtn.closest('.form-row') || saveBtn.parentElement;
       saveBtnContainer.style.display = 'flex';
       saveBtnContainer.style.gap = '8px';
@@ -470,7 +503,7 @@
     saveBtn?.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      save(form, ctx, newCoverDataUrl, extractedCoverBlob);
+      save(form, ctx, isEditing, newCoverDataUrl, extractedCoverBlob);
     });
 
     // Wire up the new quotes section

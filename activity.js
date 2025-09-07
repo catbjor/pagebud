@@ -37,14 +37,14 @@
 
     async function writePrivate(uid, id, doc) {
         const ref = db().collection("users").doc(uid).collection("activity").doc(id);
-        await ref.set(nowFields(doc));
+        await ref.set(nowFields(doc), { merge: true });
         return id;
     }
 
     async function writePublic(uid, id, doc) {
         // owner felt brukes for queries (collectionGroup + owner in [...])
         const ref = db().collection("users").doc(uid).collection("public_activity").doc(id);
-        await ref.set(nowFields({ owner: uid, ...doc }));
+        await ref.set(nowFields({ owner: uid, ...doc }), { merge: true });
         return id;
     }
 
@@ -201,7 +201,7 @@
             if (snap.exists) {
                 await likeRef.delete();
             } else {
-                await likeRef.set({ uid: me.uid, at: firebase.firestore.FieldValue.serverTimestamp() });
+                await likeRef.set({ uid: me.uid, at: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
             }
 
             // Update counts on both private and public docs

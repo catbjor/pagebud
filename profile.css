@@ -1060,3 +1060,186 @@ body {
     color: var(--muted);
     font-weight: 600;
 }
+
+/* --- Shelf Mood Emoji --- */
+.shelf-mood-emoji {
+    display: inline-block;
+    margin-right: 8px;
+    font-size: 1.2em;
+    /* Slightly larger than title */
+    vertical-align: -0.1em;
+    /* Better alignment with text */
+}
+
+/* --- Profile Guestbook --- */
+.guestbook-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 24px;
+    width: 100%;
+    max-width: 500px;
+    align-self: center;
+}
+
+.guestbook-form textarea {
+    width: 100%;
+    min-height: 80px;
+    resize: vertical;
+}
+
+.guestbook-form button {
+    align-self: flex-end;
+}
+
+.guestbook-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    text-align: left;
+    width: 100%;
+}
+
+.guestbook-entry {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+}
+
+.guestbook-author {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    width: 60px;
+    text-decoration: none;
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+}
+
+.guestbook-author img {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: var(--surface);
+}
+
+.guestbook-content {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+    flex-grow: 1;
+    position: relative;
+}
+
+.guestbook-content p {
+    margin: 0;
+    white-space: pre-wrap;
+    /* Respect newlines */
+    word-break: break-word;
+}
+
+.guestbook-date {
+    display: block;
+    margin-top: 8px;
+    font-size: 0.75rem;
+    color: var(--muted);
+    text-align: right;
+}
+
+.guestbook-delete-btn {
+    position: absolute;
+    top: 4px;
+    right: 8px;
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    font-size: 1.4rem;
+    line-height: 1;
+    padding: 4px;
+    cursor: pointer;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    display: grid;
+    place-items: center;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.guestbook-delete-btn:hover {
+    background: var(--hover);
+    color: var(--text);
+}
+
+/* --- Friend of a Friend Discovery --- */
+.fof-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    /* One per row to show more detail */
+    gap: 12px;
+    margin-top: 12px;
+    text-align: left;
+    width: 100%;
+}
+
+.fof-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    text-decoration: none;
+    color: inherit;
+    transition: background-color 0.2s;
+}
+
+.fof-card:hover {
+    background: var(--hover);
+}
+
+.fof-avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: var(--surface);
+}
+
+.fof-info {
+    flex-grow: 1;
+    min-width: 0;
+}
+
+.fof-name {
+    font-weight: 800;
+}
+
+.fof-reading-snippet {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    font-size: 0.85rem;
+    color: var(--muted);
+}
+
+.fof-reading-snippet img {
+    width: 24px;
+    height: 36px;
+    object-fit: cover;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+/* --- Custom Shelves Header --- */
+#customShelvesSection .card-head h3 {
+    font-size: 1.4rem;
+    /* Make the main shelf title larger */
+}
