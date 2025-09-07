@@ -145,7 +145,7 @@
         coverUrl: it.meta?.coverUrl || '',
         workKey: it.meta?.workKey || null,
       });
-      actionButton = `<button class="btn btn-secondary btn-add-to-tbr" data-book='${esc(bookData)}'><i class="fa-solid fa-plus"></i> Add to TBR</button>`;
+      actionButton = `<button class="btn btn-add-to-tbr" data-book='${esc(bookData)}'><i class="fa-solid fa-plus"></i> Add to TBR</button>`;
     }
 
     return `

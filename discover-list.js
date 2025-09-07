@@ -121,7 +121,7 @@
         const meta = b.year ? `<div class="muted">${esc(String(b.year))}</div>` : ``;
         const chips = (b.subjects || []).slice(0, 2).map(s => `<span class="chip">${esc(short(s, 18))}</span>`).join("");
         const act = inLib(b) ? `<span class="chip">✓ In library</span>` :
-            `<button class="btn btn-secondary small" data-add='${encodeURIComponent(JSON.stringify({
+            `<button class="btn small" data-add='${encodeURIComponent(JSON.stringify({
                 title: b.title, author: b.author, cover: b.cover, year: b.year, subjects: b.subjects || [], workKey: b.workKey || ""
             }))}'>+ Add</button>`;
         return `

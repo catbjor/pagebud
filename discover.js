@@ -447,7 +447,7 @@
         // Simplified card as requested: cover, title, author, year, add button.
         const yearHTML = b.year ? `<div class="meta">${esc(String(b.year))}</div>` : '';
         var actionHTML = inLib ? '<span class="muted-small" aria-label="In library">Already in ✓</span>'
-            : '<button class="btn btn-secondary small" data-add=\'' + encodeURIComponent(JSON.stringify(b)) + '\'>+ Add</button>';
+            : '<button class="btn small" data-add=\'' + encodeURIComponent(JSON.stringify(b)) + '\'>+ Add</button>';
 
         return (
             '<div class="tile" data-book=\'' + encodeURIComponent(JSON.stringify(b)) + '\'>' +
