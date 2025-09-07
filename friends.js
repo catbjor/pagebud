@@ -34,7 +34,7 @@
         if (typeof Audio === "undefined") return;
         try {
             const audio = new Audio(url);
-            audio.play().catch(() => {});
+            audio.play().catch(() => { });
         } catch (e) {
             warn("playSound failed:", e);
         }
@@ -402,7 +402,9 @@
                     // Add confirmation dialog before unfriending
                     rmBtn.addEventListener("click", () => unfriend(me.uid, f.uid, f.displayName || f.username));
 
-                    renderUserRow(els.friendsList, f, [chatBtn, rmBtn], () => modal.show(f));
+                    renderUserRow(els.friendsList, f, [chatBtn, rmBtn], () => {
+                        location.href = `profile.html?uid=${encodeURIComponent(f.uid)}`;
+                    });
                 }
                 if (snap.empty) els.friendsList.innerHTML = `<p class="muted">No friends yet.</p>`;
                 repaintBadges?.();

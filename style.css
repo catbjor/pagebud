@@ -1772,6 +1772,22 @@ input[type="file"]::file-selector-button:hover {
   margin-top: 4px;
 }
 
+/* --- Homepage Feed Preview Actions --- */
+.feed-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.feed-actions .btn.small {
+    padding: 6px 10px;
+    font-size: 0.8rem;
+    min-height: 32px;
+    border-radius: 8px;
+}
+
+.feed-avatar-link { flex-shrink: 0; }
+
 /* --- Social Feed Interactive Elements --- */
 .btn-like.active {
   background: #ffeded;
@@ -1822,6 +1838,14 @@ input[type="file"]::file-selector-button:hover {
 
 .comment-box {
   display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.comment-input {
+  flex: 1;
+  border-radius: 10px; /* Match button radius */
+  padding: 8px 12px;
 }
 
 .comment-input {
@@ -2338,11 +2362,6 @@ input[type="file"]::file-selector-button:hover {
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
   flex-shrink: 0;
-}
-
-#railSentinel {
-  /* Give the sentinel some height so the observer can reliably track it */
-  height: 100px;
 }
 
 #railSentinel {

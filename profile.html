@@ -36,6 +36,7 @@
                 </div>
 
                 <div class="profile-photo-wrap">
+                    <div id="moodRing" class="mood-ring"></div>
                     <img id="profilePhoto"
                         src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
                         alt="Profile photo">
@@ -59,6 +60,28 @@
                     <button id="btnMoreOptions" class="btn-icon" title="More options">
                         <i class="fa-solid fa-ellipsis-vertical"></i>
                     </button>
+                </div>
+
+                <!-- Quote Banner -->
+                <div id="quoteBanner" class="quote-banner" style="display:none;">
+                    <p class="quote-banner-text"></p>
+                    <p class="quote-banner-author"></p>
+                </div>
+
+                <!-- Stats Snapshot -->
+                <div id="statsSnapshot" class="stats-snapshot-grid" style="display:none;">
+                    <div class="stat-item">
+                        <div id="snapshotBooks" class="stat-value">0</div>
+                        <div class="stat-label">Books this year</div>
+                    </div>
+                    <div class="stat-item">
+                        <div id="snapshotStreak" class="stat-value">0</div>
+                        <div class="stat-label">Day Streak</div>
+                    </div>
+                    <div class="stat-item">
+                        <div id="snapshotAvgRating" class="stat-value">0.0</div>
+                        <div class="stat-label">Avg Rating</div>
+                    </div>
                 </div>
 
                 <div id="compatibilityScore" class="compatibility-score" style="display:none;">
@@ -113,37 +136,37 @@
                 <section id="currentlyReadingShelf" class="profile-shelf card" style="display:none;">
                     <div class="card-head">
                         <h3>Currently Reading</h3>
-                        <a href="index.html?filter=reading" class="btn btn-secondary see-all-btn"
-                            style="display:none; padding:4px 10px; font-size:.85rem;">See All</a>
                     </div>
                     <div class="shelf-grid"></div>
+                    <a href="index.html?filter=reading" class="btn btn-primary see-all-btn" style="display:none;">See
+                        All</a>
                 </section>
 
                 <section id="favoritesShelf" class="profile-shelf card" style="display:none;">
                     <div class="card-head">
                         <h3>Favorites</h3>
-                        <a href="index.html?filter=favorites" class="btn btn-secondary see-all-btn"
-                            style="display:none; padding:4px 10px; font-size:.85rem;">See All</a>
                     </div>
                     <div class="shelf-grid"></div>
+                    <a href="index.html?filter=favorites" class="btn btn-primary see-all-btn" style="display:none;">See
+                        All</a>
                 </section>
 
                 <section id="finishedShelf" class="profile-shelf card" style="display:none;">
                     <div class="card-head">
                         <h3>Finished Books</h3>
-                        <a href="index.html?filter=finished" class="btn btn-secondary see-all-btn"
-                            style="display:none; padding:4px 10px; font-size:.85rem;">See All</a>
                     </div>
                     <div class="shelf-grid"></div>
+                    <a href="index.html?filter=finished" class="btn btn-primary see-all-btn" style="display:none;">See
+                        All</a>
                 </section>
 
                 <section id="wishlistShelf" class="profile-shelf card" style="display:none;">
                     <div class="card-head">
                         <h3>Wishlist</h3>
-                        <a href="index.html?filter=wishlist" class="btn btn-secondary see-all-btn"
-                            style="display:none; padding:4px 10px; font-size:.85rem;">See All</a>
                     </div>
                     <div class="shelf-grid"></div>
+                    <a href="index.html?filter=wishlist" class="btn btn-primary see-all-btn" style="display:none;">See
+                        All</a>
                 </section>
 
                 <!-- Edit form -->
@@ -304,6 +327,8 @@
     <!-- Library for drag-and-drop shelves -->
     <script src="constants.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <script src="sync.js" defer></script>
+    <script src="activity.js" defer></script>
     <script src="profile-page.js" defer></script>
 </body>
 

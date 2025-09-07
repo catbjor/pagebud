@@ -935,3 +935,128 @@ body {
     opacity: 0.4;
     background: var(--primary);
 }
+
+/* --- Restyled Shelf Cards --- */
+
+/* For built-in shelves like "Currently Reading" */
+.profile-shelf.card {
+    display: flex;
+    flex-direction: column;
+    text-align: center;
+}
+
+.profile-shelf .card-head {
+    justify-content: center;
+    /* Center the title */
+}
+
+.profile-shelf .see-all-btn {
+    margin-top: 16px;
+    align-self: center;
+    width: 100%;
+    max-width: 250px;
+}
+
+/* For custom shelves in the "My Shelves" grid */
+.profile-shelf-box-expandable.card {
+    display: flex;
+    flex-direction: column;
+    text-align: center;
+    justify-content: space-between;
+    min-height: 150px;
+    position: relative; /* For the drag handle */
+}
+
+.profile-shelf-box-expandable .shelf-box-title {
+    padding: 8px;
+}
+
+.profile-shelf-box-expandable .shelf-box-footer {
+    margin-top: auto;
+    /* Push to bottom */
+    padding: 0 8px 8px;
+}
+
+.profile-shelf-box-expandable .see-all-btn {
+    width: 100%;
+}
+
+/* --- Quote Banner --- */
+.quote-banner {
+    width: 100%;
+    max-width: 500px;
+    margin-top: 24px;
+    padding: 16px;
+    border-radius: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    text-align: center;
+}
+
+.quote-banner-text {
+    font-family: Georgia, serif;
+    font-style: italic;
+    font-size: 1.1rem;
+    line-height: 1.5;
+    margin: 0 0 8px;
+}
+
+.quote-banner-author {
+    font-weight: 600;
+    color: var(--muted);
+    margin: 0;
+}
+
+.quote-actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* --- Reading Mood Ring --- */
+.mood-ring {
+    position: absolute;
+    inset: -6px; /* Makes it slightly larger than the photo */
+    border-radius: 50%;
+    z-index: -1; /* Behind the photo */
+    background: conic-gradient(from 90deg, #4e73df, #1cc88a, #f6c23e, #e74a3b, #4e73df); /* Placeholder gradient */
+    animation: spin 10s linear infinite;
+    opacity: 0;
+    transition: opacity 0.5s ease-in-out;
+    filter: blur(4px); /* Soft glow effect */
+}
+
+.mood-ring.visible {
+    opacity: 0.7;
+}
+
+@keyframes spin {
+    to { transform: rotate(450deg); }
+}
+
+/* --- Stats Snapshot on Profile --- */
+.stats-snapshot-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    width: 100%;
+    max-width: 450px;
+    margin-top: 24px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+}
+
+.stat-item {
+    text-align: center;
+}
+
+.stat-item .stat-value {
+    font-size: 1.8rem;
+    font-weight: 800;
+    line-height: 1.1;
+}
+
+.stat-item .stat-label {
+    font-size: 0.8rem;
+    color: var(--muted);
+    font-weight: 600;
+}

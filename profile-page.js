@@ -77,7 +77,7 @@
     }
     function createCardElement(doc, isMyProfile, options = {}) {
         const tpl = document.getElementById("book-card-template");
-        const { showActions = true } = options;
+        const { showActions = true, draggable = false } = options;
         if (!tpl) return null;
         const card = tpl.content.cloneNode(true).firstElementChild;
 
@@ -143,7 +143,27 @@
                     }
                 } else {
                     if (editBtn) editBtn.style.display = "none";
-                    if (addBtn) addBtn.style.display = "none";
+                    if (addBtn) {
+                        // Repurpose the "add to shelf" button to be "add to my library"
+                        addBtn.className = 'btn btn-primary small';
+                        addBtn.style.display = "";
+                        addBtn.innerHTML = `Add to Library`; // Remove icon to save space
+                        addBtn.title = 'Add this book to your library';
+                        addBtn.dataset.bookData = JSON.stringify({
+                            title: d.title,
+                            author: d.author,
+                            coverUrl: d.coverUrl,
+                            coverDataUrl: d.coverDataUrl,
+                            workKey: d.workKey,
+                            subjects: d.subjects,
+                            pageCount: d.pageCount,
+                            genres: d.genres,
+                            moods: d.moods,
+                            tropes: d.tropes,
+                            format: d.format,
+                            spice: d.spice,
+                        });
+                    }
                 }
                 if (d.hasFile && readBtn) {
                     readBtn.dataset.id = id;
@@ -152,6 +172,15 @@
             } else {
                 actionsContainer.remove();
             }
+        }
+
+        // Add drag handle if specified
+        if (draggable) {
+            const handle = document.createElement('div');
+            handle.className = 'book-drag-handle';
+            handle.innerHTML = '&#x2630;'; // Trigram for heaven (☰)
+            handle.title = 'Drag to reorder';
+            card.prepend(handle); // Prepend to be at the top of the card's DOM
         }
 
         return card;
@@ -212,6 +241,11 @@
             profileData = userDoc.data() || {};
             profileData.uid = profileUid;
 
+            // Render banner quote if it exists
+            if (profileData.bannerQuoteId) {
+                await renderQuoteBanner(profileUid, profileData.bannerQuoteId);
+            }
+
             // username (non-fatal)
             try {
                 const uSnap = await db()
@@ -242,7 +276,10 @@
 
             // sections (fire and forget; each has its own try/catch)
             const streak = await calculateStreak(profileUid);
+            await renderMoodRing(profileUid);
             await calculateAndShowAchievements(profileUid, streak);
+            await renderStatsSnapshot(profileUid, streak);
+            await displayYearlyGoalProgress(profileUid, isMyProfile);
             await loadAndDisplayBadges(profileUid);
 
             await Promise.all([
@@ -256,12 +293,12 @@
             if (isMyProfile) {
                 await loadNotesAndQuotes(me.uid);
             } else {
-                await checkFriendshipAndShowActions(me.uid, profileUid);
-                if (typeof calculateAndShowCompatibility === "function") {
-                    try {
-                        await calculateAndShowCompatibility(me, profileData);
-                    } catch { }
+                try {
+                    await checkFriendshipAndShowActions(me.uid, profileUid);
+                } catch (e) {
+                    console.warn("Failed to check friendship status:", e);
                 }
+                await calculateAndShowCompatibility(me, profileData);
             }
         } catch (error) {
             console.error("Failed to load profile:", error);
@@ -278,6 +315,8 @@
             if (btnChangePhoto) btnChangePhoto.style.display = "grid";
 
             if (editName) editName.value = profileData.displayName || "";
+            const editReadingGoal = $("#editReadingGoal");
+            if (editReadingGoal) editReadingGoal.value = profileData.yearlyGoal || localStorage.getItem("pb:goal:yearly") || "";
             wireUpQuirksEditor(profileData.quirks || []);
             if (editBio) editBio.value = profileData.bio || "";
 
@@ -394,6 +433,7 @@
                 const newName = (editName?.value || "").trim();
                 const newQuirks = getSelectedQuirks();
                 const newBio = (editBio?.value || "").trim();
+                const newGoal = parseInt($("#editReadingGoal")?.value, 10) || 0;
 
                 if (btnSaveChanges) {
                     btnSaveChanges.disabled = true;
@@ -406,14 +446,19 @@
                         quirks: newQuirks,
                         bio: newBio,
                         displayName_lower: (newName || "").toLowerCase(),
+                        yearlyGoal: newGoal,
                     };
                     await db().collection("users").doc(me.uid).set(updates, { merge: true });
+
+                    // Also save to localStorage for the goal badge/other components
+                    localStorage.setItem("pb:goal:yearly", newGoal);
 
                     if (nameEl) nameEl.textContent = newName || "No name";
                     renderQuirks(newQuirks);
                     if (bioEl)
                         bioEl.textContent =
                             newBio || "You haven't written a bio yet. Click 'Edit Profile' to add one.";
+                    await displayYearlyGoalProgress(me.uid, true);
                     alert("Profile saved!");
 
                     // close the sheet on mobile after save
@@ -526,19 +571,20 @@
                     const bookCount = Array.isArray(shelf.bookIds) ? shelf.bookIds.length : 0;
 
                     const shelfBox = document.createElement("div");
-                    shelfBox.className = "profile-shelf-box-expandable";
+                    shelfBox.className = "profile-shelf-box-expandable card";
                     shelfBox.dataset.shelfId = shelfId;
 
                     shelfBox.innerHTML = `
-                        <div class="shelf-box-header">
-                            <div class="shelf-box-title">
-                                <h3>${esc(name)}</h3>
-                                <div class="book-count">(${bookCount} book${bookCount !== 1 ? 's' : ''})</div>
-                            </div>
-                            <button class="btn btn-secondary see-all-btn" data-action="see-all">See All</button>
+                        <div class="shelf-box-title">
+                            <h3>${esc(name)}</h3>
+                            <div class="book-count">(${bookCount} book${bookCount !== 1 ? 's' : ''})</div>
                         </div>
                         <div class="shelf-expanded-content" style="display: none;"></div>
-                        ${isMy ? `<span class="shelf-handle" title="Drag to reorder">☰</span>` : ''}
+                        <div class="shelf-box-footer">
+                             <button class="btn btn-primary see-all-btn" data-action="see-all">See All</button>
+                        </div>
+                        ${isMy ? `<span class="shelf-handle" title="Drag to reorder">☰</span>` : ''
+                        }
                     `;
                     container.appendChild(shelfBox);
                 });
@@ -921,7 +967,8 @@
                 const frag = document.createDocumentFragment();
                 bookSnaps.forEach(doc => {
                     if (doc.exists) {
-                        const card = createCardElement(doc, isMy, { showActions: true });
+                        // Pass draggable option only for custom shelves on my profile
+                        const card = createCardElement(doc, isMy, { showActions: true, draggable: isMy });
                         if (card) frag.appendChild(card);
                     }
                 });
@@ -929,6 +976,26 @@
                 gridDiv.innerHTML = '';
                 gridDiv.appendChild(frag);
                 wireShelfGridActions(gridDiv, isMy, shelfId);
+
+                // Add Sortable.js logic for reordering
+                if (isMy && typeof Sortable !== "undefined") {
+                    Sortable.create(gridDiv, {
+                        animation: 150,
+                        handle: ".book-drag-handle",
+                        onEnd: async (evt) => {
+                            const reorderedBookIds = Array.from(evt.target.children).map(card => card.dataset.id).filter(Boolean);
+
+                            const shelfRef = db().collection("users").doc(uid).collection("shelves").doc(shelfId);
+                            try {
+                                await shelfRef.update({ bookIds: reorderedBookIds });
+                                window.toast?.("Shelf order saved!");
+                            } catch (e) {
+                                console.error("Failed to save shelf order:", e);
+                                alert("Could not save the new order.");
+                            }
+                        }
+                    });
+                }
 
             } catch (error) {
                 console.error("Failed to render expanded shelf:", error);
@@ -950,14 +1017,19 @@
                     const noteHtml = quote.note ? `<div class="note-body">${quote.note}</div>` : "";
                     const quoteData = encodeURIComponent(JSON.stringify(quote));
                     return `
-          <div class="quote-item" data-search-text="${(quote.text + " " + (quote.note || "")).toLowerCase()}">
+          <div class="quote-item" data-quote-id="${quote.id}" data-search-text="${(quote.text + " " + (quote.note || "")).toLowerCase()}">
             <blockquote class="quote-text">“${quote.text}”</blockquote>
             ${noteHtml}
             <div class="quote-meta">
               <span>From <strong>${quote.bookTitle || "a book"}</strong></span>
-              <button class="btn btn-secondary small" data-action="share-quote" data-quote='${quoteData}'>
-                <i class="fa-solid fa-share-nodes"></i> Share
-              </button>
+              <div class="quote-actions">
+                <button class="btn btn-secondary small" data-action="share-quote" data-quote='${quoteData}'>
+                  <i class="fa-solid fa-share-nodes"></i> Share
+                </button>
+                <button class="btn btn-secondary small" data-action="set-banner">
+                  <i class="fa-solid fa-thumbtack"></i> Set as Banner
+                </button>
+              </div>
             </div>
           </div>`;
                 })
@@ -1054,27 +1126,45 @@
 
         $("#notesAndQuotesList")?.addEventListener("click", async (e) => {
             const shareBtn = e.target.closest('[data-action="share-quote"]');
-            if (!shareBtn) return;
-            const quote = JSON.parse(decodeURIComponent(shareBtn.dataset.quote));
-            const modal = $("#quoteCardModal");
-            const wrap = $("#quoteCardCanvasWrap");
-            const dl = $("#downloadQuoteCardBtn");
-            wrap.innerHTML = `<p class="muted">Generating card...</p>`;
-            modal.classList.add("show");
-            const canvas = await generateQuoteCard(quote);
-            wrap.innerHTML = "";
-            wrap.appendChild(canvas);
-            dl.href = canvas.toDataURL("image/png");
-            $("#closeQuoteCardBtn")?.addEventListener("click", () => modal.classList.remove("show"), {
-                once: true,
-            });
-            modal.addEventListener(
-                "click",
-                (evt) => {
-                    if (evt.target === modal) modal.classList.remove("show");
-                },
-                { once: true }
-            );
+            if (shareBtn) {
+                const quote = JSON.parse(decodeURIComponent(shareBtn.dataset.quote));
+                const modal = $("#quoteCardModal");
+                const wrap = $("#quoteCardCanvasWrap");
+                const dl = $("#downloadQuoteCardBtn");
+                wrap.innerHTML = `<p class="muted">Generating card...</p>`;
+                modal.classList.add("show");
+                const canvas = await generateQuoteCard(quote);
+                wrap.innerHTML = "";
+                wrap.appendChild(canvas);
+                dl.href = canvas.toDataURL("image/png");
+                $("#closeQuoteCardBtn")?.addEventListener("click", () => modal.classList.remove("show"), { once: true });
+                modal.addEventListener("click", (evt) => { if (evt.target === modal) modal.classList.remove("show"); }, { once: true });
+                return;
+            }
+
+            const bannerBtn = e.target.closest('[data-action="set-banner"]');
+            if (bannerBtn) {
+                const quoteItem = bannerBtn.closest('.quote-item');
+                const quoteId = quoteItem?.dataset.quoteId;
+                const user = auth().currentUser;
+                if (!user || !quoteId) return;
+
+                bannerBtn.disabled = true;
+                bannerBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Setting...`;
+
+                try {
+                    await db().collection("users").doc(user.uid).update({ bannerQuoteId: quoteId });
+                    window.toast?.("Banner quote set!");
+                    await renderQuoteBanner(user.uid, quoteId);
+                } catch (err) {
+                    console.error("Failed to set banner quote:", err);
+                    alert("Could not set banner quote.");
+                } finally {
+                    bannerBtn.disabled = false;
+                    bannerBtn.innerHTML = `<i class="fa-solid fa-thumbtack"></i> Set as Banner`;
+                }
+                return;
+            }
         });
         $("#notesSearchInput")?.addEventListener("input", (e) => {
             const q = (e.target.value || "").toLowerCase().trim();
@@ -1088,6 +1178,31 @@
                 )
             );
         });
+
+        async function renderQuoteBanner(uid, quoteId) {
+            const bannerEl = $("#quoteBanner");
+            if (!bannerEl) return;
+
+            try {
+                const quoteDoc = await db().collection("users").doc(uid).collection("quotes").doc(quoteId).get();
+                if (!quoteDoc.exists) {
+                    bannerEl.style.display = 'none';
+                    return;
+                }
+
+                const quote = quoteDoc.data();
+                const bannerTextEl = bannerEl.querySelector('.quote-banner-text');
+                const bannerAuthorEl = bannerEl.querySelector('.quote-banner-author');
+
+                if (bannerTextEl) bannerTextEl.textContent = `“${quote.text}”`;
+                if (bannerAuthorEl) bannerAuthorEl.textContent = `— ${quote.bookTitle || 'A Book'}`;
+
+                bannerEl.style.display = 'block';
+            } catch (error) {
+                console.warn("Could not render quote banner:", error);
+                bannerEl.style.display = 'none';
+            }
+        }
 
         // ---------- quirks ----------
         function renderQuirks(quirks) {
@@ -1139,6 +1254,47 @@
                         addBtn.closest(".book-card")?.querySelector(".title")?.textContent || "This book";
                     await openAddToShelfForBook(auth().currentUser.uid, id, title);
                     return;
+                } else if (addBtn && !isMyProfile) {
+                    // This is the new logic for adding a friend's book to my library
+                    const bookDataStr = addBtn.dataset.bookData;
+                    if (!bookDataStr) return;
+
+                    addBtn.disabled = true;
+                    addBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Adding...`;
+
+                    try {
+                        const bookData = JSON.parse(bookDataStr);
+                        const payload = {
+                            title: bookData.title,
+                            author: bookData.author,
+                            coverUrl: bookData.coverUrl,
+                            coverDataUrl: bookData.coverDataUrl,
+                            workKey: bookData.workKey,
+                            subjects: bookData.subjects,
+                            pageCount: bookData.pageCount,
+                            genres: bookData.genres,
+                            moods: bookData.moods,
+                            tropes: bookData.tropes,
+                            format: bookData.format,
+                            spice: bookData.spice,
+                            status: 'tbr',
+                            statuses: ['tbr'],
+                        };
+
+                        if (!window.PBSync || !window.PBActivity) throw new Error("Core library features are not available.");
+
+                        const savedBook = await window.PBSync.saveBook(payload);
+                        await window.PBActivity.handleBookUpdate(savedBook.id, savedBook, null);
+
+                        addBtn.innerHTML = `✓ Added`;
+                        window.toast?.("Added to your library!");
+                    } catch (err) {
+                        console.error("Failed to add book from profile:", err);
+                        alert("Could not add book to your library.");
+                        addBtn.disabled = false;
+                        addBtn.innerHTML = `Add to Library`;
+                    }
+                    return;
                 }
 
                 const favBtn = e.target.closest("[data-action='fav']");
@@ -1183,8 +1339,8 @@
                     .get();
                 if (snap.empty) return;
                 const frag = document.createDocumentFragment();
-                snap.forEach(doc => {
-                    const card = createCardElement(doc, isMyProfile, { showActions: false });
+                snap.forEach((doc) => {
+                    const card = createCardElement(doc, isMyProfile, { showActions: !isMyProfile });
                     if (card) frag.appendChild(card);
                 });
                 grid.innerHTML = "";
@@ -1211,8 +1367,8 @@
                     .get();
                 if (snap.empty) return;
                 const frag = document.createDocumentFragment();
-                snap.forEach(doc => {
-                    const card = createCardElement(doc, isMyProfile, { showActions: false });
+                snap.forEach((doc) => {
+                    const card = createCardElement(doc, isMyProfile, { showActions: !isMyProfile });
                     if (card) frag.appendChild(card);
                 });
                 grid.innerHTML = "";
@@ -1268,8 +1424,8 @@
 
                 if (snap.empty) return;
                 const frag = document.createDocumentFragment();
-                snap.forEach(doc => {
-                    const card = createCardElement(doc, isMyProfile, { showActions: false });
+                snap.forEach((doc) => {
+                    const card = createCardElement(doc, isMyProfile, { showActions: !isMyProfile });
                     if (card) frag.appendChild(card);
                 });
                 grid.innerHTML = "";
@@ -1296,8 +1452,8 @@
                     .get();
                 if (snap.empty) return;
                 const frag = document.createDocumentFragment();
-                snap.forEach(doc => {
-                    const card = createCardElement(doc, isMyProfile, { showActions: false });
+                snap.forEach((doc) => {
+                    const card = createCardElement(doc, isMyProfile, { showActions: !isMyProfile });
                     if (card) frag.appendChild(card);
                 });
                 grid.innerHTML = "";
@@ -1308,6 +1464,217 @@
                 wireShelfGridActions(grid, isMyProfile, "wishlistShelf");
             } catch (e) {
                 console.warn("Wishlist load failed:", e);
+            }
+        }
+
+        // ---------- Mood Ring ----------
+        async function renderMoodRing(uid) {
+            const ringEl = $("#moodRing");
+            if (!ringEl) return;
+
+            const moodColors = {
+                "default": "#cccccc", "angsty": "#5D3A9B", "astonished": "#F5A623", "badass": "#D0021B",
+                "blissful": "#4A90E2", "cozy": "#F8E71C", "dreamy": "#BD10E0", "empowered": "#7ED321",
+                "funny": "#F5A623", "heartbroken": "#4A90E2", "hopeful": "#7ED321", "inspired": "#F8E71C",
+                "loved": "#F472B6", "moody": "#9B9B9B", "nostalgic": "#8B572A", "spicy": "#D0021B",
+                "thought-provoking": "#4A90E2", "whimsical": "#BD10E0", "sad": "#4A90E2", "shocked": "#F5A623",
+                "weird": "#BD10E0", "calm": "#4A90E2", "frightened": "#D0021B"
+            };
+
+            const getColorForMood = (moodStr) => {
+                const lowerMood = moodStr.toLowerCase();
+                for (const [key, color] of Object.entries(moodColors)) {
+                    if (lowerMood.includes(key)) return color;
+                }
+                return null;
+            };
+
+            try {
+                const booksSnap = await db().collection("users").doc(uid).collection("books")
+                    .where("status", "==", "reading")
+                    .orderBy("updatedAt", "desc")
+                    .limit(5)
+                    .get();
+
+                let recentMoods = [];
+                booksSnap.forEach(doc => {
+                    const book = doc.data();
+                    if (Array.isArray(book.moods)) recentMoods.push(...book.moods);
+                });
+
+                const uniqueMoods = [...new Set(recentMoods)];
+                const colors = uniqueMoods.map(getColorForMood).filter(Boolean).slice(0, 5);
+
+                if (colors.length === 0) {
+                    ringEl.classList.remove('visible');
+                    return;
+                }
+
+                const gradient = colors.length === 1
+                    ? colors[0]
+                    : `conic-gradient(from 90deg, ${colors.join(', ')}, ${colors[0]})`;
+
+                ringEl.style.background = gradient;
+                ringEl.classList.add('visible');
+
+            } catch (error) {
+                console.warn("Could not render mood ring:", error);
+            }
+        }
+
+        // ---------- Stats Snapshot & Goal Tracker ----------
+        async function renderStatsSnapshot(uid, streak) {
+            const container = $("#statsSnapshot");
+            if (!container) return;
+
+            try {
+                const currentYear = new Date().getFullYear();
+                const startOfYear = new Date(currentYear, 0, 1);
+
+                const booksSnap = await db().collection("users").doc(uid).collection("books")
+                    .where("status", "==", "finished")
+                    .where("finished", ">=", startOfYear)
+                    .get();
+
+                const finishedBooks = [];
+                booksSnap.forEach(doc => {
+                    if (doc.data().finished?.toDate().getFullYear() === currentYear) finishedBooks.push(doc.data());
+                });
+
+                const booksRead = finishedBooks.length;
+                const ratedBooks = finishedBooks.filter(b => (b.rating || 0) > 0);
+                const avgRating = ratedBooks.length > 0 ? (ratedBooks.reduce((sum, b) => sum + Number(b.rating), 0) / ratedBooks.length).toFixed(1) : "0.0";
+
+                $("#snapshotBooks").textContent = booksRead;
+                $("#snapshotStreak").textContent = streak;
+                $("#snapshotAvgRating").textContent = avgRating;
+                container.style.display = 'grid';
+            } catch (error) {
+                console.warn("Could not render stats snapshot:", error);
+                container.style.display = 'none';
+            }
+        }
+
+        async function displayYearlyGoalProgress(uid, isMy) {
+            const section = $("#readingGoalSection");
+            if (!section) return;
+
+            try {
+                const yearlyGoal = isMy
+                    ? parseInt(localStorage.getItem("pb:goal:yearly") || "12", 10)
+                    : parseInt(profileData?.yearlyGoal || 0, 10);
+
+                // If viewing a friend's profile and they have no goal set, hide the section.
+                if (!isMy && !yearlyGoal) {
+                    section.style.display = 'none';
+                    return;
+                }
+
+                const currentYear = new Date().getFullYear();
+                const startOfYear = new Date(currentYear, 0, 1);
+
+                const booksSnap = await db().collection("users").doc(uid).collection("books")
+                    .where("status", "==", "finished")
+                    .where("finished", ">=", startOfYear)
+                    .get();
+
+                let booksReadThisYear = 0;
+                booksSnap.forEach(doc => {
+                    if (doc.data().finished?.toDate().getFullYear() === currentYear) {
+                        booksReadThisYear++;
+                    }
+                });
+
+                const progressPercent = yearlyGoal > 0 ? Math.min(100, (booksReadThisYear / yearlyGoal) * 100) : 0;
+
+                const ring = $("#goalProgressRing");
+                const ringValue = $("#goalProgressValue");
+                const booksReadEl = $("#statsBooksRead");
+
+                if (ring) {
+                    const radius = ring.r.baseVal.value;
+                    const circumference = 2 * Math.PI * radius;
+                    ring.style.strokeDashoffset = circumference - (progressPercent / 100) * circumference;
+                }
+                if (ringValue) ringValue.textContent = `${Math.round(progressPercent)}%`;
+                if (booksReadEl) booksReadEl.textContent = booksReadThisYear;
+
+                section.style.display = 'grid';
+            } catch (error) {
+                console.warn("Failed to display yearly goal progress:", error);
+            }
+        }
+
+        async function calculateAndShowCompatibility(me, friend) {
+            const container = $("#compatibilityScore");
+            if (!container || !me || !friend) return;
+
+            // Helper to get top N items from a list of books
+            const getTopItems = (books, field, count) => {
+                const itemCounts = new Map();
+                books.forEach(book => {
+                    if (Array.isArray(book[field])) {
+                        book[field].forEach(item => {
+                            itemCounts.set(item, (itemCounts.get(item) || 0) + 1);
+                        });
+                    }
+                });
+                return Array.from(itemCounts.entries())
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, count)
+                    .map(entry => entry[0]);
+            };
+
+            try {
+                // 1. Fetch finished books for both users
+                const myBooksSnap = await db().collection("users").doc(me.uid).collection("books").where("status", "==", "finished").get();
+                const friendBooksSnap = await db().collection("users").doc(friend.uid).collection("books").where("status", "==", "finished").get();
+
+                const myBooks = myBooksSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+                const friendBooks = friendBooksSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+                // --- Ratings Score (50% weight) ---
+                const myRatedBooks = new Map(myBooks.filter(b => b.rating > 0).map(b => [b.workKey || b.title, b.rating]));
+                const friendRatedBooks = new Map(friendBooks.filter(b => b.rating > 0).map(b => [b.workKey || b.title, b.rating]));
+
+                let totalRatingSimilarity = 0;
+                let commonRatedBooks = 0;
+
+                myRatedBooks.forEach((myRating, key) => {
+                    if (friendRatedBooks.has(key)) {
+                        const friendRating = friendRatedBooks.get(key);
+                        const difference = Math.abs(myRating - friendRating);
+                        const similarity = 1 - (difference / 5); // 1 for same rating, 0 for 5-star diff
+                        totalRatingSimilarity += similarity;
+                        commonRatedBooks++;
+                    }
+                });
+
+                const ratingScore = commonRatedBooks > 0 ? (totalRatingSimilarity / commonRatedBooks) * 100 : 50;
+
+                // --- Moods Score (25% weight) ---
+                const myTopMoods = new Set(getTopItems(myBooks, 'moods', 5));
+                const friendTopMoods = new Set(getTopItems(friendBooks, 'moods', 5));
+                const commonMoods = [...myTopMoods].filter(mood => friendTopMoods.has(mood)).length;
+                const moodScore = (commonMoods / 5) * 100;
+
+                // --- Tropes Score (25% weight) ---
+                const myTopTropes = new Set(getTopItems(myBooks, 'tropes', 5));
+                const friendTopTropes = new Set(getTopItems(friendBooks, 'tropes', 5));
+                const commonTropes = [...myTopTropes].filter(trope => friendTopTropes.has(trope)).length;
+                const tropeScore = (commonTropes / 5) * 100;
+
+                // --- Final Score ---
+                const finalScore = Math.round((ratingScore * 0.5) + (moodScore * 0.25) + (tropeScore * 0.25));
+
+                // --- Update DOM ---
+                $("#compFriendName").textContent = friend.displayName.split(' ')[0];
+                $(".score-value", container).textContent = `${finalScore}%`;
+                $(".score-breakdown", container).innerHTML = `<div class="breakdown-item">Ratings: ${Math.round(ratingScore)}%</div><div class="breakdown-item">Moods: ${Math.round(moodScore)}%</div><div class="breakdown-item">Tropes: ${Math.round(tropeScore)}%</div>`;
+                container.style.display = 'block';
+            } catch (error) {
+                console.warn("Could not calculate compatibility score:", error);
+                container.style.display = 'none';
             }
         }
 
